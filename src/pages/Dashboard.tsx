@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   QrCode,
   Plus,
@@ -46,6 +46,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 // Types
 interface Item {
@@ -54,12 +56,20 @@ interface Item {
   type: "url" | "text" | "pdf" | "image" | "video" | "audio";
   content: string;
   selected: boolean;
+  category_id: string;
+  display_order: number;
 }
 
 interface Category {
   id: string;
   name: string;
   items: Item[];
+  display_order: number;
+}
+
+interface Profile {
+  display_name: string | null;
+  bio: string | null;
 }
 
 const itemTypeIcons = {
@@ -72,24 +82,13 @@ const itemTypeIcons = {
 };
 
 const Dashboard = () => {
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: "1",
-      name: "Social Links",
-      items: [
-        { id: "1-1", title: "Twitter", type: "url", content: "https://twitter.com/johndoe", selected: false },
-        { id: "1-2", title: "LinkedIn", type: "url", content: "https://linkedin.com/in/johndoe", selected: false },
-      ],
-    },
-    {
-      id: "2",
-      name: "Portfolio",
-      items: [
-        { id: "2-1", title: "Website", type: "url", content: "https://johndoe.com", selected: false },
-        { id: "2-2", title: "Resume", type: "pdf", content: "resume.pdf", selected: false },
-      ],
-    },
-  ]);
+  const navigate = useNavigate();
+  const { user, signOut, loading: authLoading } = useAuth();
+  
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -97,106 +96,229 @@ const Dashboard = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: "", type: "url" as Item["type"], content: "" });
 
-  const handleAddCategory = () => {
-    if (!newCategoryName.trim()) {
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user && !authLoading) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  // Fetch profile and data
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  const fetchData = async () => {
+    if (!user) return;
+    
+    try {
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("display_name, bio")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      setProfile(profileData);
+
+      // Fetch categories with items
+      const { data: categoriesData, error: catError } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("display_order", { ascending: true });
+
+      if (catError) throw catError;
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("items")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("display_order", { ascending: true });
+
+      if (itemsError) throw itemsError;
+
+      // Combine categories with their items
+      const categoriesWithItems = (categoriesData || []).map((cat) => ({
+        ...cat,
+        items: (itemsData || [])
+          .filter((item) => item.category_id === cat.id)
+          .map((item) => ({ ...item, selected: selectedItems.has(item.id) })),
+      }));
+
+      setCategories(categoriesWithItems);
+    } catch (error: any) {
+      toast.error("Failed to load data");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim() || !user) {
       toast.error("Please enter a category name");
       return;
     }
-    
-    const exists = categories.some(c => c.name.toLowerCase() === newCategoryName.toLowerCase());
-    if (exists) {
-      toast.error("Category already exists");
-      return;
-    }
 
-    setCategories([...categories, { id: Date.now().toString(), name: newCategoryName, items: [] }]);
-    setNewCategoryName("");
-    setIsAddCategoryOpen(false);
-    toast.success("Category created!");
+    try {
+      const { data, error } = await supabase
+        .from("categories")
+        .insert({
+          user_id: user.id,
+          name: newCategoryName.trim(),
+          display_order: categories.length,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("Category already exists");
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setCategories([...categories, { ...data, items: [] }]);
+      setNewCategoryName("");
+      setIsAddCategoryOpen(false);
+      toast.success("Category created!");
+    } catch (error: any) {
+      toast.error("Failed to create category");
+    }
   };
 
-  const handleAddItem = () => {
-    if (!selectedCategoryId || !newItem.title.trim() || !newItem.content.trim()) {
+  const handleAddItem = async () => {
+    if (!selectedCategoryId || !newItem.title.trim() || !newItem.content.trim() || !user) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    setCategories(categories.map(cat => {
-      if (cat.id === selectedCategoryId) {
-        const exists = cat.items.some(i => i.title.toLowerCase() === newItem.title.toLowerCase());
-        if (exists) {
-          toast.error("Item with this title already exists in this category");
+    const category = categories.find((c) => c.id === selectedCategoryId);
+    if (!category) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("items")
+        .insert({
+          user_id: user.id,
+          category_id: selectedCategoryId,
+          title: newItem.title.trim(),
+          type: newItem.type,
+          content: newItem.content.trim(),
+          display_order: category.items.length,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCategories(
+        categories.map((cat) => {
+          if (cat.id === selectedCategoryId) {
+            return { ...cat, items: [...cat.items, { ...data, selected: false }] };
+          }
           return cat;
-        }
-        return {
-          ...cat,
-          items: [...cat.items, { id: Date.now().toString(), ...newItem, selected: false }],
-        };
-      }
-      return cat;
-    }));
-    
-    setNewItem({ title: "", type: "url", content: "" });
-    setIsAddItemOpen(false);
-    toast.success("Item added!");
+        })
+      );
+
+      setNewItem({ title: "", type: "url", content: "" });
+      setSelectedCategoryId(null);
+      setIsAddItemOpen(false);
+      toast.success("Item added!");
+    } catch (error: any) {
+      toast.error("Failed to add item");
+    }
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    setCategories(categories.filter(c => c.id !== categoryId));
-    toast.success("Category deleted");
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      const { error } = await supabase.from("categories").delete().eq("id", categoryId);
+      if (error) throw error;
+
+      setCategories(categories.filter((c) => c.id !== categoryId));
+      toast.success("Category deleted");
+    } catch (error: any) {
+      toast.error("Failed to delete category");
+    }
   };
 
-  const handleDeleteItem = (categoryId: string, itemId: string) => {
-    setCategories(categories.map(cat => {
-      if (cat.id === categoryId) {
-        return { ...cat, items: cat.items.filter(i => i.id !== itemId) };
-      }
-      return cat;
-    }));
-    toast.success("Item deleted");
+  const handleDeleteItem = async (categoryId: string, itemId: string) => {
+    try {
+      const { error } = await supabase.from("items").delete().eq("id", itemId);
+      if (error) throw error;
+
+      setCategories(
+        categories.map((cat) => {
+          if (cat.id === categoryId) {
+            return { ...cat, items: cat.items.filter((i) => i.id !== itemId) };
+          }
+          return cat;
+        })
+      );
+      
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+      
+      toast.success("Item deleted");
+    } catch (error: any) {
+      toast.error("Failed to delete item");
+    }
   };
 
-  const toggleItemSelection = (categoryId: string, itemId: string) => {
-    setCategories(categories.map(cat => {
-      if (cat.id === categoryId) {
-        return {
-          ...cat,
-          items: cat.items.map(item => 
-            item.id === itemId ? { ...item, selected: !item.selected } : item
-          ),
-        };
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
       }
-      return cat;
-    }));
+      return next;
+    });
   };
 
   const selectAll = () => {
-    setCategories(categories.map(cat => ({
-      ...cat,
-      items: cat.items.map(item => ({ ...item, selected: true })),
-    })));
+    const allItemIds = categories.flatMap((cat) => cat.items.map((item) => item.id));
+    setSelectedItems(new Set(allItemIds));
   };
 
   const deselectAll = () => {
-    setCategories(categories.map(cat => ({
-      ...cat,
-      items: cat.items.map(item => ({ ...item, selected: false })),
-    })));
+    setSelectedItems(new Set());
   };
 
-  const selectedCount = categories.reduce(
-    (acc, cat) => acc + cat.items.filter(i => i.selected).length, 
-    0
-  );
-
   const handleGenerateQR = () => {
-    if (selectedCount === 0) {
+    if (selectedItems.size === 0) {
       toast.error("Please select at least one item");
       return;
     }
-    toast.success(`Generating QR code with ${selectedCount} items...`);
-    // Navigate to QR generation page
+    // Store selected items and navigate to QR generator
+    const itemIds = Array.from(selectedItems);
+    navigate(`/qr?items=${itemIds.join(",")}`);
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const displayName = profile?.display_name || user?.email?.split("@")[0] || "User";
+  const userInitials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -206,12 +328,14 @@ const Dashboard = () => {
           <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
             <QrCode className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-foreground">Connect<span className="text-gradient-primary">HUB</span></span>
+          <span className="text-xl font-bold text-foreground">
+            Connect<span className="text-gradient-primary">HUB</span>
+          </span>
         </div>
 
         <nav className="flex-1 space-y-2">
           <SidebarLink icon={<Folder />} label="My Profile" active />
-          <SidebarLink icon={<QrCode />} label="QR Codes" />
+          <SidebarLink icon={<QrCode />} label="QR Codes" onClick={() => navigate("/qr-list")} />
           <SidebarLink icon={<Settings />} label="Settings" />
         </nav>
 
@@ -220,11 +344,11 @@ const Dashboard = () => {
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-sidebar-accent transition-colors">
                 <div className="w-9 h-9 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                  JD
+                  {userInitials}
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-sidebar-foreground">John Doe</p>
-                  <p className="text-xs text-muted-foreground">john@example.com</p>
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -238,7 +362,7 @@ const Dashboard = () => {
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
               </DropdownMenuItem>
@@ -267,15 +391,14 @@ const Dashboard = () => {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Create New Category</DialogTitle>
-                    <DialogDescription>
-                      Add a new category to organize your items.
-                    </DialogDescription>
+                    <DialogDescription>Add a new category to organize your items.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
                     <Input
                       placeholder="Category name"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
                     />
                     <Button onClick={handleAddCategory} className="w-full">
                       Create Category
@@ -294,9 +417,7 @@ const Dashboard = () => {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Item</DialogTitle>
-                    <DialogDescription>
-                      Add a new item to one of your categories.
-                    </DialogDescription>
+                    <DialogDescription>Add a new item to one of your categories.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
                     <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
@@ -304,8 +425,10 @@ const Dashboard = () => {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -314,7 +437,10 @@ const Dashboard = () => {
                       value={newItem.title}
                       onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
                     />
-                    <Select value={newItem.type} onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"] })}>
+                    <Select
+                      value={newItem.type}
+                      onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"] })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -349,7 +475,7 @@ const Dashboard = () => {
           >
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
-                <span className="text-primary font-semibold">{selectedCount}</span> items selected
+                <span className="text-primary font-semibold">{selectedItems.size}</span> items selected
               </span>
               <Button variant="ghost" size="sm" onClick={selectAll}>
                 Select All
@@ -358,7 +484,7 @@ const Dashboard = () => {
                 Deselect All
               </Button>
             </div>
-            <Button onClick={handleGenerateQR} disabled={selectedCount === 0}>
+            <Button onClick={handleGenerateQR} disabled={selectedItems.size === 0}>
               <QrCode className="w-4 h-4 mr-2" />
               Generate QR Code
             </Button>
@@ -413,7 +539,7 @@ const Dashboard = () => {
                               <Edit2 className="w-4 h-4 mr-2" />
                               Rename
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDeleteCategory(category.id)}
                             >
@@ -425,19 +551,20 @@ const Dashboard = () => {
                       </CardHeader>
                       <CardContent className="p-0">
                         {category.items.length === 0 ? (
-                          <div className="p-8 text-center text-muted-foreground">
-                            No items in this category yet.
-                          </div>
+                          <div className="p-8 text-center text-muted-foreground">No items in this category yet.</div>
                         ) : (
                           <ul className="divide-y divide-border/50">
                             {category.items.map((item) => {
                               const Icon = itemTypeIcons[item.type];
                               return (
-                                <li key={item.id} className="flex items-center gap-4 p-4 hover:bg-secondary/20 transition-colors">
+                                <li
+                                  key={item.id}
+                                  className="flex items-center gap-4 p-4 hover:bg-secondary/20 transition-colors"
+                                >
                                   <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
                                   <Checkbox
-                                    checked={item.selected}
-                                    onCheckedChange={() => toggleItemSelection(category.id, item.id)}
+                                    checked={selectedItems.has(item.id)}
+                                    onCheckedChange={() => toggleItemSelection(item.id)}
                                   />
                                   <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
                                     <Icon className="w-4 h-4 text-muted-foreground" />
@@ -460,7 +587,7 @@ const Dashboard = () => {
                                         <Edit2 className="w-4 h-4 mr-2" />
                                         Edit
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem 
+                                      <DropdownMenuItem
                                         className="text-destructive"
                                         onClick={() => handleDeleteItem(category.id, item.id)}
                                       >
@@ -487,12 +614,21 @@ const Dashboard = () => {
   );
 };
 
-const SidebarLink = ({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }) => (
+const SidebarLink = ({
+  icon,
+  label,
+  active = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) => (
   <button
+    onClick={onClick}
     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-      active 
-        ? "bg-sidebar-accent text-sidebar-primary" 
-        : "text-sidebar-foreground hover:bg-sidebar-accent"
+      active ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground hover:bg-sidebar-accent"
     }`}
   >
     <span className={active ? "text-sidebar-primary" : "text-muted-foreground"}>{icon}</span>

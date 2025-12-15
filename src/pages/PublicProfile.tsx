@@ -1,35 +1,155 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock public profile data
-const publicProfile = {
-  name: "John Doe",
-  bio: "Digital Creator & Developer",
-  categories: [
-    {
-      name: "Social Links",
-      items: [
-        { title: "Twitter", type: "url", content: "https://twitter.com/johndoe" },
-        { title: "LinkedIn", type: "url", content: "https://linkedin.com/in/johndoe" },
-      ],
-    },
-    {
-      name: "Portfolio",
-      items: [
-        { title: "Website", type: "url", content: "https://johndoe.com" },
-      ],
-    },
-  ],
+interface ProfileItem {
+  id: string;
+  title: string;
+  type: string;
+  content: string;
+  category_name: string;
+}
+
+interface ProfileData {
+  display_name: string | null;
+  bio: string | null;
+}
+
+const typeIcons: Record<string, React.ComponentType<any>> = {
+  url: LinkIcon,
+  text: FileText,
+  pdf: File,
+  image: Image,
+  video: Video,
+  audio: Music,
 };
 
 const PublicProfile = () => {
-  const handleItemClick = (item: { type: string; content: string }) => {
-    if (item.type === "url") {
-      window.open(item.content, "_blank");
+  const { profileId } = useParams<{ profileId: string }>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [items, setItems] = useState<ProfileItem[]>([]);
+
+  useEffect(() => {
+    if (profileId) {
+      fetchPublicProfile();
+    }
+  }, [profileId]);
+
+  const fetchPublicProfile = async () => {
+    try {
+      // Fetch QR page
+      const { data: qrPage, error: qrError } = await supabase
+        .from("qr_pages")
+        .select(`
+          id,
+          user_id,
+          title
+        `)
+        .eq("public_id", profileId)
+        .maybeSingle();
+
+      if (qrError) throw qrError;
+
+      if (!qrPage) {
+        setError("Profile not found");
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch profile of the owner
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("display_name, bio")
+        .eq("user_id", qrPage.user_id)
+        .maybeSingle();
+
+      setProfile(profileData);
+
+      // Fetch items associated with this QR page
+      const { data: qrPageItems, error: itemsError } = await supabase
+        .from("qr_page_items")
+        .select(`
+          display_order,
+          items (
+            id,
+            title,
+            type,
+            content,
+            categories (name)
+          )
+        `)
+        .eq("qr_page_id", qrPage.id)
+        .order("display_order", { ascending: true });
+
+      if (itemsError) throw itemsError;
+
+      const formattedItems = (qrPageItems || []).map((qpItem: any) => ({
+        id: qpItem.items.id,
+        title: qpItem.items.title,
+        type: qpItem.items.type,
+        content: qpItem.items.content,
+        category_name: qpItem.items.categories?.name || "Unknown",
+      }));
+
+      setItems(formattedItems);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load profile");
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const handleItemClick = (item: ProfileItem) => {
+    if (item.type === "url") {
+      window.open(item.content, "_blank");
+    } else if (item.type === "text") {
+      // Could show in a modal
+      navigator.clipboard.writeText(item.content);
+    }
+  };
+
+  // Group items by category
+  const groupedItems = items.reduce((acc, item) => {
+    if (!acc[item.category_name]) {
+      acc[item.category_name] = [];
+    }
+    acc[item.category_name].push(item);
+    return acc;
+  }, {} as Record<string, ProfileItem[]>);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
+        <Card className="max-w-md text-center p-8">
+          <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-bold mb-2">{error}</h2>
+          <p className="text-muted-foreground mb-6">
+            This profile link may be invalid or expired.
+          </p>
+          <Button asChild>
+            <a href="/">Create Your Own Profile</a>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const displayName = profile?.display_name || "User";
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
@@ -59,61 +179,64 @@ const PublicProfile = () => {
             transition={{ delay: 0.2 }}
             className="text-2xl font-bold text-foreground mb-1"
           >
-            {publicProfile.name}
+            {displayName}
           </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-muted-foreground"
-          >
-            {publicProfile.bio}
-          </motion.p>
+          {profile?.bio && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-muted-foreground"
+            >
+              {profile.bio}
+            </motion.p>
+          )}
         </div>
 
         {/* Categories & Items */}
         <div className="space-y-6">
-          {publicProfile.categories.map((category, catIndex) => (
+          {Object.entries(groupedItems).map(([categoryName, categoryItems], catIndex) => (
             <motion.div
-              key={category.name}
+              key={categoryName}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + catIndex * 0.1 }}
             >
               <h3 className="text-sm font-medium text-muted-foreground mb-3 px-1">
-                {category.name}
+                {categoryName}
               </h3>
               <div className="space-y-2">
-                {category.items.map((item, itemIndex) => (
-                  <motion.div
-                    key={item.title}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + catIndex * 0.1 + itemIndex * 0.05 }}
-                  >
-                    <Card 
-                      className="cursor-pointer hover:border-primary/50 hover:shadow-glow transition-all group"
-                      onClick={() => handleItemClick(item)}
+                {categoryItems.map((item, itemIndex) => {
+                  const Icon = typeIcons[item.type] || LinkIcon;
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 + catIndex * 0.1 + itemIndex * 0.05 }}
                     >
-                      <CardContent className="flex items-center gap-4 p-4">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                          {item.type === "url" ? (
-                            <LinkIcon className="w-5 h-5 text-primary" />
-                          ) : (
-                            <FileText className="w-5 h-5 text-primary" />
+                      <Card
+                        className="cursor-pointer hover:border-primary/50 hover:shadow-glow transition-all group"
+                        onClick={() => handleItemClick(item)}
+                      >
+                        <CardContent className="flex items-center gap-4 p-4">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <Icon className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground">{item.title}</p>
+                            {item.type === "url" && (
+                              <p className="text-sm text-muted-foreground truncate">{item.content}</p>
+                            )}
+                          </div>
+                          {item.type === "url" && (
+                            <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                           )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground">{item.title}</p>
-                          <p className="text-sm text-muted-foreground truncate">{item.content}</p>
-                        </div>
-                        {item.type === "url" && (
-                          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           ))}
