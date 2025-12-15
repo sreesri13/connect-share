@@ -1,31 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useSearchParams, Link } from "react-router-dom";
-import { QrCode, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { QrCode, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user, signUp, signIn, loading: authLoading } = useAuth();
+  
   const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate("/dashboard");
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate auth - will be replaced with Supabase
-    setTimeout(() => {
+
+    try {
+      if (isSignUp) {
+        const { error } = await signUp(email, password, displayName || undefined);
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast.error("This email is already registered. Please sign in instead.");
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success("Account created! Redirecting to dashboard...");
+          navigate("/dashboard");
+        }
+      } else {
+        const { error } = await signIn(email, password);
+        if (error) {
+          if (error.message.includes("Invalid login")) {
+            toast.error("Invalid email or password. Please try again.");
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success("Welcome back!");
+          navigate("/dashboard");
+        }
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
       setIsLoading(false);
-      toast.success(isSignUp ? "Account created! Please check your email." : "Welcome back!");
-      // Navigate to dashboard after auth
-    }, 1000);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6 overflow-hidden">
@@ -63,6 +108,25 @@ const AuthPage = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <label htmlFor="displayName" className="text-sm font-medium text-foreground">
+                    Display Name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="displayName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email

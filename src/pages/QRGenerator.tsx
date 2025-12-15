@@ -1,27 +1,137 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock selected items for demo
-const selectedItems = [
-  { id: "1", categoryName: "Social Links", title: "Twitter", type: "url", content: "https://twitter.com/johndoe" },
-  { id: "2", categoryName: "Social Links", title: "LinkedIn", type: "url", content: "https://linkedin.com/in/johndoe" },
-  { id: "3", categoryName: "Portfolio", title: "Website", type: "url", content: "https://johndoe.com" },
-];
+interface ItemWithCategory {
+  id: string;
+  title: string;
+  type: string;
+  content: string;
+  category_name: string;
+}
 
 const QRGenerator = () => {
   const navigate = useNavigate();
-  const [copied, setCopied] = useState(false);
+  const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   
-  // Generate a unique public URL for this QR
-  const publicUrl = `${window.location.origin}/p/demo123`;
+  const [copied, setCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<ItemWithCategory[]>([]);
+  const [qrPageId, setQrPageId] = useState<string | null>(null);
+  const [qrTitle, setQrTitle] = useState("");
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user && !authLoading) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  // Fetch selected items
+  useEffect(() => {
+    const itemIds = searchParams.get("items")?.split(",") || [];
+    if (itemIds.length > 0 && user) {
+      fetchItems(itemIds);
+    } else {
+      setIsLoading(false);
+    }
+  }, [searchParams, user]);
+
+  const fetchItems = async (itemIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from("items")
+        .select(`
+          id,
+          title,
+          type,
+          content,
+          categories (name)
+        `)
+        .in("id", itemIds);
+
+      if (error) throw error;
+
+      const itemsWithCategory = (data || []).map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        content: item.content,
+        category_name: item.categories?.name || "Unknown",
+      }));
+
+      setSelectedItems(itemsWithCategory);
+    } catch (error) {
+      toast.error("Failed to load items");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generatePublicId = () => {
+    return Math.random().toString(36).substring(2, 10);
+  };
+
+  const handleSaveQR = async () => {
+    if (!user || selectedItems.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      const publicId = generatePublicId();
+
+      // Create QR page
+      const { data: qrPage, error: qrError } = await supabase
+        .from("qr_pages")
+        .insert({
+          user_id: user.id,
+          public_id: publicId,
+          title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
+        })
+        .select()
+        .single();
+
+      if (qrError) throw qrError;
+
+      // Add items to QR page
+      const qrPageItems = selectedItems.map((item, index) => ({
+        qr_page_id: qrPage.id,
+        item_id: item.id,
+        display_order: index,
+      }));
+
+      const { error: itemsError } = await supabase.from("qr_page_items").insert(qrPageItems);
+
+      if (itemsError) throw itemsError;
+
+      setQrPageId(publicId);
+      toast.success("QR code saved successfully!");
+    } catch (error: any) {
+      toast.error("Failed to save QR code");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const publicUrl = qrPageId 
+    ? `${window.location.origin}/p/${qrPageId}` 
+    : `${window.location.origin}/p/preview`;
 
   const handleCopyUrl = () => {
+    if (!qrPageId) {
+      toast.error("Please save the QR code first");
+      return;
+    }
     navigator.clipboard.writeText(publicUrl);
     setCopied(true);
     toast.success("URL copied to clipboard!");
@@ -35,31 +145,54 @@ const QRGenerator = () => {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       const img = new window.Image();
-      
+
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
         ctx?.drawImage(img, 0, 0);
         const pngFile = canvas.toDataURL("image/png");
         const downloadLink = document.createElement("a");
-        downloadLink.download = "connecthub-qr.png";
+        downloadLink.download = `connecthub-qr-${qrPageId || "preview"}.png`;
         downloadLink.href = pngFile;
         downloadLink.click();
         toast.success("QR code downloaded!");
       };
-      
+
       img.src = "data:image/svg+xml;base64," + btoa(svgData);
     }
   };
 
   // Group items by category
   const groupedItems = selectedItems.reduce((acc, item) => {
-    if (!acc[item.categoryName]) {
-      acc[item.categoryName] = [];
+    if (!acc[item.category_name]) {
+      acc[item.category_name] = [];
     }
-    acc[item.categoryName].push(item);
+    acc[item.category_name].push(item);
     return acc;
-  }, {} as Record<string, typeof selectedItems>);
+  }, {} as Record<string, ItemWithCategory[]>);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (selectedItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
+        <Card className="max-w-md text-center p-8">
+          <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-bold mb-2">No items selected</h2>
+          <p className="text-muted-foreground mb-6">
+            Go back to your dashboard and select items to generate a QR code.
+          </p>
+          <Button onClick={() => navigate("/dashboard")}>Go to Dashboard</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero p-6 md:p-12">
@@ -75,11 +208,11 @@ const QRGenerator = () => {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-4 mb-8"
         >
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Your QR Code</h1>
+            <h1 className="text-3xl font-bold text-foreground">Generate QR Code</h1>
             <p className="text-muted-foreground">Share your selected content with a single scan</p>
           </div>
         </motion.div>
@@ -93,7 +226,7 @@ const QRGenerator = () => {
           >
             <Card className="overflow-hidden">
               <CardHeader className="text-center">
-                <CardTitle>Scan to View</CardTitle>
+                <CardTitle>Your QR Code</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-6 pb-8">
                 <div className="p-6 bg-foreground rounded-2xl shadow-elevated">
@@ -108,32 +241,56 @@ const QRGenerator = () => {
                   />
                 </div>
 
-                <div className="w-full space-y-3">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border">
-                    <input
-                      type="text"
-                      value={publicUrl}
-                      readOnly
-                      className="flex-1 bg-transparent text-sm text-foreground outline-none"
+                {!qrPageId && (
+                  <div className="w-full space-y-3">
+                    <Input
+                      placeholder="QR Code title (optional)"
+                      value={qrTitle}
+                      onChange={(e) => setQrTitle(e.target.value)}
                     />
-                    <Button variant="ghost" size="sm" onClick={handleCopyUrl}>
-                      {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                    <Button onClick={handleSaveQR} className="w-full" disabled={isSaving}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                          Saving...
+                        </span>
+                      ) : (
+                        "Save QR Code"
+                      )}
                     </Button>
                   </div>
+                )}
 
-                  <div className="flex gap-3">
-                    <Button variant="outline" className="flex-1" onClick={handleDownloadQR}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button variant="default" className="flex-1" asChild>
-                      <Link to="/p/demo123" target="_blank">
+                {qrPageId && (
+                  <div className="w-full space-y-3">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border">
+                      <input
+                        type="text"
+                        value={publicUrl}
+                        readOnly
+                        className="flex-1 bg-transparent text-sm text-foreground outline-none"
+                      />
+                      <Button variant="ghost" size="sm" onClick={handleCopyUrl}>
+                        {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button variant="outline" className="flex-1" onClick={handleDownloadQR}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                      <Button
+                        variant="default"
+                        className="flex-1"
+                        onClick={() => window.open(publicUrl, "_blank")}
+                      >
                         <ExternalLink className="w-4 h-4 mr-2" />
                         Preview
-                      </Link>
-                    </Button>
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -148,16 +305,19 @@ const QRGenerator = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Share2 className="w-5 h-5 text-primary" />
-                  Shared Content
+                  Shared Content ({selectedItems.length} items)
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 max-h-[500px] overflow-y-auto">
                 {Object.entries(groupedItems).map(([categoryName, items]) => (
                   <div key={categoryName} className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground">{categoryName}</h4>
                     <ul className="space-y-2">
                       {items.map((item) => (
-                        <li key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30">
+                        <li
+                          key={item.id}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30"
+                        >
                           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
                             <QrCode className="w-4 h-4 text-primary" />
                           </div>
@@ -173,12 +333,6 @@ const QRGenerator = () => {
                     </ul>
                   </div>
                 ))}
-
-                <div className="pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Anyone with this QR code can view {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
               </CardContent>
             </Card>
           </motion.div>

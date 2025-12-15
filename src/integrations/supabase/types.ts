@@ -14,7 +14,167 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      items: {
+        Row: {
+          category_id: string
+          content: string
+          created_at: string
+          display_order: number
+          id: string
+          title: string
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          content: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          title: string
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          content?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["item_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      qr_page_items: {
+        Row: {
+          display_order: number
+          id: string
+          item_id: string
+          qr_page_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          item_id: string
+          qr_page_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          item_id?: string
+          qr_page_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_page_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_page_items_qr_page_id_fkey"
+            columns: ["qr_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_pages: {
+        Row: {
+          created_at: string
+          id: string
+          public_id: string
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          public_id: string
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          public_id?: string
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +183,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      item_type: "url" | "text" | "pdf" | "image" | "video" | "audio"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +310,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      item_type: ["url", "text", "pdf", "image", "video", "audio"],
+    },
   },
 } as const
