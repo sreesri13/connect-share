@@ -125,20 +125,14 @@ const QRGenerator = () => {
 
   const publicUrl = qrPageId 
     ? `${window.location.origin}/p/${qrPageId}` 
-    : `${window.location.origin}/p/preview`;
-
-  const handleCopyUrl = () => {
+    : "";
+  
+  const handleDownloadQR = () => {
     if (!qrPageId) {
       toast.error("Please save the QR code first");
       return;
     }
-    navigator.clipboard.writeText(publicUrl);
-    setCopied(true);
-    toast.success("URL copied to clipboard!");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleDownloadQR = () => {
+    
     const svg = document.querySelector("#qr-code-svg");
     if (svg) {
       const svgData = new XMLSerializer().serializeToString(svg);
@@ -152,15 +146,28 @@ const QRGenerator = () => {
         ctx?.drawImage(img, 0, 0);
         const pngFile = canvas.toDataURL("image/png");
         const downloadLink = document.createElement("a");
-        downloadLink.download = `connecthub-qr-${qrPageId || "preview"}.png`;
+        downloadLink.download = `connecthub-qr-${qrPageId}.png`;
         downloadLink.href = pngFile;
         downloadLink.click();
         toast.success("QR code downloaded!");
       };
 
-      img.src = "data:image/svg+xml;base64," + btoa(svgData);
+      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
     }
   };
+
+  const handleCopyUrl = () => {
+    if (!qrPageId) {
+      toast.error("Please save the QR code first");
+      return;
+    }
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    toast.success("URL copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // handleDownloadQR is now defined above
 
   // Group items by category
   const groupedItems = selectedItems.reduce((acc, item) => {
@@ -229,17 +236,26 @@ const QRGenerator = () => {
                 <CardTitle>Your QR Code</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-6 pb-8">
-                <div className="p-6 bg-foreground rounded-2xl shadow-elevated">
-                  <QRCodeSVG
-                    id="qr-code-svg"
-                    value={publicUrl}
-                    size={200}
-                    level="H"
-                    includeMargin
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                  />
-                </div>
+                {qrPageId ? (
+                  <div className="p-6 bg-foreground rounded-2xl shadow-elevated">
+                    <QRCodeSVG
+                      id="qr-code-svg"
+                      value={publicUrl}
+                      size={200}
+                      level="H"
+                      includeMargin
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-6 bg-secondary/50 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center w-[232px] h-[232px]">
+                    <QrCode className="w-16 h-16 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground text-center">
+                      Click "Generate QR Code" to create your shareable link
+                    </p>
+                  </div>
+                )}
 
                 {!qrPageId && (
                   <div className="w-full space-y-3">
@@ -252,10 +268,13 @@ const QRGenerator = () => {
                       {isSaving ? (
                         <span className="flex items-center gap-2">
                           <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                          Saving...
+                          Generating...
                         </span>
                       ) : (
-                        "Save QR Code"
+                        <>
+                          <QrCode className="w-4 h-4 mr-2" />
+                          Generate QR Code
+                        </>
                       )}
                     </Button>
                   </div>
