@@ -8,6 +8,7 @@ import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import QRGenerator from "./pages/QRGenerator";
+import QRCodesList from "./pages/QRCodesList";
 import PublicProfile from "./pages/PublicProfile";
 import DemoPage from "./pages/DemoPage";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/qr" element={<QRGenerator />} />
+            <Route path="/qr-list" element={<QRCodesList />} />
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/p/:profileId" element={<PublicProfile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
