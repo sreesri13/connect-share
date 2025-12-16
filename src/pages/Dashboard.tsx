@@ -48,6 +48,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { FileUpload } from "@/components/FileUpload";
 
 // Types
 interface Item {
@@ -414,7 +415,7 @@ const Dashboard = () => {
                     Add Item
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                   <DialogHeader>
                     <DialogTitle>Add New Item</DialogTitle>
                     <DialogDescription>Add a new item to one of your categories.</DialogDescription>
@@ -439,7 +440,7 @@ const Dashboard = () => {
                     />
                     <Select
                       value={newItem.type}
-                      onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"] })}
+                      onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"], content: "" })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -453,12 +454,24 @@ const Dashboard = () => {
                         <SelectItem value="audio">Audio (MP3)</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Input
-                      placeholder={newItem.type === "url" ? "https://..." : "Content or file path"}
-                      value={newItem.content}
-                      onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
-                    />
-                    <Button onClick={handleAddItem} className="w-full">
+                    
+                    {/* Show FileUpload for file types, Input for url/text */}
+                    {["pdf", "image", "video", "audio"].includes(newItem.type) ? (
+                      <FileUpload
+                        type={newItem.type as "pdf" | "image" | "video" | "audio"}
+                        userId={user?.id || ""}
+                        value={newItem.content}
+                        onUploadComplete={(url) => setNewItem({ ...newItem, content: url })}
+                      />
+                    ) : (
+                      <Input
+                        placeholder={newItem.type === "url" ? "https://..." : "Enter text content"}
+                        value={newItem.content}
+                        onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
+                      />
+                    )}
+                    
+                    <Button onClick={handleAddItem} className="w-full" disabled={!newItem.content}>
                       Add Item
                     </Button>
                   </div>
