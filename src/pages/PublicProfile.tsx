@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2 } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, X, Download, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ProfileItem {
@@ -34,6 +35,7 @@ const PublicProfile = () => {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [items, setItems] = useState<ProfileItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
 
   useEffect(() => {
     if (profileId) {
@@ -110,9 +112,24 @@ const PublicProfile = () => {
     if (item.type === "url") {
       window.open(item.content, "_blank");
     } else if (item.type === "text") {
-      // Could show in a modal
       navigator.clipboard.writeText(item.content);
+    } else if (item.type === "pdf") {
+      // Open PDF in new tab
+      window.open(item.content, "_blank");
+    } else if (["image", "video", "audio"].includes(item.type)) {
+      // Open modal for media preview
+      setSelectedItem(item);
     }
+  };
+
+  const handleDownload = (item: ProfileItem) => {
+    const link = document.createElement("a");
+    link.href = item.content;
+    link.download = item.title;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Group items by category
@@ -208,6 +225,7 @@ const PublicProfile = () => {
               <div className="space-y-2">
                 {categoryItems.map((item, itemIndex) => {
                   const Icon = typeIcons[item.type] || LinkIcon;
+                  const isMedia = ["image", "video", "audio", "pdf"].includes(item.type);
                   return (
                     <motion.div
                       key={item.id}
@@ -228,9 +246,21 @@ const PublicProfile = () => {
                             {item.type === "url" && (
                               <p className="text-sm text-muted-foreground truncate">{item.content}</p>
                             )}
+                            {item.type === "text" && (
+                              <p className="text-sm text-muted-foreground">Click to copy</p>
+                            )}
+                            {isMedia && item.type !== "pdf" && (
+                              <p className="text-sm text-muted-foreground">Click to view</p>
+                            )}
+                            {item.type === "pdf" && (
+                              <p className="text-sm text-muted-foreground">Click to open PDF</p>
+                            )}
                           </div>
-                          {item.type === "url" && (
+                          {(item.type === "url" || item.type === "pdf") && (
                             <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          )}
+                          {["image", "video", "audio"].includes(item.type) && (
+                            <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                           )}
                         </CardContent>
                       </Card>
@@ -258,6 +288,63 @@ const PublicProfile = () => {
           </Button>
         </motion.div>
       </motion.div>
+
+      {/* Media Preview Modal */}
+      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{selectedItem?.title}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedItem && handleDownload(selectedItem)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            {selectedItem?.type === "image" && (
+              <img
+                src={selectedItem.content}
+                alt={selectedItem.title}
+                className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+              />
+            )}
+            
+            {selectedItem?.type === "video" && (
+              <video
+                src={selectedItem.content}
+                controls
+                autoPlay
+                className="w-full h-auto max-h-[70vh] rounded-lg"
+              >
+                Your browser does not support the video tag.
+              </video>
+            )}
+            
+            {selectedItem?.type === "audio" && (
+              <div className="p-8 bg-muted rounded-lg flex flex-col items-center gap-4">
+                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Music className="w-12 h-12 text-primary" />
+                </div>
+                <p className="font-medium text-lg">{selectedItem.title}</p>
+                <audio
+                  src={selectedItem.content}
+                  controls
+                  autoPlay
+                  className="w-full max-w-md"
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
