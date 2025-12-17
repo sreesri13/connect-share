@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2 } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +31,11 @@ const QRGenerator = () => {
   const [selectedItems, setSelectedItems] = useState<ItemWithCategory[]>([]);
   const [qrPageId, setQrPageId] = useState<string | null>(null);
   const [qrTitle, setQrTitle] = useState("");
+  
+  // Password protection
+  const [enablePassword, setEnablePassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -85,9 +92,24 @@ const QRGenerator = () => {
   const handleSaveQR = async () => {
     if (!user || selectedItems.length === 0) return;
 
+    if (enablePassword && !password.trim()) {
+      toast.error("Please enter a password");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const publicId = generatePublicId();
+
+      // Hash password if enabled
+      let passwordHash = null;
+      if (enablePassword && password.trim()) {
+        const { data: hashData, error: hashError } = await supabase.rpc("hash_qr_password", {
+          password: password.trim(),
+        });
+        if (hashError) throw hashError;
+        passwordHash = hashData;
+      }
 
       // Create QR page
       const { data: qrPage, error: qrError } = await supabase
@@ -96,6 +118,7 @@ const QRGenerator = () => {
           user_id: user.id,
           public_id: publicId,
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
+          password_hash: passwordHash,
         })
         .select()
         .single();
@@ -166,8 +189,6 @@ const QRGenerator = () => {
     toast.success("URL copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   };
-
-  // handleDownloadQR is now defined above
 
   // Group items by category
   const groupedItems = selectedItems.reduce((acc, item) => {
@@ -258,12 +279,49 @@ const QRGenerator = () => {
                 )}
 
                 {!qrPageId && (
-                  <div className="w-full space-y-3">
+                  <div className="w-full space-y-4">
                     <Input
                       placeholder="QR Code title (optional)"
                       value={qrTitle}
                       onChange={(e) => setQrTitle(e.target.value)}
                     />
+                    
+                    {/* Password Protection Option */}
+                    <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="enablePassword"
+                          checked={enablePassword}
+                          onCheckedChange={(checked) => setEnablePassword(checked as boolean)}
+                        />
+                        <Label htmlFor="enablePassword" className="flex items-center gap-2 cursor-pointer">
+                          <Lock className="w-4 h-4 text-primary" />
+                          Password protect this QR code
+                        </Label>
+                      </div>
+                      
+                      {enablePassword && (
+                        <div className="relative mt-2">
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    
                     <Button onClick={handleSaveQR} className="w-full" disabled={isSaving}>
                       {isSaving ? (
                         <span className="flex items-center gap-2">
@@ -282,6 +340,12 @@ const QRGenerator = () => {
 
                 {qrPageId && (
                   <div className="w-full space-y-3">
+                    {enablePassword && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 text-primary text-sm">
+                        <Lock className="w-4 h-4" />
+                        This QR code is password protected
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border">
                       <input
                         type="text"

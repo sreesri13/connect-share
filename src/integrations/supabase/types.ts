@@ -155,6 +155,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          password_hash: string | null
           public_id: string
           title: string | null
           user_id: string
@@ -162,6 +163,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          password_hash?: string | null
           public_id: string
           title?: string | null
           user_id: string
@@ -169,6 +171,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          password_hash?: string | null
           public_id?: string
           title?: string | null
           user_id?: string
@@ -180,7 +183,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      hash_qr_password: { Args: { password: string }; Returns: string }
+      verify_qr_password: {
+        Args: { password: string; qr_public_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       item_type: "url" | "text" | "pdf" | "image" | "video" | "audio"
