@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, X, Download, Play } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Download, Play, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ProfileItem {
@@ -37,11 +38,81 @@ const PublicProfile = () => {
   const [items, setItems] = useState<ProfileItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
 
+  // Password protection states
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     if (profileId) {
-      fetchPublicProfile();
+      checkPasswordProtection();
     }
   }, [profileId]);
+
+  const checkPasswordProtection = async () => {
+    try {
+      const { data: qrPage, error: qrError } = await supabase
+        .from("qr_pages")
+        .select("password_hash")
+        .eq("public_id", profileId)
+        .maybeSingle();
+
+      if (qrError) throw qrError;
+
+      if (!qrPage) {
+        setError("Profile not found");
+        setIsLoading(false);
+        return;
+      }
+
+      if (qrPage.password_hash) {
+        setIsPasswordProtected(true);
+        setIsLoading(false);
+      } else {
+        setIsPasswordVerified(true);
+        fetchPublicProfile();
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load profile");
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyPassword = async () => {
+    if (!password.trim()) {
+      setPasswordError("Please enter a password");
+      return;
+    }
+
+    setIsVerifying(true);
+    setPasswordError("");
+
+    try {
+      const { data, error } = await supabase.rpc("verify_qr_password", {
+        qr_public_id: profileId,
+        password: password.trim(),
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        setIsPasswordVerified(true);
+        setIsLoading(true);
+        fetchPublicProfile();
+      } else {
+        setPasswordError("Incorrect password");
+      }
+    } catch (err) {
+      console.error(err);
+      setPasswordError("Failed to verify password");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const fetchPublicProfile = async () => {
     try {
@@ -140,6 +211,75 @@ const PublicProfile = () => {
     acc[item.category_name].push(item);
     return acc;
   }, {} as Record<string, ProfileItem[]>);
+
+  // Password entry screen
+  if (isPasswordProtected && !isPasswordVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-sm relative z-10"
+        >
+          <Card className="p-8">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                <Lock className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground mb-2">Protected Content</h2>
+              <p className="text-muted-foreground text-sm">
+                This QR code is password protected. Enter the password to view the content.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPasswordError("");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerifyPassword()}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
+
+              <Button onClick={handleVerifyPassword} className="w-full" disabled={isVerifying}>
+                {isVerifying ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Verifying...
+                  </span>
+                ) : (
+                  "Unlock Content"
+                )}
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -19,6 +19,8 @@ import {
   LogOut,
   Settings,
   User,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,6 +98,12 @@ const Dashboard = () => {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: "", type: "url" as Item["type"], content: "" });
+
+  // Edit states
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -274,6 +282,69 @@ const Dashboard = () => {
     }
   };
 
+  // Edit category name
+  const handleEditCategory = async (categoryId: string) => {
+    if (!editingCategoryName.trim()) {
+      toast.error("Please enter a category name");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("categories")
+        .update({ name: editingCategoryName.trim() })
+        .eq("id", categoryId);
+
+      if (error) throw error;
+
+      setCategories(
+        categories.map((cat) =>
+          cat.id === categoryId ? { ...cat, name: editingCategoryName.trim() } : cat
+        )
+      );
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
+      toast.success("Category renamed!");
+    } catch (error: any) {
+      toast.error("Failed to rename category");
+    }
+  };
+
+  // Edit item
+  const handleEditItem = async () => {
+    if (!editingItem || !editingItem.title.trim() || !editingItem.content.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("items")
+        .update({
+          title: editingItem.title.trim(),
+          type: editingItem.type,
+          content: editingItem.content.trim(),
+        })
+        .eq("id", editingItem.id);
+
+      if (error) throw error;
+
+      setCategories(
+        categories.map((cat) => ({
+          ...cat,
+          items: cat.items.map((item) =>
+            item.id === editingItem.id ? { ...editingItem, selected: selectedItems.has(editingItem.id) } : item
+          ),
+        }))
+      );
+      setIsEditItemOpen(false);
+      setEditingItem(null);
+      toast.success("Item updated!");
+    } catch (error: any) {
+      toast.error("Failed to update item");
+    }
+  };
+
   const toggleItemSelection = (itemId: string) => {
     setSelectedItems((prev) => {
       const next = new Set(prev);
@@ -284,6 +355,40 @@ const Dashboard = () => {
       }
       return next;
     });
+  };
+
+  // Toggle category selection - select/deselect all items in category
+  const toggleCategorySelection = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    const categoryItemIds = category.items.map((item) => item.id);
+    const allSelected = categoryItemIds.every((id) => selectedItems.has(id));
+
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        // Deselect all items in category
+        categoryItemIds.forEach((id) => next.delete(id));
+      } else {
+        // Select all items in category
+        categoryItemIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const isCategorySelected = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category || category.items.length === 0) return false;
+    return category.items.every((item) => selectedItems.has(item.id));
+  };
+
+  const isCategoryPartiallySelected = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category || category.items.length === 0) return false;
+    const selectedCount = category.items.filter((item) => selectedItems.has(item.id)).length;
+    return selectedCount > 0 && selectedCount < category.items.length;
   };
 
   const selectAll = () => {
@@ -531,15 +636,50 @@ const Dashboard = () => {
                     <Card className="overflow-hidden hover:border-primary/30 transition-colors">
                       <CardHeader className="flex flex-row items-center justify-between bg-secondary/30 border-b border-border/50">
                         <div className="flex items-center gap-3">
+                          {/* Category checkbox */}
+                          <Checkbox
+                            checked={isCategorySelected(category.id)}
+                            ref={(el) => {
+                              if (el && isCategoryPartiallySelected(category.id)) {
+                                el.dataset.state = "indeterminate";
+                              }
+                            }}
+                            onCheckedChange={() => toggleCategorySelection(category.id)}
+                            disabled={category.items.length === 0}
+                          />
                           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                             <Folder className="w-5 h-5 text-primary" />
                           </div>
-                          <div>
-                            <CardTitle className="text-lg">{category.name}</CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                              {category.items.length} item{category.items.length !== 1 ? "s" : ""}
-                            </p>
-                          </div>
+                          {editingCategoryId === category.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editingCategoryName}
+                                onChange={(e) => setEditingCategoryName(e.target.value)}
+                                className="h-8 w-40"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleEditCategory(category.id);
+                                  if (e.key === "Escape") {
+                                    setEditingCategoryId(null);
+                                    setEditingCategoryName("");
+                                  }
+                                }}
+                              />
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditCategory(category.id)}>
+                                <Check className="w-4 h-4 text-primary" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditingCategoryId(null); setEditingCategoryName(""); }}>
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div>
+                              <CardTitle className="text-lg">{category.name}</CardTitle>
+                              <p className="text-sm text-muted-foreground">
+                                {category.items.length} item{category.items.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -548,7 +688,12 @@ const Dashboard = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingCategoryId(category.id);
+                                setEditingCategoryName(category.name);
+                              }}
+                            >
                               <Edit2 className="w-4 h-4 mr-2" />
                               Rename
                             </DropdownMenuItem>
@@ -596,7 +741,12 @@ const Dashboard = () => {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setEditingItem({ ...item });
+                                          setIsEditItemOpen(true);
+                                        }}
+                                      >
                                         <Edit2 className="w-4 h-4 mr-2" />
                                         Edit
                                       </DropdownMenuItem>
@@ -623,6 +773,60 @@ const Dashboard = () => {
           )}
         </div>
       </main>
+
+      {/* Edit Item Dialog */}
+      <Dialog open={isEditItemOpen} onOpenChange={(open) => { setIsEditItemOpen(open); if (!open) setEditingItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Item</DialogTitle>
+            <DialogDescription>Update the item details below.</DialogDescription>
+          </DialogHeader>
+          {editingItem && (
+            <div className="space-y-4 mt-4">
+              <Input
+                placeholder="Item title"
+                value={editingItem.title}
+                onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
+              />
+              <Select
+                value={editingItem.type}
+                onValueChange={(v) => setEditingItem({ ...editingItem, type: v as Item["type"], content: "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="url">URL</SelectItem>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="image">Image</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="audio">Audio (MP3)</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
+                <FileUpload
+                  type={editingItem.type as "pdf" | "image" | "video" | "audio"}
+                  userId={user?.id || ""}
+                  value={editingItem.content}
+                  onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
+                />
+              ) : (
+                <Input
+                  placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
+                  value={editingItem.content}
+                  onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                />
+              )}
+              
+              <Button onClick={handleEditItem} className="w-full" disabled={!editingItem.content}>
+                Update Item
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
