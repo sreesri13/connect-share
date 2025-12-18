@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import QRGenerator from "./pages/QRGenerator";
 import QRCodesList from "./pages/QRCodesList";
 import PublicProfile from "./pages/PublicProfile";
+import SettingsPage from "./pages/SettingsPage";
 import DemoPage from "./pages/DemoPage";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/qr" element={<QRGenerator />} />
             <Route path="/qr-list" element={<QRCodesList />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/p/:profileId" element={<PublicProfile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

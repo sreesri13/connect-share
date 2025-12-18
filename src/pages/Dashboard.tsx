@@ -442,7 +442,7 @@ const Dashboard = () => {
         <nav className="flex-1 space-y-2">
           <SidebarLink icon={<Folder />} label="My Profile" active />
           <SidebarLink icon={<QrCode />} label="QR Codes" onClick={() => navigate("/qr-list")} />
-          <SidebarLink icon={<Settings />} label="Settings" />
+          <SidebarLink icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
         </nav>
 
         <div className="pt-4 border-t border-sidebar-border">
@@ -460,11 +460,11 @@ const Dashboard = () => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
