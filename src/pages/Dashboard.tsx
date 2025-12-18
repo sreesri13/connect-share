@@ -1,413 +1,69 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   QrCode,
-  Plus,
   Folder,
-  Link as LinkIcon,
-  FileText,
-  Image,
-  Video,
-  Music,
-  File,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  GripVertical,
   ChevronRight,
   LogOut,
   Settings,
   User,
-  Check,
-  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { FileUpload } from "@/components/FileUpload";
+import { ProfileSection } from "@/components/dashboard/ProfileSection";
+import { QRCodesSection } from "@/components/dashboard/QRCodesSection";
+import { SettingsSection } from "@/components/dashboard/SettingsSection";
+import { cn } from "@/lib/utils";
 
-// Types
-interface Item {
-  id: string;
-  title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio";
-  content: string;
-  selected: boolean;
-  category_id: string;
-  display_order: number;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  items: Item[];
-  display_order: number;
-}
+type DashboardSection = "profile" | "qrcodes" | "settings";
 
 interface Profile {
   display_name: string | null;
   bio: string | null;
 }
 
-const itemTypeIcons = {
-  url: LinkIcon,
-  text: FileText,
-  pdf: File,
-  image: Image,
-  video: Video,
-  audio: Music,
-};
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, signOut, loading: authLoading } = useAuth();
-  
+
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState<DashboardSection>("profile");
 
-  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [newItem, setNewItem] = useState({ title: "", type: "url" as Item["type"], content: "" });
-
-  // Edit states
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [editingCategoryName, setEditingCategoryName] = useState("");
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
-
-  // Redirect if not logged in
   useEffect(() => {
     if (!user && !authLoading) {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
 
-  // Fetch profile and data
   useEffect(() => {
     if (user) {
-      fetchData();
+      fetchProfile();
     }
   }, [user]);
 
-  const fetchData = async () => {
+  const fetchProfile = async () => {
     if (!user) return;
-    
+
     try {
-      // Fetch profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("display_name, bio")
         .eq("user_id", user.id)
         .maybeSingle();
-      
+
       setProfile(profileData);
-
-      // Fetch categories with items
-      const { data: categoriesData, error: catError } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("display_order", { ascending: true });
-
-      if (catError) throw catError;
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("items")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("display_order", { ascending: true });
-
-      if (itemsError) throw itemsError;
-
-      // Combine categories with their items
-      const categoriesWithItems = (categoriesData || []).map((cat) => ({
-        ...cat,
-        items: (itemsData || [])
-          .filter((item) => item.category_id === cat.id)
-          .map((item) => ({ ...item, selected: selectedItems.has(item.id) })),
-      }));
-
-      setCategories(categoriesWithItems);
     } catch (error: any) {
-      toast.error("Failed to load data");
       console.error(error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim() || !user) {
-      toast.error("Please enter a category name");
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("categories")
-        .insert({
-          user_id: user.id,
-          name: newCategoryName.trim(),
-          display_order: categories.length,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === "23505") {
-          toast.error("Category already exists");
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      setCategories([...categories, { ...data, items: [] }]);
-      setNewCategoryName("");
-      setIsAddCategoryOpen(false);
-      toast.success("Category created!");
-    } catch (error: any) {
-      toast.error("Failed to create category");
-    }
-  };
-
-  const handleAddItem = async () => {
-    if (!selectedCategoryId || !newItem.title.trim() || !newItem.content.trim() || !user) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    const category = categories.find((c) => c.id === selectedCategoryId);
-    if (!category) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("items")
-        .insert({
-          user_id: user.id,
-          category_id: selectedCategoryId,
-          title: newItem.title.trim(),
-          type: newItem.type,
-          content: newItem.content.trim(),
-          display_order: category.items.length,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCategories(
-        categories.map((cat) => {
-          if (cat.id === selectedCategoryId) {
-            return { ...cat, items: [...cat.items, { ...data, selected: false }] };
-          }
-          return cat;
-        })
-      );
-
-      setNewItem({ title: "", type: "url", content: "" });
-      setSelectedCategoryId(null);
-      setIsAddItemOpen(false);
-      toast.success("Item added!");
-    } catch (error: any) {
-      toast.error("Failed to add item");
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId: string) => {
-    try {
-      const { error } = await supabase.from("categories").delete().eq("id", categoryId);
-      if (error) throw error;
-
-      setCategories(categories.filter((c) => c.id !== categoryId));
-      toast.success("Category deleted");
-    } catch (error: any) {
-      toast.error("Failed to delete category");
-    }
-  };
-
-  const handleDeleteItem = async (categoryId: string, itemId: string) => {
-    try {
-      const { error } = await supabase.from("items").delete().eq("id", itemId);
-      if (error) throw error;
-
-      setCategories(
-        categories.map((cat) => {
-          if (cat.id === categoryId) {
-            return { ...cat, items: cat.items.filter((i) => i.id !== itemId) };
-          }
-          return cat;
-        })
-      );
-      
-      setSelectedItems((prev) => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-      
-      toast.success("Item deleted");
-    } catch (error: any) {
-      toast.error("Failed to delete item");
-    }
-  };
-
-  // Edit category name
-  const handleEditCategory = async (categoryId: string) => {
-    if (!editingCategoryName.trim()) {
-      toast.error("Please enter a category name");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("categories")
-        .update({ name: editingCategoryName.trim() })
-        .eq("id", categoryId);
-
-      if (error) throw error;
-
-      setCategories(
-        categories.map((cat) =>
-          cat.id === categoryId ? { ...cat, name: editingCategoryName.trim() } : cat
-        )
-      );
-      setEditingCategoryId(null);
-      setEditingCategoryName("");
-      toast.success("Category renamed!");
-    } catch (error: any) {
-      toast.error("Failed to rename category");
-    }
-  };
-
-  // Edit item
-  const handleEditItem = async () => {
-    if (!editingItem || !editingItem.title.trim() || !editingItem.content.trim()) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("items")
-        .update({
-          title: editingItem.title.trim(),
-          type: editingItem.type,
-          content: editingItem.content.trim(),
-        })
-        .eq("id", editingItem.id);
-
-      if (error) throw error;
-
-      setCategories(
-        categories.map((cat) => ({
-          ...cat,
-          items: cat.items.map((item) =>
-            item.id === editingItem.id ? { ...editingItem, selected: selectedItems.has(editingItem.id) } : item
-          ),
-        }))
-      );
-      setIsEditItemOpen(false);
-      setEditingItem(null);
-      toast.success("Item updated!");
-    } catch (error: any) {
-      toast.error("Failed to update item");
-    }
-  };
-
-  const toggleItemSelection = (itemId: string) => {
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
-  };
-
-  // Toggle category selection - select/deselect all items in category
-  const toggleCategorySelection = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category) return;
-
-    const categoryItemIds = category.items.map((item) => item.id);
-    const allSelected = categoryItemIds.every((id) => selectedItems.has(id));
-
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      if (allSelected) {
-        // Deselect all items in category
-        categoryItemIds.forEach((id) => next.delete(id));
-      } else {
-        // Select all items in category
-        categoryItemIds.forEach((id) => next.add(id));
-      }
-      return next;
-    });
-  };
-
-  const isCategorySelected = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category || category.items.length === 0) return false;
-    return category.items.every((item) => selectedItems.has(item.id));
-  };
-
-  const isCategoryPartiallySelected = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category || category.items.length === 0) return false;
-    const selectedCount = category.items.filter((item) => selectedItems.has(item.id)).length;
-    return selectedCount > 0 && selectedCount < category.items.length;
-  };
-
-  const selectAll = () => {
-    const allItemIds = categories.flatMap((cat) => cat.items.map((item) => item.id));
-    setSelectedItems(new Set(allItemIds));
-  };
-
-  const deselectAll = () => {
-    setSelectedItems(new Set());
-  };
-
-  const handleGenerateQR = () => {
-    if (selectedItems.size === 0) {
-      toast.error("Please select at least one item");
-      return;
-    }
-    // Store selected items and navigate to QR generator
-    const itemIds = Array.from(selectedItems);
-    navigate(`/qr?items=${itemIds.join(",")}`);
   };
 
   const handleSignOut = async () => {
@@ -426,6 +82,12 @@ const Dashboard = () => {
   const displayName = profile?.display_name || user?.email?.split("@")[0] || "User";
   const userInitials = displayName.slice(0, 2).toUpperCase();
 
+  const sidebarItems = [
+    { id: "profile" as DashboardSection, label: "My Profile", icon: Folder },
+    { id: "qrcodes" as DashboardSection, label: "QR Codes", icon: QrCode },
+    { id: "settings" as DashboardSection, label: "Settings", icon: Settings },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Sidebar */}
@@ -440,9 +102,26 @@ const Dashboard = () => {
         </div>
 
         <nav className="flex-1 space-y-2">
-          <SidebarLink icon={<Folder />} label="My Profile" active />
-          <SidebarLink icon={<QrCode />} label="QR Codes" onClick={() => navigate("/qr-list")} />
-          <SidebarLink icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
+          {sidebarItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  activeSection === item.id
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <span className={activeSection === item.id ? "text-sidebar-primary" : "text-muted-foreground"}>
+                  <Icon className="w-5 h-5" />
+                </span>
+                <span className="font-medium">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="pt-4 border-t border-sidebar-border">
@@ -460,11 +139,11 @@ const Dashboard = () => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
+              <DropdownMenuItem onClick={() => setActiveSection("settings")}>
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
+              <DropdownMenuItem onClick={() => setActiveSection("settings")}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
@@ -480,377 +159,19 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="ml-64 p-8">
         <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-1">My Profile</h1>
-              <p className="text-muted-foreground">Manage your categories and items</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Category
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New Category</DialogTitle>
-                    <DialogDescription>Add a new category to organize your items.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <Input
-                      placeholder="Category name"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
-                    />
-                    <Button onClick={handleAddCategory} className="w-full">
-                      Create Category
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-                <DialogTrigger asChild>
-                  <Button disabled={categories.length === 0}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Item
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add New Item</DialogTitle>
-                    <DialogDescription>Add a new item to one of your categories.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      placeholder="Item title"
-                      value={newItem.title}
-                      onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
-                    />
-                    <Select
-                      value={newItem.type}
-                      onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"], content: "" })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="url">URL</SelectItem>
-                        <SelectItem value="text">Text</SelectItem>
-                        <SelectItem value="pdf">PDF</SelectItem>
-                        <SelectItem value="image">Image</SelectItem>
-                        <SelectItem value="video">Video</SelectItem>
-                        <SelectItem value="audio">Audio (MP3)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    {/* Show FileUpload for file types, Input for url/text */}
-                    {["pdf", "image", "video", "audio"].includes(newItem.type) ? (
-                      <FileUpload
-                        type={newItem.type as "pdf" | "image" | "video" | "audio"}
-                        userId={user?.id || ""}
-                        value={newItem.content}
-                        onUploadComplete={(url) => setNewItem({ ...newItem, content: url })}
-                      />
-                    ) : (
-                      <Input
-                        placeholder={newItem.type === "url" ? "https://..." : "Enter text content"}
-                        value={newItem.content}
-                        onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
-                      />
-                    )}
-                    
-                    <Button onClick={handleAddItem} className="w-full" disabled={!newItem.content}>
-                      Add Item
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-
-          {/* Selection Bar */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between p-4 mb-6 rounded-xl glass border-border/50"
-          >
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                <span className="text-primary font-semibold">{selectedItems.size}</span> items selected
-              </span>
-              <Button variant="ghost" size="sm" onClick={selectAll}>
-                Select All
-              </Button>
-              <Button variant="ghost" size="sm" onClick={deselectAll}>
-                Deselect All
-              </Button>
-            </div>
-            <Button onClick={handleGenerateQR} disabled={selectedItems.size === 0}>
-              <QrCode className="w-4 h-4 mr-2" />
-              Generate QR Code
-            </Button>
-          </motion.div>
-
-          {/* Categories */}
-          {categories.length === 0 ? (
-            <Card className="p-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Folder className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No categories yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Create your first category to start organizing your profile.
-              </p>
-              <Button onClick={() => setIsAddCategoryOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Category
-              </Button>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              <AnimatePresence>
-                {categories.map((category) => (
-                  <motion.div
-                    key={category.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                  >
-                    <Card className="overflow-hidden hover:border-primary/30 transition-colors">
-                      <CardHeader className="flex flex-row items-center justify-between bg-secondary/30 border-b border-border/50">
-                        <div className="flex items-center gap-3">
-                          {/* Category checkbox */}
-                          <Checkbox
-                            checked={isCategorySelected(category.id)}
-                            ref={(el) => {
-                              if (el && isCategoryPartiallySelected(category.id)) {
-                                el.dataset.state = "indeterminate";
-                              }
-                            }}
-                            onCheckedChange={() => toggleCategorySelection(category.id)}
-                            disabled={category.items.length === 0}
-                          />
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Folder className="w-5 h-5 text-primary" />
-                          </div>
-                          {editingCategoryId === category.id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={editingCategoryName}
-                                onChange={(e) => setEditingCategoryName(e.target.value)}
-                                className="h-8 w-40"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleEditCategory(category.id);
-                                  if (e.key === "Escape") {
-                                    setEditingCategoryId(null);
-                                    setEditingCategoryName("");
-                                  }
-                                }}
-                              />
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditCategory(category.id)}>
-                                <Check className="w-4 h-4 text-primary" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditingCategoryId(null); setEditingCategoryName(""); }}>
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div>
-                              <CardTitle className="text-lg">{category.name}</CardTitle>
-                              <p className="text-sm text-muted-foreground">
-                                {category.items.length} item{category.items.length !== 1 ? "s" : ""}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditingCategoryId(category.id);
-                                setEditingCategoryName(category.name);
-                              }}
-                            >
-                              <Edit2 className="w-4 h-4 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteCategory(category.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        {category.items.length === 0 ? (
-                          <div className="p-8 text-center text-muted-foreground">No items in this category yet.</div>
-                        ) : (
-                          <ul className="divide-y divide-border/50">
-                            {category.items.map((item) => {
-                              const Icon = itemTypeIcons[item.type];
-                              return (
-                                <li
-                                  key={item.id}
-                                  className="flex items-center gap-4 p-4 hover:bg-secondary/20 transition-colors"
-                                >
-                                  <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                                  <Checkbox
-                                    checked={selectedItems.has(item.id)}
-                                    onCheckedChange={() => toggleItemSelection(item.id)}
-                                  />
-                                  <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
-                                    <Icon className="w-4 h-4 text-muted-foreground" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-foreground">{item.title}</p>
-                                    <p className="text-sm text-muted-foreground truncate">{item.content}</p>
-                                  </div>
-                                  <span className="px-2 py-1 text-xs font-medium rounded-md bg-secondary text-muted-foreground uppercase">
-                                    {item.type}
-                                  </span>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreVertical className="w-4 h-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          setEditingItem({ ...item });
-                                          setIsEditItemOpen(true);
-                                        }}
-                                      >
-                                        <Edit2 className="w-4 h-4 mr-2" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-destructive"
-                                        onClick={() => handleDeleteItem(category.id, item.id)}
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+          {activeSection === "profile" && user && (
+            <ProfileSection userId={user.id} />
+          )}
+          {activeSection === "qrcodes" && user && (
+            <QRCodesSection userId={user.id} />
+          )}
+          {activeSection === "settings" && user && (
+            <SettingsSection userId={user.id} userEmail={user.email || ""} />
           )}
         </div>
       </main>
-
-      {/* Edit Item Dialog */}
-      <Dialog open={isEditItemOpen} onOpenChange={(open) => { setIsEditItemOpen(open); if (!open) setEditingItem(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Item</DialogTitle>
-            <DialogDescription>Update the item details below.</DialogDescription>
-          </DialogHeader>
-          {editingItem && (
-            <div className="space-y-4 mt-4">
-              <Input
-                placeholder="Item title"
-                value={editingItem.title}
-                onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
-              />
-              <Select
-                value={editingItem.type}
-                onValueChange={(v) => setEditingItem({ ...editingItem, type: v as Item["type"], content: "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="url">URL</SelectItem>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="image">Image</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="audio">Audio (MP3)</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
-                <FileUpload
-                  type={editingItem.type as "pdf" | "image" | "video" | "audio"}
-                  userId={user?.id || ""}
-                  value={editingItem.content}
-                  onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
-                />
-              ) : (
-                <Input
-                  placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
-                  value={editingItem.content}
-                  onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
-                />
-              )}
-              
-              <Button onClick={handleEditItem} className="w-full" disabled={!editingItem.content}>
-                Update Item
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
-
-const SidebarLink = ({
-  icon,
-  label,
-  active = false,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  onClick?: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-      active ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground hover:bg-sidebar-accent"
-    }`}
-  >
-    <span className={active ? "text-sidebar-primary" : "text-muted-foreground"}>{icon}</span>
-    <span className="font-medium">{label}</span>
-  </button>
-);
 
 export default Dashboard;
