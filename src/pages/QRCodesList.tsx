@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
+import { hashPassword } from "@/lib/crypto";
 
 interface QRPage {
   id: string;
@@ -170,15 +171,11 @@ const QRCodesList = () => {
     if (!editingQR) return;
 
     try {
-      let passwordHash = undefined;
+      let passwordHash: string | null | undefined = undefined;
       
-      // If password enabled and new password provided, hash it
+      // If password enabled and new password provided, hash it using client-side hashing
       if (editEnablePassword && editPassword.trim()) {
-        const { data: hashData, error: hashError } = await supabase.rpc("hash_qr_password", {
-          password: editPassword.trim(),
-        });
-        if (hashError) throw hashError;
-        passwordHash = hashData;
+        passwordHash = hashPassword(editPassword.trim());
       } else if (!editEnablePassword) {
         // If password disabled, remove it
         passwordHash = null;

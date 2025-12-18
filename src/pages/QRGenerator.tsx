@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { hashPassword } from "@/lib/crypto";
 
 interface ItemWithCategory {
   id: string;
@@ -101,14 +102,10 @@ const QRGenerator = () => {
     try {
       const publicId = generatePublicId();
 
-      // Hash password if enabled
+      // Hash password if enabled using client-side hashing
       let passwordHash = null;
       if (enablePassword && password.trim()) {
-        const { data: hashData, error: hashError } = await supabase.rpc("hash_qr_password", {
-          password: password.trim(),
-        });
-        if (hashError) throw hashError;
-        passwordHash = hashData;
+        passwordHash = hashPassword(password.trim());
       }
 
       // Create QR page

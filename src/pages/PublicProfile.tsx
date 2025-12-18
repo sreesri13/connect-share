@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { verifyPassword } from "@/lib/crypto";
+import { toast } from "sonner";
 
 interface ProfileItem {
   id: string;
@@ -92,14 +94,17 @@ const PublicProfile = () => {
     setPasswordError("");
 
     try {
-      const { data, error } = await supabase.rpc("verify_qr_password", {
-        qr_public_id: profileId,
-        password: password.trim(),
-      });
+      // Get the stored password hash
+      const { data: qrPage, error } = await supabase
+        .from("qr_pages")
+        .select("password_hash")
+        .eq("public_id", profileId)
+        .single();
 
       if (error) throw error;
 
-      if (data) {
+      // Verify password using client-side hashing
+      if (qrPage?.password_hash && verifyPassword(password.trim(), qrPage.password_hash)) {
         setIsPasswordVerified(true);
         setIsLoading(true);
         fetchPublicProfile();
@@ -186,10 +191,11 @@ const PublicProfile = () => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
+      // Open URL in a new browser window/tab
       window.open(url, "_blank", "noopener,noreferrer");
     } else if (item.type === "text") {
       navigator.clipboard.writeText(item.content);
-      // Show a toast or feedback
+      toast.success("Text copied to clipboard!");
     } else if (item.type === "pdf") {
       // Open PDF in new tab
       window.open(item.content, "_blank", "noopener,noreferrer");
