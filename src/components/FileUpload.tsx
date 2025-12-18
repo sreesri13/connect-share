@@ -120,19 +120,24 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
   };
 
   if (uploadedFile) {
+    // Extract just the filename from the URL for display
+    const displayName = uploadedFile.name !== "Uploaded file" 
+      ? uploadedFile.name 
+      : uploadedFile.url.split('/').pop()?.split('?')[0] || "Uploaded file";
+    
     return (
-      <div className="relative p-4 rounded-xl border border-border bg-muted/50 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+      <div className="relative p-4 rounded-xl border border-border bg-muted/50 flex items-center gap-3 overflow-hidden">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
           <Icon className="w-5 h-5 text-primary" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{uploadedFile.url}</p>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <p className="text-sm font-medium truncate">{displayName}</p>
+          <p className="text-xs text-muted-foreground truncate max-w-full">{config.label} uploaded</p>
         </div>
         <button
           type="button"
           onClick={handleRemove}
-          className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+          className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
