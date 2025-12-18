@@ -397,13 +397,13 @@ const QRCodesList = () => {
 
       {/* Edit QR Dialog */}
       <Dialog open={isEditQROpen} onOpenChange={(open) => { setIsEditQROpen(open); if (!open) { setEditingQR(null); setQrItems([]); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit QR Code</DialogTitle>
             <DialogDescription>Update QR code settings and manage items</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 mt-4">
+          <div className="flex-1 overflow-y-auto space-y-5 pr-2">
             {/* Title */}
             <div className="space-y-2">
               <Label>QR Code Title</Label>
@@ -416,7 +416,7 @@ const QRCodesList = () => {
 
             {/* Password Protection */}
             <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="editEnablePassword"
@@ -429,7 +429,7 @@ const QRCodesList = () => {
                   </Label>
                 </div>
                 {editingQR?.has_password && (
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={handleRemovePassword}>
+                  <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={handleRemovePassword}>
                     Remove Password
                   </Button>
                 )}
@@ -439,7 +439,7 @@ const QRCodesList = () => {
                 <div className="relative mt-2">
                   <Input
                     type={showEditPassword ? "text" : "password"}
-                    placeholder={editingQR?.has_password ? "Enter new password (leave empty to keep current)" : "Enter password"}
+                    placeholder={editingQR?.has_password ? "New password (leave empty to keep)" : "Enter password"}
                     value={editPassword}
                     onChange={(e) => setEditPassword(e.target.value)}
                     className="pr-10"
@@ -460,22 +460,23 @@ const QRCodesList = () => {
             {/* Items List */}
             <div className="space-y-3">
               <Label>Items in this QR Code ({qrItems.length})</Label>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {qrItems.map((item) => (
                   <div
                     key={item.qr_page_item_id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30"
+                    className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-foreground">{item.title}</p>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.content}</p>
                     </div>
-                    <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary text-muted-foreground uppercase">
+                    <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary text-muted-foreground uppercase flex-shrink-0">
                       {item.type}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="flex-shrink-0 h-8 w-8 p-0"
                       onClick={() => {
                         setEditingItem({ ...item });
                         setIsEditItemOpen(true);
@@ -486,7 +487,7 @@ const QRCodesList = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-destructive"
+                      className="text-destructive flex-shrink-0 h-8 w-8 p-0"
                       onClick={() => handleRemoveItemFromQR(item.qr_page_item_id, item.id)}
                     >
                       <X className="w-4 h-4" />
@@ -495,7 +496,9 @@ const QRCodesList = () => {
                 ))}
               </div>
             </div>
+          </div>
 
+          <div className="flex-shrink-0 pt-4 border-t mt-4">
             <Button onClick={handleSaveQRChanges} className="w-full">
               <Check className="w-4 h-4 mr-2" />
               Save Changes
@@ -506,49 +509,61 @@ const QRCodesList = () => {
 
       {/* Edit Item Dialog */}
       <Dialog open={isEditItemOpen} onOpenChange={(open) => { setIsEditItemOpen(open); if (!open) setEditingItem(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit Item</DialogTitle>
             <DialogDescription>Update the item details</DialogDescription>
           </DialogHeader>
           {editingItem && (
-            <div className="space-y-4 mt-4">
-              <Input
-                placeholder="Item title"
-                value={editingItem.title}
-                onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
-              />
-              <Select
-                value={editingItem.type}
-                onValueChange={(v) => setEditingItem({ ...editingItem, type: v as QRItem["type"], content: "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="url">URL</SelectItem>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="image">Image</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="audio">Audio (MP3)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
-                <FileUpload
-                  type={editingItem.type as "pdf" | "image" | "video" | "audio"}
-                  userId={user?.id || ""}
-                  value={editingItem.content}
-                  onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
-                />
-              ) : (
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="space-y-2">
+                <Label>Title</Label>
                 <Input
-                  placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
-                  value={editingItem.content}
-                  onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                  placeholder="Item title"
+                  value={editingItem.title}
+                  onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
                 />
-              )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={editingItem.type}
+                  onValueChange={(v) => setEditingItem({ ...editingItem, type: v as QRItem["type"], content: "" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="url">URL</SelectItem>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="pdf">PDF</SelectItem>
+                    <SelectItem value="image">Image</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="audio">Audio (MP3)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Content</Label>
+                {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
+                  <div className="w-full overflow-hidden">
+                    <FileUpload
+                      type={editingItem.type as "pdf" | "image" | "video" | "audio"}
+                      userId={user?.id || ""}
+                      value={editingItem.content}
+                      onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
+                    />
+                  </div>
+                ) : (
+                  <Input
+                    placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
+                    value={editingItem.content}
+                    onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                  />
+                )}
+              </div>
 
               <Button onClick={handleEditItem} className="w-full" disabled={!editingItem.content}>
                 Update Item

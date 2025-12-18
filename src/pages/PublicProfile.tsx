@@ -191,14 +191,23 @@ const PublicProfile = () => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
-      // Open URL in a new browser window/tab
-      window.open(url, "_blank", "noopener,noreferrer");
+      // Open URL in a new browser window/tab - use window.open with popup approach for better compatibility
+      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+      if (!newWindow) {
+        // Fallback: copy URL and notify user
+        navigator.clipboard.writeText(url);
+        toast.info("Link copied! Open it in a new tab.");
+      }
     } else if (item.type === "text") {
       navigator.clipboard.writeText(item.content);
       toast.success("Text copied to clipboard!");
     } else if (item.type === "pdf") {
       // Open PDF in new tab
-      window.open(item.content, "_blank", "noopener,noreferrer");
+      const newWindow = window.open(item.content, "_blank", "noopener,noreferrer");
+      if (!newWindow) {
+        navigator.clipboard.writeText(item.content);
+        toast.info("PDF link copied! Open it in a new tab.");
+      }
     } else if (["image", "video", "audio"].includes(item.type)) {
       // Open modal for media preview
       setSelectedItem(item);
@@ -206,23 +215,35 @@ const PublicProfile = () => {
   };
 
   const handleDownload = (item: ProfileItem) => {
-    // For Supabase storage URLs, add download parameter
-    let downloadUrl = item.content;
-    if (downloadUrl.includes('supabase.co/storage')) {
-      // Append download parameter if not already present
-      downloadUrl = downloadUrl.includes('?') 
-        ? `${downloadUrl}&download=true` 
-        : `${downloadUrl}?download=true`;
-    }
+    // For Supabase storage URLs, use fetch to download
+    const downloadUrl = item.content;
     
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = item.title;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Use fetch to get the file and trigger download
+    fetch(downloadUrl)
+      .then(response => {
+        if (!response.ok) throw new Error('Download failed');
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = item.title || "download";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("Download started!");
+      })
+      .catch(() => {
+        // Fallback: open in new tab
+        window.open(downloadUrl, "_blank", "noopener,noreferrer");
+        toast.info("Opening file in new tab...");
+      });
+  };
+
+  const handleOpenInNewTab = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   // Group items by category
@@ -455,16 +476,26 @@ const PublicProfile = () => {
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{selectedItem?.title}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => selectedItem && handleDownload(selectedItem)}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download
-              </Button>
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <span className="truncate">{selectedItem?.title}</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectedItem && handleOpenInNewTab(selectedItem.content)}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectedItem && handleDownload(selectedItem)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           
@@ -474,6 +505,10 @@ const PublicProfile = () => {
                 src={selectedItem.content}
                 alt={selectedItem.title}
                 className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  toast.error("Image couldn't load. Try 'Open' button.");
+                }}
               />
             )}
             
@@ -483,6 +518,7 @@ const PublicProfile = () => {
                 controls
                 autoPlay
                 className="w-full h-auto max-h-[70vh] rounded-lg"
+                onError={() => toast.error("Video couldn't load. Try 'Open' button.")}
               >
                 Your browser does not support the video tag.
               </video>
@@ -499,6 +535,7 @@ const PublicProfile = () => {
                   controls
                   autoPlay
                   className="w-full max-w-md"
+                  onError={() => toast.error("Audio couldn't load. Try 'Open' button.")}
                 >
                   Your browser does not support the audio element.
                 </audio>
