@@ -181,12 +181,18 @@ const PublicProfile = () => {
 
   const handleItemClick = (item: ProfileItem) => {
     if (item.type === "url") {
-      window.open(item.content, "_blank");
+      // Ensure URL has protocol
+      let url = item.content;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
     } else if (item.type === "text") {
       navigator.clipboard.writeText(item.content);
+      // Show a toast or feedback
     } else if (item.type === "pdf") {
       // Open PDF in new tab
-      window.open(item.content, "_blank");
+      window.open(item.content, "_blank", "noopener,noreferrer");
     } else if (["image", "video", "audio"].includes(item.type)) {
       // Open modal for media preview
       setSelectedItem(item);
@@ -194,10 +200,20 @@ const PublicProfile = () => {
   };
 
   const handleDownload = (item: ProfileItem) => {
+    // For Supabase storage URLs, add download parameter
+    let downloadUrl = item.content;
+    if (downloadUrl.includes('supabase.co/storage')) {
+      // Append download parameter if not already present
+      downloadUrl = downloadUrl.includes('?') 
+        ? `${downloadUrl}&download=true` 
+        : `${downloadUrl}?download=true`;
+    }
+    
     const link = document.createElement("a");
-    link.href = item.content;
+    link.href = downloadUrl;
     link.download = item.title;
     link.target = "_blank";
+    link.rel = "noopener noreferrer";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
