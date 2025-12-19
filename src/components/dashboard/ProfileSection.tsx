@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -467,9 +468,16 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     value={newItem.content}
                     onUploadComplete={(url) => setNewItem({ ...newItem, content: url })}
                   />
+                ) : newItem.type === "text" ? (
+                  <Textarea
+                    placeholder="Enter text content (supports multiple lines)"
+                    value={newItem.content}
+                    onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
+                    rows={5}
+                  />
                 ) : (
                   <Input
-                    placeholder={newItem.type === "url" ? "https://..." : "Enter text content"}
+                    placeholder="https://..."
                     value={newItem.content}
                     onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
                   />
@@ -708,9 +716,16 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   value={editingItem.content}
                   onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
                 />
+              ) : editingItem.type === "text" ? (
+                <Textarea
+                  placeholder="Enter text content (supports multiple lines)"
+                  value={editingItem.content}
+                  onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                  rows={5}
+                />
               ) : (
                 <Input
-                  placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
+                  placeholder="https://..."
                   value={editingItem.content}
                   onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
                 />

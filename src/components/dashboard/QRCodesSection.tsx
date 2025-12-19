@@ -4,6 +4,7 @@ import { QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen,
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -49,6 +50,8 @@ interface QRCodesSectionProps {
 export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [qrPages, setQrPages] = useState<QRPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [editingQR, setEditingQR] = useState<QRPage | null>(null);
   const [isEditQROpen, setIsEditQROpen] = useState(false);
@@ -139,10 +142,51 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       if (error) throw error;
 
       setQrPages(qrPages.filter((p) => p.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast.success("QR code deleted");
     } catch (error) {
       toast.error("Failed to delete QR code");
       console.error(error);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    try {
+      for (const id of selectedIds) {
+        await supabase.from("qr_page_items").delete().eq("qr_page_id", id);
+        await supabase.from("qr_pages").delete().eq("id", id);
+      }
+      setQrPages(qrPages.filter((p) => !selectedIds.has(p.id)));
+      toast.success(`${selectedIds.size} QR code(s) deleted`);
+      setSelectedIds(new Set());
+    } catch (error) {
+      toast.error("Failed to delete QR codes");
+      console.error(error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === qrPages.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(qrPages.map((p) => p.id)));
     }
   };
 
@@ -283,9 +327,29 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">My QR Codes</h2>
-        <p className="text-muted-foreground">Manage all your generated QR codes</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">My QR Codes</h2>
+          <p className="text-muted-foreground">Manage all your generated QR codes</p>
+        </div>
+        {qrPages.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+              {selectedIds.size === qrPages.length ? "Deselect All" : "Select All"}
+            </Button>
+            {selectedIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                Delete ({selectedIds.size})
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {qrPages.length === 0 ? (
@@ -305,8 +369,13 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card className="hover:border-primary/30 transition-colors">
+              <Card className={`hover:border-primary/30 transition-colors ${selectedIds.has(page.id) ? "border-primary bg-primary/5" : ""}`}>
                 <CardContent className="flex items-center gap-4 p-4">
+                  <Checkbox
+                    checked={selectedIds.has(page.id)}
+                    onCheckedChange={() => toggleSelect(page.id)}
+                    className="flex-shrink-0"
+                  />
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center relative">
                     <QrCode className="w-6 h-6 text-primary" />
                     {page.has_password && (
@@ -524,9 +593,16 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                       onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
                     />
                   </div>
+                ) : editingItem.type === "text" ? (
+                  <Textarea
+                    placeholder="Enter text content (supports multiple lines)"
+                    value={editingItem.content}
+                    onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                    rows={5}
+                  />
                 ) : (
                   <Input
-                    placeholder={editingItem.type === "url" ? "https://..." : "Enter text content"}
+                    placeholder="https://..."
                     value={editingItem.content}
                     onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
                   />

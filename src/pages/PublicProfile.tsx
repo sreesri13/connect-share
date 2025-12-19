@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Download, Play, Lock, Eye, EyeOff } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Download, Play, Lock, Eye, EyeOff, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -199,8 +199,8 @@ const PublicProfile = () => {
         toast.info("Link copied! Open it in a new tab.");
       }
     } else if (item.type === "text") {
-      navigator.clipboard.writeText(item.content);
-      toast.success("Text copied to clipboard!");
+      // Open text in modal for viewing
+      setSelectedItem(item);
     } else if (item.type === "pdf") {
       // Open PDF in new tab
       const newWindow = window.open(item.content, "_blank", "noopener,noreferrer");
@@ -212,6 +212,11 @@ const PublicProfile = () => {
       // Open modal for media preview
       setSelectedItem(item);
     }
+  };
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Text copied to clipboard!");
   };
 
   const handleDownload = (item: ProfileItem) => {
@@ -430,7 +435,7 @@ const PublicProfile = () => {
                               <p className="text-sm text-muted-foreground truncate">{item.content}</p>
                             )}
                             {item.type === "text" && (
-                              <p className="text-sm text-muted-foreground">Click to copy</p>
+                              <p className="text-sm text-muted-foreground">Click to view</p>
                             )}
                             {isMedia && item.type !== "pdf" && (
                               <p className="text-sm text-muted-foreground">Click to view</p>
@@ -472,34 +477,53 @@ const PublicProfile = () => {
         </motion.div>
       </motion.div>
 
-      {/* Media Preview Modal */}
+      {/* Media/Text Preview Modal */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between gap-2">
               <span className="truncate">{selectedItem?.title}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => selectedItem && handleOpenInNewTab(selectedItem.content)}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => selectedItem && handleDownload(selectedItem)}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
+                {selectedItem?.type === "text" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => selectedItem && handleCopyText(selectedItem.content)}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedItem && handleOpenInNewTab(selectedItem.content)}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedItem && handleDownload(selectedItem)}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </>
+                )}
               </div>
             </DialogTitle>
           </DialogHeader>
           
           <div className="mt-4">
+            {selectedItem?.type === "text" && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-foreground whitespace-pre-wrap break-words">{selectedItem.content}</p>
+              </div>
+            )}
+            
             {selectedItem?.type === "image" && (
               <img
                 src={selectedItem.content}
