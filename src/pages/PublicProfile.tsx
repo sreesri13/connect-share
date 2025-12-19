@@ -30,6 +30,7 @@ const typeIcons: Record<string, React.ComponentType<any>> = {
   image: Image,
   video: Video,
   audio: Music,
+  others: File,
 };
 
 const PublicProfile = () => {
@@ -201,12 +202,12 @@ const PublicProfile = () => {
     } else if (item.type === "text") {
       // Open text in modal for viewing
       setSelectedItem(item);
-    } else if (item.type === "pdf") {
-      // Open PDF in new tab
+    } else if (item.type === "pdf" || item.type === "others") {
+      // Open PDF or other file in new tab
       const newWindow = window.open(item.content, "_blank", "noopener,noreferrer");
       if (!newWindow) {
         navigator.clipboard.writeText(item.content);
-        toast.info("PDF link copied! Open it in a new tab.");
+        toast.info("File link copied! Open it in a new tab.");
       }
     } else if (["image", "video", "audio"].includes(item.type)) {
       // Open modal for media preview

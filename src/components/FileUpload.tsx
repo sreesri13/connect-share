@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface FileUploadProps {
-  type: "pdf" | "image" | "video" | "audio";
+  type: "pdf" | "image" | "video" | "audio" | "others";
   userId: string;
   onUploadComplete: (url: string) => void;
   value?: string;
@@ -35,6 +35,12 @@ const typeConfig = {
     icon: Music,
     label: "Audio",
     maxSize: 20 * 1024 * 1024, // 20MB
+  },
+  others: {
+    accept: "*/*",
+    icon: FileText,
+    label: "File",
+    maxSize: 50 * 1024 * 1024, // 50MB
   },
 };
 
