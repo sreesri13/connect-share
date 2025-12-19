@@ -1,0 +1,2 @@
+-- Add 'others' to the item_type enum
+ALTER TYPE public.item_type ADD VALUE IF NOT EXISTS 'others';

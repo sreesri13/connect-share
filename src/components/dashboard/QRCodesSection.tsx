@@ -38,7 +38,7 @@ interface QRPage {
 interface QRItem {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others";
   content: string;
   qr_page_item_id: string;
 }
@@ -578,16 +578,17 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                     <SelectItem value="image">Image</SelectItem>
                     <SelectItem value="video">Video</SelectItem>
                     <SelectItem value="audio">Audio (MP3)</SelectItem>
+                    <SelectItem value="others">Others (Any File)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label>Content</Label>
-                {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
+                {["pdf", "image", "video", "audio", "others"].includes(editingItem.type) ? (
                   <div className="w-full overflow-hidden">
                     <FileUpload
-                      type={editingItem.type as "pdf" | "image" | "video" | "audio"}
+                      type={editingItem.type as "pdf" | "image" | "video" | "audio" | "others"}
                       userId={userId}
                       value={editingItem.content}
                       onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}

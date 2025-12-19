@@ -51,7 +51,7 @@ import { useNavigate } from "react-router-dom";
 interface Item {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others";
   content: string;
   selected: boolean;
   category_id: string;
@@ -65,13 +65,14 @@ interface Category {
   display_order: number;
 }
 
-const itemTypeIcons = {
+const itemTypeIcons: Record<Item["type"], any> = {
   url: LinkIcon,
   text: FileText,
   pdf: File,
   image: Image,
   video: Video,
   audio: Music,
+  others: File,
 };
 
 interface ProfileSectionProps {
@@ -458,12 +459,13 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     <SelectItem value="image">Image</SelectItem>
                     <SelectItem value="video">Video</SelectItem>
                     <SelectItem value="audio">Audio (MP3)</SelectItem>
+                    <SelectItem value="others">Others (Any File)</SelectItem>
                   </SelectContent>
                 </Select>
 
-                {["pdf", "image", "video", "audio"].includes(newItem.type) ? (
+                {["pdf", "image", "video", "audio", "others"].includes(newItem.type) ? (
                   <FileUpload
-                    type={newItem.type as "pdf" | "image" | "video" | "audio"}
+                    type={newItem.type as "pdf" | "image" | "video" | "audio" | "others"}
                     userId={userId}
                     value={newItem.content}
                     onUploadComplete={(url) => setNewItem({ ...newItem, content: url })}
@@ -706,12 +708,13 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   <SelectItem value="image">Image</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
                   <SelectItem value="audio">Audio (MP3)</SelectItem>
+                  <SelectItem value="others">Others (Any File)</SelectItem>
                 </SelectContent>
               </Select>
 
-              {["pdf", "image", "video", "audio"].includes(editingItem.type) ? (
+              {["pdf", "image", "video", "audio", "others"].includes(editingItem.type) ? (
                 <FileUpload
-                  type={editingItem.type as "pdf" | "image" | "video" | "audio"}
+                  type={editingItem.type as "pdf" | "image" | "video" | "audio" | "others"}
                   userId={userId}
                   value={editingItem.content}
                   onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}
