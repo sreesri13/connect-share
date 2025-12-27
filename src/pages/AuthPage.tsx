@@ -61,6 +61,27 @@ const AuthPage = () => {
     }
   };
 
+  const verifyRecaptcha = async (token: string): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-recaptcha`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token, action: "signup" }),
+        }
+      );
+      
+      const data = await response.json();
+      return data.success === true;
+    } catch (error) {
+      console.error("reCAPTCHA verification error:", error);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -73,6 +94,17 @@ const AuthPage = () => {
     setIsLoading(true);
 
     try {
+      // Verify reCAPTCHA token on server for signup
+      if (isSignUp && recaptchaToken) {
+        const isValid = await verifyRecaptcha(recaptchaToken);
+        if (!isValid) {
+          toast.error("reCAPTCHA verification failed. Please try again.");
+          resetRecaptcha();
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (isSignUp) {
         const { error } = await signUp(email, password, displayName || undefined);
         if (error) {

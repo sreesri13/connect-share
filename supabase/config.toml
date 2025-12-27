@@ -2,3 +2,9 @@ project_id = "kyzazsmsqrqwbjpkqjqm"
 
 [functions.resolve-upi]
 verify_jwt = false
+
+[functions.get-analytics]
+verify_jwt = false
+
+[functions.verify-recaptcha]
+verify_jwt = false
