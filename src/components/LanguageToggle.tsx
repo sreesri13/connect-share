@@ -60,7 +60,11 @@ declare global {
   }
 }
 
-export const LanguageToggle = () => {
+interface LanguageToggleProps {
+  inline?: boolean;
+}
+
+export const LanguageToggle = ({ inline = false }: LanguageToggleProps) => {
   // Default language is English, target language defaults to Telugu
   const [currentLang, setCurrentLang] = useState(() => 
     localStorage.getItem(STORAGE_KEYS.currentLang) || "en"
@@ -231,7 +235,10 @@ export const LanguageToggle = () => {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+    <div className={cn(
+      "flex items-center gap-2",
+      !inline && "fixed top-4 right-4 z-50"
+    )}>
       {/* Toggle Button */}
       <Button
         variant="outline"

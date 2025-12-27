@@ -10,6 +10,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,8 +33,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
-type SettingsTab = "profile" | "account";
+type SettingsTab = "profile" | "account" | "language";
 
 interface SettingsSectionProps {
   userId: string;
@@ -186,6 +188,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
   const tabs = [
     { id: "profile" as SettingsTab, label: "My Profile", icon: User },
     { id: "account" as SettingsTab, label: "Account", icon: Shield },
+    { id: "language" as SettingsTab, label: "Language", icon: Globe },
   ];
 
   if (isLoading) {
@@ -448,6 +451,28 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeTab === "language" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-primary" />
+                  Language Settings
+                </CardTitle>
+                <CardDescription>
+                  Change the display language of the application using Google Translate.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Use the language toggle below to switch between English and your preferred language.
+                </p>
+                <div className="flex justify-start">
+                  <LanguageToggle inline />
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

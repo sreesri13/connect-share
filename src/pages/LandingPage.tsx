@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { QrCode, Layers, Share2, Shield, Zap, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 const LandingPage = () => {
   return (
@@ -82,19 +83,26 @@ const LandingPage = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.5 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4"
+            className="flex flex-col items-center gap-4 sm:gap-6"
           >
-            <Button variant="hero" size="lg" asChild className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px]">
-              <Link to="/auth?mode=signup">
-                Create Your Profile
-                <Zap className="w-4 sm:w-5 h-4 sm:h-5 ml-1" />
-              </Link>
-            </Button>
-            <Button variant="hero-outline" size="lg" asChild className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px]">
-              <Link to="/demo">
-                View Demo
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full">
+              <Button variant="hero" size="lg" asChild className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px]">
+                <Link to="/auth?mode=signup">
+                  Create Your Profile
+                  <Zap className="w-4 sm:w-5 h-4 sm:h-5 ml-1" />
+                </Link>
+              </Button>
+              <Button variant="hero-outline" size="lg" asChild className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px]">
+                <Link to="/demo">
+                  View Demo
+                </Link>
+              </Button>
+            </div>
+            
+            {/* Language Toggle - Below buttons */}
+            <div className="relative z-20">
+              <LanguageToggle inline />
+            </div>
           </motion.div>
         </div>
 

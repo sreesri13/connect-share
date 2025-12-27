@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { verifyPassword } from "@/lib/crypto";
 import { toast } from "sonner";
 import { initGA, trackProfileView, trackQRScan } from "@/lib/analytics";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface ProfileItem {
   id: string;
@@ -366,6 +367,9 @@ const PublicProfile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
+      {/* Language Toggle - Top Right */}
+      <LanguageToggle />
+      
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
