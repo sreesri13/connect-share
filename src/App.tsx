@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import LanguageToggle from "@/components/LanguageToggle";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
@@ -23,6 +24,8 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        {/* Language Toggle - Fixed position, visible on all pages */}
+        <LanguageToggle />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
