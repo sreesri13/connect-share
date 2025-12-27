@@ -18,7 +18,9 @@ declare global {
   }
 }
 
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"; // Google's test key
+// Use your own reCAPTCHA site key from https://www.google.com/recaptcha/admin
+// For production, replace this with your actual site key
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 export const useRecaptcha = (containerId: string) => {
   const [isLoaded, setIsLoaded] = useState(false);

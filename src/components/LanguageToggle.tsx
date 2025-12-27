@@ -177,20 +177,40 @@ export const LanguageToggle = ({ inline = false }: LanguageToggleProps) => {
 
     if (selectEl) {
       if (langCode === "en") {
-        // Reset to English - clear the translation
-        selectEl.value = "";
+        // Reset to English - use the proper Google Translate reset mechanism
+        // First clear the cookies
+        const hostname = window.location.hostname;
+        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + hostname;
+        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." + hostname;
+        
+        // Set to English using the select
+        selectEl.value = "en";
         selectEl.dispatchEvent(new Event("change", { bubbles: true }));
         
-        // Also try to restore original text
-        const frame = document.querySelector(".goog-te-menu-frame") as HTMLIFrameElement;
-        if (frame?.contentDocument) {
-          const resetBtn = frame.contentDocument.querySelector('[id=":1.restore"]') as HTMLElement;
-          if (resetBtn) resetBtn.click();
-        }
-        
-        // Clear cookies
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." + window.location.hostname;
+        // Force restore by triggering the banner's restore link if available
+        setTimeout(() => {
+          // Try clicking the "Show original" button if it exists
+          const restoreLink = document.querySelector(".goog-te-banner-frame");
+          if (restoreLink) {
+            try {
+              const iframe = restoreLink as HTMLIFrameElement;
+              const innerDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (innerDoc) {
+                const restoreBtn = innerDoc.querySelector('[id=":1.restore"]') as HTMLElement;
+                if (restoreBtn) {
+                  restoreBtn.click();
+                }
+              }
+            } catch (e) {
+              // Cross-origin restrictions may prevent this
+            }
+          }
+          
+          // Alternative: Force the select back to empty state which shows original
+          selectEl.selectedIndex = 0;
+          selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+        }, 100);
       } else {
         selectEl.value = langCode;
         selectEl.dispatchEvent(new Event("change", { bubbles: true }));
