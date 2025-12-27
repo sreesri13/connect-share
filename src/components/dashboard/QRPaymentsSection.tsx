@@ -206,8 +206,9 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
   };
 
   const getRedirectUrl = (publicCode: string): string => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    return `${supabaseUrl}/functions/v1/resolve-upi?code=${publicCode}`;
+    // Use the app's own URL for a clean redirect (no database URL exposed)
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/pay?code=${publicCode}`;
   };
 
   if (isLoading) {
