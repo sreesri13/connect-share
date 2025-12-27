@@ -34,8 +34,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { RecycleBinSection } from "@/components/dashboard/RecycleBinSection";
 
-type SettingsTab = "profile" | "account" | "language";
+type SettingsTab = "profile" | "account" | "language" | "recycle";
 
 interface SettingsSectionProps {
   userId: string;
@@ -189,6 +190,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
     { id: "profile" as SettingsTab, label: "My Profile", icon: User },
     { id: "account" as SettingsTab, label: "Account", icon: Shield },
     { id: "language" as SettingsTab, label: "Language", icon: Globe },
+    { id: "recycle" as SettingsTab, label: "Recycle Bin", icon: Trash2 },
   ];
 
   if (isLoading) {
@@ -473,6 +475,10 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === "recycle" && (
+            <RecycleBinSection userId={userId} />
           )}
         </div>
       </div>
