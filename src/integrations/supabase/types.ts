@@ -154,7 +154,10 @@ export type Database = {
       qr_pages: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          expires_at: string | null
           id: string
+          is_deleted: boolean | null
           password_hash: string | null
           public_id: string
           title: string | null
@@ -162,7 +165,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          expires_at?: string | null
           id?: string
+          is_deleted?: boolean | null
           password_hash?: string | null
           public_id: string
           title?: string | null
@@ -170,7 +176,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          expires_at?: string | null
           id?: string
+          is_deleted?: boolean | null
           password_hash?: string | null
           public_id?: string
           title?: string | null
