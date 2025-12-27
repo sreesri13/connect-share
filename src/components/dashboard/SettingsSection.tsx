@@ -197,18 +197,18 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-        <p className="text-muted-foreground">Manage your account and profile</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Settings</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Manage your account and profile</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
         {/* Tabs Navigation */}
-        <div className="md:w-56 flex-shrink-0">
+        <div className="w-full md:w-56 flex-shrink-0">
           <Card className="p-2">
-            <nav className="space-y-1">
+            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -216,14 +216,14 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors",
+                      "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-left transition-colors whitespace-nowrap min-h-[44px] flex-1 md:flex-none md:w-full",
                       activeTab === tab.id
                         ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-foreground"
+                        : "hover:bg-muted active:bg-muted text-foreground"
                     )}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span className="font-medium">{tab.label}</span>
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-medium text-sm sm:text-base">{tab.label}</span>
                   </button>
                 );
               })}
