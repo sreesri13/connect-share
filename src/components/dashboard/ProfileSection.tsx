@@ -381,22 +381,22 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">My Profile</h2>
-          <p className="text-muted-foreground">Manage your categories and items</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">My Profile</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your categories and items</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Category
+              <Button variant="outline" size="sm" className="min-h-[44px] sm:min-h-[40px]">
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Category</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Category</DialogTitle>
                 <DialogDescription>Add a new category to organize your items.</DialogDescription>
@@ -407,8 +407,9 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                  className="min-h-[44px]"
                 />
-                <Button onClick={handleAddCategory} className="w-full">
+                <Button onClick={handleAddCategory} className="w-full min-h-[44px]">
                   Create Category
                 </Button>
               </div>
@@ -417,19 +418,19 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
 
           <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
             <DialogTrigger asChild>
-              <Button disabled={categories.length === 0}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Item
+              <Button disabled={categories.length === 0} size="sm" className="min-h-[44px] sm:min-h-[40px]">
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Item</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Item</DialogTitle>
                 <DialogDescription>Add a new item to one of your categories.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="min-h-[44px]">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -444,12 +445,13 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   placeholder="Item title"
                   value={newItem.title}
                   onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                  className="min-h-[44px]"
                 />
                 <Select
                   value={newItem.type}
                   onValueChange={(v) => setNewItem({ ...newItem, type: v as Item["type"], content: "" })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="min-h-[44px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -482,10 +484,11 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     placeholder="https://..."
                     value={newItem.content}
                     onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
+                    className="min-h-[44px]"
                   />
                 )}
 
-                <Button onClick={handleAddItem} className="w-full" disabled={!newItem.content}>
+                <Button onClick={handleAddItem} className="w-full min-h-[44px]" disabled={!newItem.content}>
                   Add Item
                 </Button>
               </div>
@@ -498,20 +501,22 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between p-4 rounded-xl glass border-border/50"
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl glass border-border/50"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <span className="text-sm text-muted-foreground">
             <span className="text-primary font-semibold">{selectedItems.size}</span> items selected
           </span>
-          <Button variant="ghost" size="sm" onClick={selectAll}>
-            Select All
-          </Button>
-          <Button variant="ghost" size="sm" onClick={deselectAll}>
-            Deselect All
-          </Button>
+          <div className="flex gap-1 sm:gap-2">
+            <Button variant="ghost" size="sm" onClick={selectAll} className="min-h-[36px] px-2 sm:px-3">
+              Select All
+            </Button>
+            <Button variant="ghost" size="sm" onClick={deselectAll} className="min-h-[36px] px-2 sm:px-3">
+              Deselect All
+            </Button>
+          </div>
         </div>
-        <Button onClick={handleGenerateQR} disabled={selectedItems.size === 0}>
+        <Button onClick={handleGenerateQR} disabled={selectedItems.size === 0} size="sm" className="w-full sm:w-auto min-h-[44px]">
           <QrCode className="w-4 h-4 mr-2" />
           Generate QR Code
         </Button>

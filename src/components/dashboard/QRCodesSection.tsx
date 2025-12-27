@@ -325,17 +325,17 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">My QR Codes</h2>
-          <p className="text-muted-foreground">Manage all your generated QR codes</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">My QR Codes</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage all your generated QR codes</p>
         </div>
         {qrPages.length > 0 && (
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-              {selectedIds.size === qrPages.length ? "Deselect All" : "Select All"}
+            <Button variant="outline" size="sm" onClick={toggleSelectAll} className="min-h-[44px] text-xs sm:text-sm">
+              {selectedIds.size === qrPages.length ? "Deselect" : "Select All"}
             </Button>
             {selectedIds.size > 0 && (
               <Button
@@ -343,9 +343,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                 size="sm"
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}
+                className="min-h-[44px]"
               >
-                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                Delete ({selectedIds.size})
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin sm:mr-2" /> : <Trash2 className="w-4 h-4 sm:mr-2" />}
+                <span className="hidden sm:inline">Delete ({selectedIds.size})</span>
+                <span className="sm:hidden">{selectedIds.size}</span>
               </Button>
             )}
           </div>
@@ -353,15 +355,15 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       </div>
 
       {qrPages.length === 0 ? (
-        <Card className="p-12 text-center">
-          <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-xl font-semibold mb-2">No QR codes yet</h3>
-          <p className="text-muted-foreground mb-6">
+        <Card className="p-8 sm:p-12 text-center">
+          <QrCode className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg sm:text-xl font-semibold mb-2">No QR codes yet</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mb-6">
             Generate your first QR code from the My Profile section
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3 sm:gap-4">
           {qrPages.map((page, index) => (
             <motion.div
               key={page.id}
@@ -370,45 +372,48 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               transition={{ delay: index * 0.05 }}
             >
               <Card className={`hover:border-primary/30 transition-colors ${selectedIds.has(page.id) ? "border-primary bg-primary/5" : ""}`}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <Checkbox
-                    checked={selectedIds.has(page.id)}
-                    onCheckedChange={() => toggleSelect(page.id)}
-                    className="flex-shrink-0"
-                  />
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center relative">
-                    <QrCode className="w-6 h-6 text-primary" />
-                    {page.has_password && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                        <Lock className="w-2.5 h-2.5 text-primary-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-foreground truncate">
-                        {page.title || `QR Code`}
-                      </h3>
+                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(page.id)}
+                      onCheckedChange={() => toggleSelect(page.id)}
+                      className="flex-shrink-0"
+                    />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center relative flex-shrink-0">
+                      <QrCode className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                       {page.has_password && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">Protected</span>
+                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Lock className="w-2.5 h-2.5 text-primary-foreground" />
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(page.created_at).toLocaleDateString()}
-                      </span>
-                      <span>{page.item_count} items</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium text-foreground truncate text-sm sm:text-base">
+                          {page.title || `QR Code`}
+                        </h3>
+                        {page.has_password && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">Protected</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(page.created_at).toLocaleDateString()}
+                        </span>
+                        <span>{page.item_count} items</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-1 hidden sm:block">
+                        {getPublicUrl(page.public_id)}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mt-1">
-                      {getPublicUrl(page.public_id)}
-                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 justify-end sm:justify-start ml-auto sm:ml-0">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditQR(page)}
+                      className="min-h-[40px] min-w-[40px]"
                     >
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -416,13 +421,14 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(getPublicUrl(page.public_id), "_blank")}
+                      className="min-h-[40px] min-w-[40px]"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive min-h-[40px] min-w-[40px]"
                       onClick={() => handleDelete(page.id)}
                     >
                       <Trash2 className="w-4 h-4" />
