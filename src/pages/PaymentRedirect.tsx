@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle, Smartphone, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { initGA, trackPaymentQRScan } from "@/lib/analytics";
 
 const PaymentRedirect = () => {
   const [searchParams] = useSearchParams();
@@ -13,12 +14,17 @@ const PaymentRedirect = () => {
   const code = searchParams.get("code");
 
   useEffect(() => {
+    // Initialize GA tracking on payment redirect pages
+    initGA();
+    
     if (!code) {
       setError("Invalid payment link");
       setIsLoading(false);
       return;
     }
 
+    // Track payment QR scan
+    trackPaymentQRScan(code);
     resolveAndRedirect();
   }, [code]);
 
