@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPassword } from "@/lib/crypto";
 import { toast } from "sonner";
+import { initGA, trackProfileView, trackQRScan } from "@/lib/analytics";
 
 interface ProfileItem {
   id: string;
@@ -50,7 +51,13 @@ const PublicProfile = () => {
   const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
+    // Initialize GA tracking on public profile pages
+    initGA();
+    
     if (profileId) {
+      // Track QR scan event when profile is accessed
+      trackQRScan(profileId);
+      trackProfileView(profileId);
       checkPasswordProtection();
     }
   }, [profileId]);
