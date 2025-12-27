@@ -12,9 +12,9 @@
  * 3. Replace GA_MEASUREMENT_ID below with your ID
  */
 
-// Replace with your GA4 Measurement ID (e.g., 'G-XXXXXXXXXX')
+// GA4 Measurement ID for ConnectHub
 // This is a public/publishable key - safe to include in frontend code
-const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || '';
+const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || 'G-PWRFTR3KCM';
 
 declare global {
   interface Window {
