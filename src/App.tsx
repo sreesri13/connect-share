@@ -13,6 +13,7 @@ import PublicProfile from "./pages/PublicProfile";
 import SettingsPage from "./pages/SettingsPage";
 import DemoPage from "./pages/DemoPage";
 import NotFound from "./pages/NotFound";
+import PaymentRedirect from "./pages/PaymentRedirect";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/p/:profileId" element={<PublicProfile />} />
+            <Route path="/pay" element={<PaymentRedirect />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
