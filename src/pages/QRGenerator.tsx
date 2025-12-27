@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword } from "@/lib/crypto";
+import { format, addDays, addHours, addMinutes } from "date-fns";
 
 interface ItemWithCategory {
   id: string;
@@ -37,6 +38,12 @@ const QRGenerator = () => {
   const [enablePassword, setEnablePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Expiration settings
+  const [enableExpiration, setEnableExpiration] = useState(false);
+  const [expirationDays, setExpirationDays] = useState(0);
+  const [expirationHours, setExpirationHours] = useState(1);
+  const [expirationMinutes, setExpirationMinutes] = useState(0);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -90,11 +97,27 @@ const QRGenerator = () => {
     return Math.random().toString(36).substring(2, 10);
   };
 
+  const calculateExpirationDate = () => {
+    if (!enableExpiration) return null;
+    
+    let expirationDate = new Date();
+    expirationDate = addDays(expirationDate, expirationDays);
+    expirationDate = addHours(expirationDate, expirationHours);
+    expirationDate = addMinutes(expirationDate, expirationMinutes);
+    
+    return expirationDate.toISOString();
+  };
+
   const handleSaveQR = async () => {
     if (!user || selectedItems.length === 0) return;
 
     if (enablePassword && !password.trim()) {
       toast.error("Please enter a password");
+      return;
+    }
+
+    if (enableExpiration && expirationDays === 0 && expirationHours === 0 && expirationMinutes === 0) {
+      toast.error("Please set an expiration time");
       return;
     }
 
@@ -108,6 +131,9 @@ const QRGenerator = () => {
         passwordHash = hashPassword(password.trim());
       }
 
+      // Calculate expiration date
+      const expiresAt = calculateExpirationDate();
+
       // Create QR page
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
@@ -116,6 +142,7 @@ const QRGenerator = () => {
           public_id: publicId,
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
           password_hash: passwordHash,
+          expires_at: expiresAt,
         })
         .select()
         .single();
@@ -195,6 +222,13 @@ const QRGenerator = () => {
     acc[item.category_name].push(item);
     return acc;
   }, {} as Record<string, ItemWithCategory[]>);
+
+  const getExpirationPreview = () => {
+    if (!enableExpiration) return null;
+    const date = calculateExpirationDate();
+    if (!date) return null;
+    return format(new Date(date), "PPp");
+  };
 
   if (authLoading || isLoading) {
     return (
@@ -319,6 +353,67 @@ const QRGenerator = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Expiration Option */}
+                    <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="enableExpiration"
+                          checked={enableExpiration}
+                          onCheckedChange={(checked) => setEnableExpiration(checked as boolean)}
+                        />
+                        <Label htmlFor="enableExpiration" className="flex items-center gap-2 cursor-pointer">
+                          <Clock className="w-4 h-4 text-primary" />
+                          Set expiration time
+                        </Label>
+                      </div>
+                      
+                      {enableExpiration && (
+                        <div className="space-y-3 mt-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Days</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="365"
+                                value={expirationDays}
+                                onChange={(e) => setExpirationDays(parseInt(e.target.value) || 0)}
+                                className="text-center"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Hours</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={expirationHours}
+                                onChange={(e) => setExpirationHours(parseInt(e.target.value) || 0)}
+                                className="text-center"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Minutes</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={expirationMinutes}
+                                onChange={(e) => setExpirationMinutes(parseInt(e.target.value) || 0)}
+                                className="text-center"
+                              />
+                            </div>
+                          </div>
+                          {getExpirationPreview() && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              Expires: {getExpirationPreview()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     
                     <Button onClick={handleSaveQR} className="w-full" disabled={isSaving}>
                       {isSaving ? (
@@ -342,6 +437,12 @@ const QRGenerator = () => {
                       <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 text-primary text-sm">
                         <Lock className="w-4 h-4" />
                         This QR code is password protected
+                      </div>
+                    )}
+                    {enableExpiration && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 text-amber-600 text-sm">
+                        <Clock className="w-4 h-4" />
+                        Expires: {getExpirationPreview()}
                       </div>
                     )}
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 border border-border">

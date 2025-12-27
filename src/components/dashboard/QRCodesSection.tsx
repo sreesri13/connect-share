@@ -77,9 +77,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           title,
           created_at,
           password_hash,
+          is_deleted,
           qr_page_items (id)
         `)
         .eq("user_id", userId)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -137,8 +139,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
   const handleDelete = async (id: string) => {
     try {
-      await supabase.from("qr_page_items").delete().eq("qr_page_id", id);
-      const { error } = await supabase.from("qr_pages").delete().eq("id", id);
+      // Soft delete - move to recycle bin
+      const { error } = await supabase
+        .from("qr_pages")
+        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) throw error;
 
       setQrPages(qrPages.filter((p) => p.id !== id));
@@ -147,7 +152,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         next.delete(id);
         return next;
       });
-      toast.success("QR code deleted");
+      toast.success("QR code moved to recycle bin");
     } catch (error) {
       toast.error("Failed to delete QR code");
       console.error(error);
@@ -159,11 +164,14 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setIsDeleting(true);
     try {
       for (const id of selectedIds) {
-        await supabase.from("qr_page_items").delete().eq("qr_page_id", id);
-        await supabase.from("qr_pages").delete().eq("id", id);
+        // Soft delete - move to recycle bin
+        await supabase
+          .from("qr_pages")
+          .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+          .eq("id", id);
       }
       setQrPages(qrPages.filter((p) => !selectedIds.has(p.id)));
-      toast.success(`${selectedIds.size} QR code(s) deleted`);
+      toast.success(`${selectedIds.size} QR code(s) moved to recycle bin`);
       setSelectedIds(new Set());
     } catch (error) {
       toast.error("Failed to delete QR codes");
