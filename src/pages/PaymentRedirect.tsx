@@ -22,16 +22,26 @@ const PaymentRedirect = () => {
     resolveAndRedirect();
   }, [code]);
 
-  const buildUpiDeepLink = (upiId: string, displayName: string, amount: number | null) => {
+  const buildUpiDeepLink = (
+    upiId: string,
+    displayName: string,
+    amount: number | null,
+    reference?: string
+  ) => {
     const params = new URLSearchParams();
-    params.set("pa", upiId);
-    params.set("pn", displayName || "Payment");
+    params.set("pa", upiId.trim());
+    params.set("pn", displayName?.trim() || "Payment");
     params.set("cu", "INR");
-    
+
+    // Optional but recommended params for better compatibility across UPI apps
+    params.set("tn", "QR Payment");
+    const safeRef = (reference ?? "").replace(/[^a-zA-Z0-9]/g, "");
+    params.set("tr", `QR${safeRef ? `-${safeRef}` : ""}-${Date.now()}`);
+
     if (amount && amount > 0) {
       params.set("am", amount.toFixed(2));
     }
-    
+
     return `upi://pay?${params.toString()}`;
   };
 
@@ -53,7 +63,12 @@ const PaymentRedirect = () => {
 
       setUpiData(data);
       
-      const upiDeepLink = buildUpiDeepLink(data.upi_id, data.display_name, data.amount);
+      const upiDeepLink = buildUpiDeepLink(
+        data.upi_id,
+        data.display_name,
+        data.amount,
+        code ?? undefined
+      );
 
       window.location.href = upiDeepLink;
       
@@ -71,7 +86,12 @@ const PaymentRedirect = () => {
   const handleOpenPaymentApp = () => {
     if (!upiData) return;
     
-    const upiDeepLink = buildUpiDeepLink(upiData.upi_id, upiData.display_name, upiData.amount);
+    const upiDeepLink = buildUpiDeepLink(
+      upiData.upi_id,
+      upiData.display_name,
+      upiData.amount,
+      code ?? undefined
+    );
     window.location.href = upiDeepLink;
   };
 
