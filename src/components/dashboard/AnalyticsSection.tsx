@@ -14,7 +14,8 @@ import {
   QrCode,
   RefreshCw,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Radio
 } from "lucide-react";
 import {
   LineChart,
@@ -32,6 +33,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { isGAConfigured, GA_MEASUREMENT_ID } from "@/lib/analytics";
+import { useRealtimeVisitors } from "@/hooks/useRealtimeVisitors";
 
 // Types for analytics data
 interface AnalyticsOverview {
@@ -133,6 +135,9 @@ export const AnalyticsSection = () => {
   const [devices, setDevices] = useState<DeviceData[]>(DEMO_DEVICES);
   const [sources, setSources] = useState<TrafficSource[]>(DEMO_SOURCES);
   const [countries, setCountries] = useState<CountryData[]>(DEMO_COUNTRIES);
+  
+  // Real-time visitors tracking
+  const { activeVisitors, isConnected } = useRealtimeVisitors();
 
   const gaConfigured = isGAConfigured();
 
@@ -275,7 +280,29 @@ export const AnalyticsSection = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Real-time Visitors Card */}
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50 relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Active Now</p>
+                  <p className="text-2xl font-bold">{activeVisitors}</p>
+                  <p className="text-xs flex items-center gap-1 text-green-500">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    {isConnected ? 'Live' : 'Connecting...'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-full bg-green-500/10">
+                  <Radio className="h-6 w-6 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <MetricCard 
             title="Total Visits" 
             value={overview.totalVisits.toLocaleString()} 
