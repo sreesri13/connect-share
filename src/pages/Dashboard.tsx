@@ -9,6 +9,7 @@ import {
   User,
   Menu,
   X,
+  CreditCard,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,10 +22,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProfileSection } from "@/components/dashboard/ProfileSection";
 import { QRCodesSection } from "@/components/dashboard/QRCodesSection";
+import { QRPaymentsSection } from "@/components/dashboard/QRPaymentsSection";
 import { SettingsSection } from "@/components/dashboard/SettingsSection";
 import { cn } from "@/lib/utils";
 
-type DashboardSection = "profile" | "qrcodes" | "settings";
+type DashboardSection = "profile" | "qrcodes" | "qrpayments" | "settings";
 
 interface Profile {
   display_name: string | null;
@@ -117,6 +119,7 @@ const Dashboard = () => {
   const sidebarItems = [
     { id: "profile" as DashboardSection, label: "My Profile", icon: Folder },
     { id: "qrcodes" as DashboardSection, label: "QR Codes", icon: QrCode },
+    { id: "qrpayments" as DashboardSection, label: "QR Payments", icon: CreditCard },
     { id: "settings" as DashboardSection, label: "Settings", icon: Settings },
   ];
 
@@ -294,6 +297,9 @@ const Dashboard = () => {
           )}
           {activeSection === "qrcodes" && user && (
             <QRCodesSection userId={user.id} />
+          )}
+          {activeSection === "qrpayments" && user && (
+            <QRPaymentsSection userId={user.id} />
           )}
           {activeSection === "settings" && user && (
             <SettingsSection userId={user.id} userEmail={user.email || ""} />

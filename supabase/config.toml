@@ -1,1 +1,4 @@
 project_id = "kyzazsmsqrqwbjpkqjqm"
+
+[functions.resolve-upi]
+verify_jwt = false
