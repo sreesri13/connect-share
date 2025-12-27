@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, Smartphone } from "lucide-react";
+import { Loader2, AlertCircle, Smartphone, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PaymentRedirect = () => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const [upiData, setUpiData] = useState<{ upi_id: string; display_name: string } | null>(null);
+  const [upiData, setUpiData] = useState<{ upi_id: string; display_name: string; amount: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const code = searchParams.get("code");
@@ -22,12 +22,24 @@ const PaymentRedirect = () => {
     resolveAndRedirect();
   }, [code]);
 
+  const buildUpiDeepLink = (upiId: string, displayName: string, amount: number | null) => {
+    const params = new URLSearchParams();
+    params.set("pa", upiId);
+    params.set("pn", displayName || "Payment");
+    params.set("cu", "INR");
+    
+    if (amount && amount > 0) {
+      params.set("am", amount.toFixed(2));
+    }
+    
+    return `upi://pay?${params.toString()}`;
+  };
+
   const resolveAndRedirect = async () => {
     try {
-      // Fetch UPI data directly from database
       const { data, error: dbError } = await supabase
         .from("upi_payments")
-        .select("upi_id, display_name")
+        .select("upi_id, display_name, amount")
         .eq("public_code", code)
         .maybeSingle();
 
@@ -41,14 +53,10 @@ const PaymentRedirect = () => {
 
       setUpiData(data);
       
-      // Build UPI deep link
-      const displayName = encodeURIComponent(data.display_name || "Payment");
-      const upiDeepLink = `upi://pay?pa=${encodeURIComponent(data.upi_id)}&pn=${displayName}&cu=INR`;
+      const upiDeepLink = buildUpiDeepLink(data.upi_id, data.display_name, data.amount);
 
-      // Try to redirect immediately
       window.location.href = upiDeepLink;
       
-      // After a short delay, show the manual button (in case auto-redirect fails)
       setTimeout(() => {
         setIsLoading(false);
       }, 1500);
@@ -63,8 +71,7 @@ const PaymentRedirect = () => {
   const handleOpenPaymentApp = () => {
     if (!upiData) return;
     
-    const displayName = encodeURIComponent(upiData.display_name || "Payment");
-    const upiDeepLink = `upi://pay?pa=${encodeURIComponent(upiData.upi_id)}&pn=${displayName}&cu=INR`;
+    const upiDeepLink = buildUpiDeepLink(upiData.upi_id, upiData.display_name, upiData.amount);
     window.location.href = upiDeepLink;
   };
 
@@ -117,6 +124,12 @@ const PaymentRedirect = () => {
                 <p className="text-xs text-muted-foreground mb-1">Paying to</p>
                 <p className="font-medium text-foreground">{upiData.display_name}</p>
                 <p className="text-sm text-muted-foreground font-mono">{upiData.upi_id}</p>
+                {upiData.amount && (
+                  <p className="text-lg font-semibold text-primary mt-2 flex items-center justify-center gap-1">
+                    <IndianRupee className="w-4 h-4" />
+                    {upiData.amount.toFixed(2)}
+                  </p>
+                )}
               </div>
             )}
 
