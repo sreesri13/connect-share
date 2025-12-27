@@ -178,6 +178,36 @@ export type Database = {
         }
         Relationships: []
       }
+      upi_payments: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          public_code: string
+          updated_at: string
+          upi_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          public_code: string
+          updated_at?: string
+          upi_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          public_code?: string
+          updated_at?: string
+          upi_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
