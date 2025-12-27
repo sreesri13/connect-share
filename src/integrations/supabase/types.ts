@@ -160,6 +160,8 @@ export type Database = {
           is_deleted: boolean | null
           password_hash: string | null
           public_id: string
+          style_config: Json | null
+          style_id: string | null
           title: string | null
           user_id: string
         }
@@ -171,6 +173,8 @@ export type Database = {
           is_deleted?: boolean | null
           password_hash?: string | null
           public_id: string
+          style_config?: Json | null
+          style_id?: string | null
           title?: string | null
           user_id: string
         }
@@ -182,7 +186,47 @@ export type Database = {
           is_deleted?: boolean | null
           password_hash?: string | null
           public_id?: string
+          style_config?: Json | null
+          style_id?: string | null
           title?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_pages_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "qr_styles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_styles: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

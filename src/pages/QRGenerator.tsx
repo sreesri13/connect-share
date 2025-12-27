@@ -1,18 +1,23 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword } from "@/lib/crypto";
 import { format, addDays, addHours, addMinutes } from "date-fns";
+import { CustomQRCode } from "@/components/qr/CustomQRCode";
+import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
+import { useQRStyles } from "@/hooks/useQRStyles";
+import type { QRStyleConfig } from "@/lib/qr-styles";
+import { defaultQRStyle } from "@/lib/qr-styles";
 
 interface ItemWithCategory {
   id: string;
@@ -26,6 +31,7 @@ const QRGenerator = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  const { styles: savedStyles, saveStyle, defaultStyle, getStyleById } = useQRStyles();
   
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +39,10 @@ const QRGenerator = () => {
   const [selectedItems, setSelectedItems] = useState<ItemWithCategory[]>([]);
   const [qrPageId, setQrPageId] = useState<string | null>(null);
   const [qrTitle, setQrTitle] = useState("");
+  
+  // QR Style
+  const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
+  const [showCustomization, setShowCustomization] = useState(false);
   
   // Password protection
   const [enablePassword, setEnablePassword] = useState(false);
@@ -44,6 +54,13 @@ const QRGenerator = () => {
   const [expirationDays, setExpirationDays] = useState(0);
   const [expirationHours, setExpirationHours] = useState(1);
   const [expirationMinutes, setExpirationMinutes] = useState(0);
+
+  // Load default style when available
+  useEffect(() => {
+    if (defaultStyle) {
+      setQrStyle(defaultStyle);
+    }
+  }, [defaultStyle]);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -134,7 +151,7 @@ const QRGenerator = () => {
       // Calculate expiration date
       const expiresAt = calculateExpirationDate();
 
-      // Create QR page
+      // Create QR page with style config
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
         .insert({
@@ -143,6 +160,7 @@ const QRGenerator = () => {
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
           password_hash: passwordHash,
           expires_at: expiresAt,
+          style_config: qrStyle as any,
         })
         .select()
         .single();
@@ -174,32 +192,36 @@ const QRGenerator = () => {
     ? `${window.location.origin}/p/${qrPageId}` 
     : "";
   
-  const handleDownloadQR = () => {
+  const handleDownloadQR = (highRes: boolean = false) => {
     if (!qrPageId) {
       toast.error("Please save the QR code first");
       return;
     }
     
-    const svg = document.querySelector("#qr-code-svg");
-    if (svg) {
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new window.Image();
-
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        const pngFile = canvas.toDataURL("image/png");
-        const downloadLink = document.createElement("a");
-        downloadLink.download = `connecthub-qr-${qrPageId}.png`;
-        downloadLink.href = pngFile;
-        downloadLink.click();
-        toast.success("QR code downloaded!");
-      };
-
-      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+    const canvas = document.querySelector("#qr-code-canvas") as HTMLCanvasElement;
+    if (canvas) {
+      let downloadCanvas = canvas;
+      
+      if (highRes) {
+        // Create high-res version
+        downloadCanvas = document.createElement("canvas");
+        const scale = 4;
+        downloadCanvas.width = canvas.width * scale;
+        downloadCanvas.height = canvas.height * scale;
+        const ctx = downloadCanvas.getContext("2d");
+        if (ctx) {
+          ctx.imageSmoothingEnabled = false;
+          ctx.scale(scale, scale);
+          ctx.drawImage(canvas, 0, 0);
+        }
+      }
+      
+      const pngFile = downloadCanvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `connecthub-qr-${qrPageId}${highRes ? '-hires' : ''}.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+      toast.success(highRes ? "High-res QR code downloaded!" : "QR code downloaded!");
     }
   };
 
@@ -212,6 +234,18 @@ const QRGenerator = () => {
     setCopied(true);
     toast.success("URL copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSaveStyle = async (name: string) => {
+    await saveStyle(name, qrStyle);
+  };
+
+  const handleLoadStyle = (id: string) => {
+    const style = getStyleById(id);
+    if (style) {
+      setQrStyle(style.config);
+      toast.success(`Style "${style.name}" loaded!`);
+    }
   };
 
   // Group items by category
@@ -253,6 +287,9 @@ const QRGenerator = () => {
     );
   }
 
+  // Preview URL for customization (before saving)
+  const previewUrl = "https://example.com/preview";
+
   return (
     <div className="min-h-screen bg-gradient-hero p-6 md:p-12">
       {/* Background Effects */}
@@ -260,7 +297,7 @@ const QRGenerator = () => {
         <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
       </div>
 
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -276,38 +313,36 @@ const QRGenerator = () => {
           </div>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8">
           {/* QR Code Section */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
+            className="lg:col-span-1"
           >
             <Card className="overflow-hidden">
               <CardHeader className="text-center">
                 <CardTitle>Your QR Code</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-4 sm:gap-6 pb-6 sm:pb-8">
-                {qrPageId ? (
-                  <div className="p-3 sm:p-6 bg-foreground rounded-xl sm:rounded-2xl shadow-elevated">
-                    <QRCodeSVG
-                      id="qr-code-svg"
-                      value={publicUrl}
-                      size={160}
-                      level="H"
-                      includeMargin
-                      bgColor="#ffffff"
-                      fgColor="#000000"
-                      className="w-[140px] h-[140px] sm:w-[200px] sm:h-[200px]"
-                    />
-                  </div>
-                ) : (
-                  <div className="p-4 sm:p-6 bg-secondary/50 rounded-xl sm:rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center w-[180px] h-[180px] sm:w-[232px] sm:h-[232px]">
-                    <QrCode className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground mb-2 sm:mb-3" />
-                    <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
-                      Click "Generate QR Code" to create your shareable link
-                    </p>
-                  </div>
+                {/* QR Preview - always show with customization */}
+                <div 
+                  className="p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-elevated"
+                  style={{ backgroundColor: qrStyle.backgroundColor }}
+                >
+                  <CustomQRCode
+                    id="qr-code-canvas"
+                    value={qrPageId ? publicUrl : previewUrl}
+                    style={qrStyle}
+                    className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
+                  />
+                </div>
+
+                {!qrPageId && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Live preview - customize below
+                  </p>
                 )}
 
                 {!qrPageId && (
@@ -457,24 +492,45 @@ const QRGenerator = () => {
                       </Button>
                     </div>
 
-                    <div className="flex gap-3">
-                      <Button variant="outline" className="flex-1" onClick={handleDownloadQR}>
-                        <Download className="w-4 h-4 mr-2" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(false)}>
+                        <Download className="w-4 h-4 mr-1" />
                         Download
                       </Button>
-                      <Button
-                        variant="default"
-                        className="flex-1"
-                        onClick={() => window.open(publicUrl, "_blank")}
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Preview
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(true)}>
+                        <Download className="w-4 h-4 mr-1" />
+                        Hi-Res
                       </Button>
                     </div>
+                    
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      onClick={() => window.open(publicUrl, "_blank")}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Preview Page
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/* Customization Panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="lg:col-span-1"
+          >
+            <QRCustomizationPanel
+              value={qrStyle}
+              onChange={setQrStyle}
+              onSaveStyle={handleSaveStyle}
+              savedStyles={savedStyles.map(s => ({ id: s.id, name: s.name, config: s.config }))}
+              onLoadStyle={handleLoadStyle}
+            />
           </motion.div>
 
           {/* Selected Items Preview */}
@@ -482,6 +538,7 @@ const QRGenerator = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
+            className="lg:col-span-1"
           >
             <Card>
               <CardHeader>
