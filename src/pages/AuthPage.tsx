@@ -34,16 +34,16 @@ const AuthPage = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Render reCAPTCHA when switching to signup mode
+  // Render reCAPTCHA when loaded
   useEffect(() => {
-    if (isSignUp && recaptchaLoaded) {
+    if (recaptchaLoaded) {
       // Small delay to ensure container is mounted
       const timer = setTimeout(() => {
         renderRecaptcha();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isSignUp, recaptchaLoaded, renderRecaptcha]);
+  }, [recaptchaLoaded, renderRecaptcha]);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -85,8 +85,8 @@ const AuthPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // For signup, require reCAPTCHA verification
-    if (isSignUp && !isVerified) {
+    // Require reCAPTCHA verification for both signup and signin
+    if (!isVerified) {
       toast.error("Please complete the reCAPTCHA verification");
       return;
     }
@@ -94,8 +94,8 @@ const AuthPage = () => {
     setIsLoading(true);
 
     try {
-      // Verify reCAPTCHA token on server for signup
-      if (isSignUp && recaptchaToken) {
+      // Verify reCAPTCHA token on server
+      if (recaptchaToken) {
         const isValid = await verifyRecaptcha(recaptchaToken);
         if (!isValid) {
           toast.error("reCAPTCHA verification failed. Please try again.");
@@ -126,6 +126,7 @@ const AuthPage = () => {
           } else {
             toast.error(error.message);
           }
+          resetRecaptcha();
         } else {
           toast.success("Welcome back!");
           navigate("/dashboard");
@@ -133,7 +134,7 @@ const AuthPage = () => {
       }
     } catch (err) {
       toast.error("An unexpected error occurred. Please try again.");
-      if (isSignUp) resetRecaptcha();
+      resetRecaptcha();
     } finally {
       setIsLoading(false);
     }
@@ -287,19 +288,17 @@ const AuthPage = () => {
                 </div>
               </div>
 
-              {/* reCAPTCHA for signup only */}
-              {isSignUp && (
-                <div className="flex justify-center py-2">
-                  <div id="recaptcha-container" ref={recaptchaRef}></div>
-                </div>
-              )}
+              {/* reCAPTCHA for both signup and signin */}
+              <div className="flex justify-center py-2">
+                <div id="recaptcha-container" ref={recaptchaRef}></div>
+              </div>
 
               <Button 
                 type="submit" 
                 variant="hero" 
                 size="lg" 
                 className="w-full mt-6" 
-                disabled={isLoading || (isSignUp && !isVerified)}
+                disabled={isLoading || !isVerified}
               >
                 {isLoading ? (
                   <span className="flex items-center gap-2">

@@ -14,6 +14,9 @@ import SettingsPage from "./pages/SettingsPage";
 import DemoPage from "./pages/DemoPage";
 import NotFound from "./pages/NotFound";
 import PaymentRedirect from "./pages/PaymentRedirect";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CodeOfConduct from "./pages/CodeOfConduct";
+import TermsConditions from "./pages/TermsConditions";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +37,9 @@ const App = () => (
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/p/:profileId" element={<PublicProfile />} />
             <Route path="/pay" element={<PaymentRedirect />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/code-of-conduct" element={<CodeOfConduct />} />
+            <Route path="/terms-conditions" element={<TermsConditions />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
