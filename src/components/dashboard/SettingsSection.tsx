@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   Globe,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +36,9 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { RecycleBinSection } from "@/components/dashboard/RecycleBinSection";
+import { AppearanceSection } from "@/components/dashboard/AppearanceSection";
 
-type SettingsTab = "profile" | "account" | "language" | "recycle";
+type SettingsTab = "profile" | "account" | "appearance" | "language" | "recycle";
 
 interface SettingsSectionProps {
   userId: string;
@@ -189,6 +191,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
   const tabs = [
     { id: "profile" as SettingsTab, label: "My Profile", icon: User },
     { id: "account" as SettingsTab, label: "Account", icon: Shield },
+    { id: "appearance" as SettingsTab, label: "Appearance", icon: Palette },
     { id: "language" as SettingsTab, label: "Language", icon: Globe },
     { id: "recycle" as SettingsTab, label: "Recycle Bin", icon: Trash2 },
   ];
@@ -453,6 +456,10 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeTab === "appearance" && (
+            <AppearanceSection />
           )}
 
           {activeTab === "language" && (
