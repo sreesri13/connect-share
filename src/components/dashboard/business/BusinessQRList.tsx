@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
-import { defaultQRConfig, QRConfig } from "@/lib/qr-styles";
+import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format } from "date-fns";
 import {
   DropdownMenu,
@@ -29,7 +29,7 @@ interface BusinessQRPage {
   id: string;
   public_id: string;
   title: string | null;
-  style_config: QRConfig | null;
+  style_config: QRStyleConfig | null;
   is_deleted: boolean;
   created_at: string;
   product_count: number;
@@ -70,7 +70,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
 
           return {
             ...page,
-            style_config: page.style_config as QRConfig | null,
+            style_config: page.style_config as unknown as QRStyleConfig | null,
             product_count: count || 0,
           };
         })
@@ -160,7 +160,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pages.map((page) => {
               const url = `${window.location.origin}/business/${page.public_id}`;
-              const config = page.style_config || defaultQRConfig;
+              const styleConfig = page.style_config || defaultQRStyle;
 
               return (
                 <div
@@ -212,7 +212,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     }}
                     className="flex justify-center p-3 bg-muted/30 rounded-lg"
                   >
-                    <CustomQRCode value={url} size={120} config={config} />
+                    <CustomQRCode 
+                      value={url} 
+                      style={{ ...styleConfig, size: 120 }} 
+                    />
                   </div>
 
                   <div className="flex items-center justify-between">
