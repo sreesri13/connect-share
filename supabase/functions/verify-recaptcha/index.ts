@@ -5,8 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RECAPTCHA_PROJECT_ID = "connecthub-482514";
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -14,9 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const { token, action = "signup" } = await req.json();
+    const { token } = await req.json();
     
     if (!token) {
+      console.log("No reCAPTCHA token provided");
       return new Response(
         JSON.stringify({ success: false, error: "No reCAPTCHA token provided" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -33,65 +32,52 @@ serve(async (req) => {
       );
     }
 
-    // Create assessment using reCAPTCHA Enterprise API
-    const assessmentUrl = `https://recaptchaenterprise.googleapis.com/v1/projects/${RECAPTCHA_PROJECT_ID}/assessments?key=${RECAPTCHA_SECRET_KEY}`;
+    // Verify token using reCAPTCHA v2 API
+    const verifyUrl = "https://www.google.com/recaptcha/api/siteverify";
     
-    const siteKey = Deno.env.get("RECAPTCHA_SITE_KEY") || "";
-    
-    const assessmentResponse = await fetch(assessmentUrl, {
+    const formData = new URLSearchParams();
+    formData.append("secret", RECAPTCHA_SECRET_KEY);
+    formData.append("response", token);
+
+    const verifyResponse = await fetch(verifyUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        event: {
-          token: token,
-          siteKey: siteKey,
-          expectedAction: action,
-        },
-      }),
+      body: formData.toString(),
     });
 
-    const assessmentData = await assessmentResponse.json();
+    const verifyData = await verifyResponse.json();
     
-    if (!assessmentResponse.ok) {
-      console.error("reCAPTCHA assessment failed:", assessmentData);
+    console.log("reCAPTCHA v2 verification response:", verifyData);
+
+    if (!verifyResponse.ok) {
+      console.error("reCAPTCHA verification request failed");
       return new Response(
         JSON.stringify({ success: false, error: "reCAPTCHA verification failed" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check if token is valid
-    if (!assessmentData.tokenProperties?.valid) {
-      console.error("Invalid reCAPTCHA token:", assessmentData.tokenProperties?.invalidReason);
+    // Check if verification passed
+    const success = verifyData.success === true;
+
+    if (!success) {
+      console.error("reCAPTCHA verification failed:", verifyData["error-codes"]);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Invalid token: ${assessmentData.tokenProperties?.invalidReason || "unknown"}` 
+          error: "reCAPTCHA verification failed",
+          errorCodes: verifyData["error-codes"]
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Get the risk score (0.0 = likely bot, 1.0 = likely human)
-    const score = assessmentData.riskAnalysis?.score || 0;
-    
-    // Consider scores above 0.5 as passing (you can adjust this threshold)
-    const passed = score >= 0.5;
-
-    console.log("reCAPTCHA assessment:", {
-      score,
-      passed,
-      action: assessmentData.tokenProperties?.action,
-      reasons: assessmentData.riskAnalysis?.reasons,
-    });
-
     return new Response(
       JSON.stringify({ 
-        success: passed, 
-        score,
-        message: passed ? "Verification passed" : "Verification failed - suspected bot activity"
+        success: true, 
+        message: "Verification passed"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
