@@ -95,21 +95,6 @@ const renderBodyModule = (
       ctx.closePath();
       ctx.fill();
       break;
-    case 'classy':
-      ctx.beginPath();
-      ctx.roundRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize, [0, size * 0.4, 0, size * 0.4]);
-      ctx.fill();
-      break;
-    case 'classy-rounded':
-      ctx.beginPath();
-      ctx.roundRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize, [size * 0.1, size * 0.4, size * 0.1, size * 0.4]);
-      ctx.fill();
-      break;
-    case 'extra-rounded':
-      ctx.beginPath();
-      ctx.roundRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize, size * 0.45);
-      ctx.fill();
-      break;
     default: // square
       ctx.fillRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize);
   }
@@ -205,30 +190,25 @@ const renderEyeBall = (
       ctx.arc(centerX, centerY, size * 1.5, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'diamond':
+    case 'star':
+      const outerR = size * 1.4;
+      const innerR = size * 0.6;
       ctx.beginPath();
-      ctx.moveTo(centerX, y);
-      ctx.lineTo(x + size * 3, centerY);
-      ctx.lineTo(centerX, y + size * 3);
-      ctx.lineTo(x, centerY);
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * 72 - 90) * Math.PI / 180;
+        const px = centerX + outerR * Math.cos(angle);
+        const py = centerY + outerR * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+        const innerAngle = ((i * 72) + 36 - 90) * Math.PI / 180;
+        ctx.lineTo(centerX + innerR * Math.cos(innerAngle), centerY + innerR * Math.sin(innerAngle));
+      }
       ctx.closePath();
       ctx.fill();
       break;
-    case 'flower':
-      const petalCount = 6;
-      for (let i = 0; i < petalCount; i++) {
-        const angle = (i / petalCount) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.ellipse(
-          centerX + Math.cos(angle) * size * 0.5,
-          centerY + Math.sin(angle) * size * 0.5,
-          size * 0.6, size * 0.4,
-          angle, 0, Math.PI * 2
-        );
-        ctx.fill();
-      }
+    case 'dot':
       ctx.beginPath();
-      ctx.arc(centerX, centerY, size * 0.5, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, size * 1.2, 0, Math.PI * 2);
       ctx.fill();
       break;
     default: // square

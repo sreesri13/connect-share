@@ -1,8 +1,8 @@
 // QR Style Types and Defaults
 
-export type BodyShape = 'square' | 'dots' | 'rounded' | 'diamond' | 'star' | 'blob' | 'classy' | 'classy-rounded' | 'extra-rounded';
+export type BodyShape = 'square' | 'dots' | 'rounded' | 'diamond' | 'star';
 export type EyeFrameShape = 'square' | 'rounded' | 'circle' | 'leaf' | 'dotted';
-export type EyeBallShape = 'square' | 'rounded' | 'circle' | 'diamond' | 'flower';
+export type EyeBallShape = 'square' | 'rounded' | 'circle' | 'star' | 'dot';
 export type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
 
 export interface QRStyleConfig {
@@ -37,9 +37,6 @@ export const bodyShapeOptions: { value: BodyShape; label: string }[] = [
   { value: 'rounded', label: 'Rounded' },
   { value: 'diamond', label: 'Diamond' },
   { value: 'star', label: 'Star' },
-  { value: 'classy', label: 'Classy' },
-  { value: 'classy-rounded', label: 'Classy Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
 ];
 
 export const eyeFrameShapeOptions: { value: EyeFrameShape; label: string }[] = [
@@ -54,8 +51,8 @@ export const eyeBallShapeOptions: { value: EyeBallShape; label: string }[] = [
   { value: 'square', label: 'Square' },
   { value: 'rounded', label: 'Rounded' },
   { value: 'circle', label: 'Circle' },
-  { value: 'diamond', label: 'Diamond' },
-  { value: 'flower', label: 'Flower' },
+  { value: 'star', label: 'Star' },
+  { value: 'dot', label: 'Dot' },
 ];
 
 export const errorCorrectionOptions: { value: ErrorCorrectionLevel; label: string; description: string }[] = [
@@ -95,7 +92,7 @@ export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = 
     config: {
       bodyShape: 'dots',
       eyeFrameShape: 'circle',
-      eyeBallShape: 'circle',
+      eyeBallShape: 'dot',
       bodyColor: '#333333',
       eyeFrameColor: '#333333',
       eyeBallColor: '#333333',
@@ -115,11 +112,11 @@ export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = 
     },
   },
   {
-    name: 'Artistic',
+    name: 'Starry',
     config: {
-      bodyShape: 'classy-rounded',
+      bodyShape: 'star',
       eyeFrameShape: 'leaf',
-      eyeBallShape: 'flower',
+      eyeBallShape: 'star',
       bodyColor: '#e63946',
       eyeFrameColor: '#1d3557',
       eyeBallColor: '#457b9d',
@@ -127,11 +124,11 @@ export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = 
     },
   },
   {
-    name: 'Corporate',
+    name: 'Diamond',
     config: {
-      bodyShape: 'classy',
-      eyeFrameShape: 'square',
-      eyeBallShape: 'square',
+      bodyShape: 'diamond',
+      eyeFrameShape: 'dotted',
+      eyeBallShape: 'rounded',
       bodyColor: '#2c3e50',
       eyeFrameColor: '#2c3e50',
       eyeBallColor: '#3498db',

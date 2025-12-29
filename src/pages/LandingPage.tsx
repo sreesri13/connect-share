@@ -234,17 +234,94 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 px-4 sm:px-6 py-6 sm:py-8 border-t border-border/50 safe-area-padding">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <QrCode className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-primary-foreground" />
+      <footer className="relative z-10 px-4 sm:px-6 py-8 sm:py-12 border-t border-border/50 safe-area-padding bg-card/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+            {/* Brand */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                  <QrCode className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <span className="font-semibold text-foreground">ConnectHUB</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Share your digital identity with a single scan. The future of professional networking.
+              </p>
             </div>
-            <span className="font-semibold text-foreground text-sm sm:text-base">ConnectHUB</span>
+
+            {/* Quick Links */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-foreground">Quick Links</h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/auth?mode=signup" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Get Started
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/auth" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Sign In
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/demo" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    View Demo
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-foreground">Legal</h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms-conditions" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Terms & Conditions
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/code-of-conduct" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Code of Conduct
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-foreground">Contact</h4>
+              <ul className="space-y-2">
+                <li className="text-sm text-muted-foreground">
+                  support@connecthub.app
+                </li>
+              </ul>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground text-center">
-            © 2024 ConnectHUB. All rights reserved.
-          </p>
+
+          {/* Bottom Bar */}
+          <div className="pt-8 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
+              © {new Date().getFullYear()} ConnectHUB. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              <Link to="/privacy-policy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                Privacy
+              </Link>
+              <Link to="/terms-conditions" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                Terms
+              </Link>
+              <Link to="/code-of-conduct" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                Conduct
+              </Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

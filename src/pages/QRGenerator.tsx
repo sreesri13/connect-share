@@ -42,7 +42,7 @@ const QRGenerator = () => {
   
   // QR Style
   const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
-  const [showCustomization, setShowCustomization] = useState(false);
+  const [enableCustomization, setEnableCustomization] = useState(false);
   
   // Password protection
   const [enablePassword, setEnablePassword] = useState(false);
@@ -55,12 +55,14 @@ const QRGenerator = () => {
   const [expirationHours, setExpirationHours] = useState(1);
   const [expirationMinutes, setExpirationMinutes] = useState(0);
 
-  // Load default style when available
+  // Load default style when customization is enabled and default style exists
   useEffect(() => {
-    if (defaultStyle) {
+    if (enableCustomization && defaultStyle) {
       setQrStyle(defaultStyle);
+    } else if (!enableCustomization) {
+      setQrStyle(defaultQRStyle);
     }
-  }, [defaultStyle]);
+  }, [defaultStyle, enableCustomization]);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -151,7 +153,7 @@ const QRGenerator = () => {
       // Calculate expiration date
       const expiresAt = calculateExpirationDate();
 
-      // Create QR page with style config
+      // Create QR page with style config (only if customization enabled)
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
         .insert({
@@ -160,7 +162,7 @@ const QRGenerator = () => {
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
           password_hash: passwordHash,
           expires_at: expiresAt,
-          style_config: qrStyle as any,
+          style_config: enableCustomization ? (qrStyle as any) : null,
         })
         .select()
         .single();
@@ -326,27 +328,49 @@ const QRGenerator = () => {
                 <CardTitle>Your QR Code</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-4 sm:gap-6 pb-6 sm:pb-8">
-                {/* QR Preview - always show with customization */}
+                {/* QR Preview */}
                 <div 
                   className="p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-elevated"
-                  style={{ backgroundColor: qrStyle.backgroundColor }}
+                  style={{ backgroundColor: enableCustomization ? qrStyle.backgroundColor : '#ffffff' }}
                 >
-                  <CustomQRCode
-                    id="qr-code-canvas"
-                    value={qrPageId ? publicUrl : previewUrl}
-                    style={qrStyle}
-                    className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
-                  />
+                  {enableCustomization ? (
+                    <CustomQRCode
+                      id="qr-code-canvas"
+                      value={qrPageId ? publicUrl : previewUrl}
+                      style={qrStyle}
+                      className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
+                    />
+                  ) : (
+                    <CustomQRCode
+                      id="qr-code-canvas"
+                      value={qrPageId ? publicUrl : previewUrl}
+                      style={defaultQRStyle}
+                      className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
+                    />
+                  )}
                 </div>
 
                 {!qrPageId && (
                   <p className="text-xs text-muted-foreground text-center">
-                    Live preview - customize below
+                    {enableCustomization ? 'Live preview - customize below' : 'Standard QR code'}
                   </p>
                 )}
 
                 {!qrPageId && (
                   <div className="w-full space-y-4">
+                    {/* Customize QR Code Toggle */}
+                    <div className="flex items-center space-x-2 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                      <Checkbox
+                        id="enableCustomization"
+                        checked={enableCustomization}
+                        onCheckedChange={(checked) => setEnableCustomization(checked as boolean)}
+                      />
+                      <Label htmlFor="enableCustomization" className="flex items-center gap-2 cursor-pointer font-medium">
+                        <Palette className="w-4 h-4 text-primary" />
+                        Customize QR Code Design
+                      </Label>
+                    </div>
+
                     <Input
                       placeholder="QR Code title (optional)"
                       value={qrTitle}
@@ -517,21 +541,23 @@ const QRGenerator = () => {
             </Card>
           </motion.div>
 
-          {/* Customization Panel */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="lg:col-span-1"
-          >
-            <QRCustomizationPanel
-              value={qrStyle}
-              onChange={setQrStyle}
-              onSaveStyle={handleSaveStyle}
-              savedStyles={savedStyles.map(s => ({ id: s.id, name: s.name, config: s.config }))}
-              onLoadStyle={handleLoadStyle}
-            />
-          </motion.div>
+          {/* Customization Panel - only show if enabled */}
+          {enableCustomization && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="lg:col-span-1"
+            >
+              <QRCustomizationPanel
+                value={qrStyle}
+                onChange={setQrStyle}
+                onSaveStyle={handleSaveStyle}
+                savedStyles={savedStyles.map(s => ({ id: s.id, name: s.name, config: s.config }))}
+                onLoadStyle={handleLoadStyle}
+              />
+            </motion.div>
+          )}
 
           {/* Selected Items Preview */}
           <motion.div
