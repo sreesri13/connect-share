@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
 import { useQRStyles } from "@/hooks/useQRStyles";
-import { defaultQRConfig } from "@/lib/qr-styles";
+import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Category {
@@ -41,12 +41,12 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [qrTitle, setQrTitle] = useState("");
   const [enableCustomization, setEnableCustomization] = useState(false);
-  const [qrConfig, setQrConfig] = useState(defaultQRConfig);
+  const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
   const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const qrRef = useRef<HTMLDivElement>(null);
-  const { styles, saveStyle, isLoading: stylesLoading } = useQRStyles(userId);
+  const { styles, saveStyle, getStyleById } = useQRStyles();
 
   useEffect(() => {
     fetchData();
@@ -162,7 +162,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           user_id: userId,
           public_id: publicId,
           title: qrTitle.trim() || null,
-          style_config: enableCustomization ? qrConfig : null,
+          style_config: enableCustomization ? (qrStyle as any) : null,
         })
         .select("id")
         .single();
@@ -222,8 +222,19 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setGeneratedQR(null);
     setSelectedProducts(new Set());
     setQrTitle("");
-    setQrConfig(defaultQRConfig);
+    setQrStyle(defaultQRStyle);
     setEnableCustomization(false);
+  };
+
+  const handleSaveStyle = async (name: string) => {
+    await saveStyle(name, qrStyle);
+  };
+
+  const handleLoadStyle = (styleId: string) => {
+    const style = getStyleById(styleId);
+    if (style) {
+      setQrStyle({ ...defaultQRStyle, ...style.config });
+    }
   };
 
   if (isLoading) {
@@ -265,8 +276,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
             <div ref={qrRef} className="bg-card p-4 rounded-lg border">
               <CustomQRCode
                 value={generatedQR.url}
-                size={200}
-                config={enableCustomization ? qrConfig : defaultQRConfig}
+                style={enableCustomization ? qrStyle : defaultQRStyle}
               />
             </div>
 
@@ -417,17 +427,17 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
             <CustomQRCode
               value={`${window.location.origin}/business/preview`}
-              size={160}
-              config={enableCustomization ? qrConfig : defaultQRConfig}
+              style={enableCustomization ? qrStyle : defaultQRStyle}
             />
           </div>
 
           {enableCustomization && (
             <QRCustomizationPanel
-              config={qrConfig}
-              onConfigChange={setQrConfig}
+              value={qrStyle}
+              onChange={setQrStyle}
               savedStyles={styles}
-              onSaveStyle={saveStyle}
+              onSaveStyle={handleSaveStyle}
+              onLoadStyle={handleLoadStyle}
             />
           )}
 
