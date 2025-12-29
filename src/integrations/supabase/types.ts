@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_categories: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_products: {
+        Row: {
+          category_id: string
+          created_at: string
+          description: string | null
+          discount_price: number | null
+          display_order: number
+          id: string
+          image_url: string
+          name: string
+          original_price: number
+          status: Database["public"]["Enums"]["product_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          description?: string | null
+          discount_price?: number | null
+          display_order?: number
+          id?: string
+          image_url: string
+          name: string
+          original_price: number
+          status?: Database["public"]["Enums"]["product_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          discount_price?: number | null
+          display_order?: number
+          id?: string
+          image_url?: string
+          name?: string
+          original_price?: number
+          status?: Database["public"]["Enums"]["product_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "business_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -114,6 +194,89 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      qr_business_page_products: {
+        Row: {
+          display_order: number
+          id: string
+          product_id: string
+          qr_page_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          product_id: string
+          qr_page_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          product_id?: string
+          qr_page_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_business_page_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "business_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_business_page_products_qr_page_id_fkey"
+            columns: ["qr_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_business_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_business_pages: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_deleted: boolean | null
+          public_id: string
+          style_config: Json | null
+          style_id: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          public_id: string
+          style_config?: Json | null
+          style_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          public_id?: string
+          style_config?: Json | null
+          style_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_business_pages_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "qr_styles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       qr_page_items: {
         Row: {
@@ -277,6 +440,7 @@ export type Database = {
     }
     Enums: {
       item_type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others"
+      product_status: "active" | "disabled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -405,6 +569,7 @@ export const Constants = {
   public: {
     Enums: {
       item_type: ["url", "text", "pdf", "image", "video", "audio", "others"],
+      product_status: ["active", "disabled"],
     },
   },
 } as const
