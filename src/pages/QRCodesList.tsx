@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check } from "lucide-react";
+import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
 import { hashPassword } from "@/lib/crypto";
+import { CustomQRCode } from "@/components/qr/CustomQRCode";
+import { defaultQRStyle } from "@/lib/qr-styles";
+import { format, addDays, addHours, addMinutes } from "date-fns";
 
 interface QRPage {
   id: string;
@@ -34,6 +37,8 @@ interface QRPage {
   created_at: string;
   item_count: number;
   has_password: boolean;
+  expires_at: string | null;
+  style_config: any;
 }
 
 interface QRItem {
@@ -60,6 +65,12 @@ const QRCodesList = () => {
   const [qrItems, setQrItems] = useState<QRItem[]>([]);
   const [editingItem, setEditingItem] = useState<QRItem | null>(null);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+  
+  // Expiration extension states
+  const [editEnableExpiration, setEditEnableExpiration] = useState(false);
+  const [editExpirationDays, setEditExpirationDays] = useState(0);
+  const [editExpirationHours, setEditExpirationHours] = useState(0);
+  const [editExpirationMinutes, setEditExpirationMinutes] = useState(0);
 
   useEffect(() => {
     if (!user && !authLoading) {
@@ -83,9 +94,12 @@ const QRCodesList = () => {
           title,
           created_at,
           password_hash,
+          expires_at,
+          style_config,
           qr_page_items (id)
         `)
         .eq("user_id", user!.id)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -97,6 +111,8 @@ const QRCodesList = () => {
         created_at: page.created_at,
         item_count: page.qr_page_items?.length || 0,
         has_password: !!page.password_hash,
+        expires_at: page.expires_at,
+        style_config: page.style_config,
       }));
 
       setQrPages(pages);
@@ -163,8 +179,31 @@ const QRCodesList = () => {
     setEditQRTitle(qrPage.title || "");
     setEditEnablePassword(qrPage.has_password);
     setEditPassword("");
+    // Set expiration states
+    setEditEnableExpiration(!!qrPage.expires_at);
+    setEditExpirationDays(0);
+    setEditExpirationHours(0);
+    setEditExpirationMinutes(0);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
+  };
+
+  const calculateNewExpirationDate = () => {
+    if (!editEnableExpiration) return undefined;
+    if (editExpirationDays === 0 && editExpirationHours === 0 && editExpirationMinutes === 0) return undefined;
+    
+    // Start from current expiration or now
+    let baseDate = editingQR?.expires_at ? new Date(editingQR.expires_at) : new Date();
+    // If already expired, start from now
+    if (baseDate < new Date()) {
+      baseDate = new Date();
+    }
+    
+    baseDate = addDays(baseDate, editExpirationDays);
+    baseDate = addHours(baseDate, editExpirationHours);
+    baseDate = addMinutes(baseDate, editExpirationMinutes);
+    
+    return baseDate.toISOString();
   };
 
   const handleSaveQRChanges = async () => {
@@ -185,6 +224,12 @@ const QRCodesList = () => {
       if (passwordHash !== undefined) {
         updateData.password_hash = passwordHash;
       }
+      
+      // Handle expiration extension
+      const newExpiration = calculateNewExpirationDate();
+      if (newExpiration !== undefined) {
+        updateData.expires_at = newExpiration;
+      }
 
       const { error } = await supabase
         .from("qr_pages")
@@ -195,7 +240,12 @@ const QRCodesList = () => {
 
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id
-          ? { ...p, title: editQRTitle, has_password: editEnablePassword }
+          ? { 
+              ...p, 
+              title: editQRTitle, 
+              has_password: editEnablePassword,
+              expires_at: newExpiration || p.expires_at,
+            }
           : p
       ));
 
@@ -404,6 +454,23 @@ const QRCodesList = () => {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-5 pr-2">
+            {/* QR Code Preview */}
+            {editingQR && (
+              <div className="flex flex-col items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/50">
+                <Label className="text-sm text-muted-foreground">QR Code Preview</Label>
+                <div className="bg-white p-4 rounded-lg">
+                  <CustomQRCode
+                    value={getPublicUrl(editingQR.public_id)}
+                    style={editingQR.style_config || defaultQRStyle}
+                    className="w-[140px] h-[140px]"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground truncate max-w-full">
+                  {getPublicUrl(editingQR.public_id)}
+                </p>
+              </div>
+            )}
+
             {/* Title */}
             <div className="space-y-2">
               <Label>QR Code Title</Label>
@@ -453,6 +520,72 @@ const QRCodesList = () => {
                   >
                     {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Expiration Extension */}
+            <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <Label className="font-medium">Expiration Settings</Label>
+              </div>
+              
+              {editingQR?.expires_at && (
+                <p className="text-sm text-muted-foreground">
+                  Current expiration: {format(new Date(editingQR.expires_at), "PPp")}
+                  {new Date(editingQR.expires_at) < new Date() && (
+                    <span className="ml-2 text-destructive font-medium">(Expired)</span>
+                  )}
+                </p>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="editEnableExpiration"
+                  checked={editEnableExpiration}
+                  onCheckedChange={(checked) => setEditEnableExpiration(checked as boolean)}
+                />
+                <Label htmlFor="editEnableExpiration" className="cursor-pointer text-sm">
+                  {editingQR?.expires_at ? "Extend expiration time" : "Set expiration time"}
+                </Label>
+              </div>
+
+              {editEnableExpiration && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Days</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      value={editExpirationDays}
+                      onChange={(e) => setEditExpirationDays(parseInt(e.target.value) || 0)}
+                      className="text-center"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Hours</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={editExpirationHours}
+                      onChange={(e) => setEditExpirationHours(parseInt(e.target.value) || 0)}
+                      className="text-center"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Minutes</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={editExpirationMinutes}
+                      onChange={(e) => setEditExpirationMinutes(parseInt(e.target.value) || 0)}
+                      className="text-center"
+                    />
+                  </div>
                 </div>
               )}
             </div>

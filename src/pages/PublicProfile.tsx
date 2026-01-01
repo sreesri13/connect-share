@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPassword } from "@/lib/crypto";
 import { toast } from "sonner";
-import { initGA, trackProfileView, trackQRScan } from "@/lib/analytics";
+import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } from "@/lib/analytics";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface ProfileItem {
@@ -194,6 +194,14 @@ const PublicProfile = () => {
   };
 
   const handleItemClick = (item: ProfileItem) => {
+    // Track link click for analytics
+    trackLinkClick(
+      item.content,
+      item.title,
+      item.type === "url" ? "url" : "other",
+      profileId
+    );
+
     if (item.type === "url") {
       // Ensure URL has protocol
       let url = item.content;

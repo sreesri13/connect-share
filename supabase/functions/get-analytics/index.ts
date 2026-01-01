@@ -478,6 +478,8 @@ function processAnalyticsData(rawData: any, realtimeData: any) {
     if (source === "qr" && medium === "scan") label = "QR Code Scan";
     else if (source === "link" && medium === "share") label = "Shared URL";
     else if (source === "(direct)") label = "Direct";
+    // Replace lovable.dev with vercel.app for display consistency
+    else if (source.includes("lovable.dev")) label = source.replace("lovable.dev", "vercel.app");
     
     sourceMap.set(label, (sourceMap.get(label) || 0) + visits);
   });

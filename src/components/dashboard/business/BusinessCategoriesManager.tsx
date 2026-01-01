@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, GripVertical, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ export const BusinessCategoriesManager = ({ userId, onUpdate }: BusinessCategori
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -151,6 +153,76 @@ export const BusinessCategoriesManager = ({ userId, onUpdate }: BusinessCategori
     setEditingName("");
   };
 
+  const handleDragStart = (e: React.DragEvent, categoryId: string) => {
+    setDraggedId(categoryId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    if (draggedId && draggedId !== categoryId) {
+      setDragOverId(categoryId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    setDragOverId(null);
+    
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+
+    const draggedIndex = categories.findIndex(c => c.id === draggedId);
+    const targetIndex = categories.findIndex(c => c.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedId(null);
+      return;
+    }
+
+    // Reorder locally
+    const newCategories = [...categories];
+    const [removed] = newCategories.splice(draggedIndex, 1);
+    newCategories.splice(targetIndex, 0, removed);
+
+    // Update display orders
+    const updatedCategories = newCategories.map((cat, index) => ({
+      ...cat,
+      display_order: index,
+    }));
+
+    setCategories(updatedCategories);
+    setDraggedId(null);
+
+    // Save to database
+    try {
+      const updates = updatedCategories.map(cat => 
+        supabase
+          .from("business_categories")
+          .update({ display_order: cat.display_order })
+          .eq("id", cat.id)
+      );
+      
+      await Promise.all(updates);
+      toast.success("Order updated");
+      onUpdate?.();
+    } catch (error) {
+      toast.error("Failed to update order");
+      fetchCategories();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -190,9 +262,17 @@ export const BusinessCategoriesManager = ({ userId, onUpdate }: BusinessCategori
             {categories.map((category) => (
               <div
                 key={category.id}
-                className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg group"
+                draggable={editingId !== category.id}
+                onDragStart={(e) => handleDragStart(e, category.id)}
+                onDragOver={(e) => handleDragOver(e, category.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, category.id)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-2 p-3 bg-muted/50 rounded-lg group transition-all ${
+                  draggedId === category.id ? "opacity-50" : ""
+                } ${dragOverId === category.id ? "border-2 border-primary border-dashed" : ""}`}
               >
-                <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+                <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
 
                 {editingId === category.id ? (
                   <>
@@ -248,6 +328,10 @@ export const BusinessCategoriesManager = ({ userId, onUpdate }: BusinessCategori
             ))}
           </div>
         )}
+
+        <p className="text-xs text-muted-foreground">
+          Drag categories to reorder them
+        </p>
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
