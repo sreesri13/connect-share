@@ -609,32 +609,45 @@ export const AnalyticsSection = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {topPages.slice(0, 7).map((page, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-2 rounded-lg ${
-                    page.isQRPage ? 'bg-purple-500/5 border border-purple-500/20' : ''
-                  }`}>
-                    <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
-                      page.isQRPage ? 'bg-purple-500/20 text-purple-500' : 'bg-primary/10 text-primary'
-                    }`}>
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{page.title}</p>
-                        {page.isQRPage && (
-                          <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-purple-500/20 text-purple-500">
-                            QR
-                          </Badge>
-                        )}
+                {topPages.slice(0, 7).map((page, i) => {
+                  // Extract simplified title - remove common suffixes
+                  const simplifiedTitle = page.title
+                    .replace(/\s*[-–|]\s*ConnectHUB.*$/i, '')
+                    .replace(/\s*[-–|]\s*Share Your Digital Identity.*$/i, '')
+                    .trim() || page.path;
+                  
+                  return (
+                    <div 
+                      key={i} 
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
+                        page.isQRPage ? 'bg-purple-500/5 border border-purple-500/20' : ''
+                      }`}
+                      onClick={() => window.open(page.path, '_blank')}
+                    >
+                      <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
+                        page.isQRPage ? 'bg-purple-500/20 text-purple-500' : 'bg-primary/10 text-primary'
+                      }`}>
+                        {i + 1}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{page.path}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{simplifiedTitle}</p>
+                          {page.isQRPage && (
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-purple-500/20 text-purple-500">
+                              QR
+                            </Badge>
+                          )}
+                          <ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{page.path}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-medium">{page.views.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{page.percentage}%</p>
+                      </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-medium">{page.views.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">{page.percentage}%</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

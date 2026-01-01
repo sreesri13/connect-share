@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
+import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 
 interface Category {
   id: string;
@@ -40,7 +41,12 @@ const BusinessPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
+    // Initialize GA tracking on business pages
+    initGA();
+    
     if (publicId) {
+      // Track QR scan event when page is accessed
+      trackQRScan(publicId, undefined, 'business');
       fetchPageData();
     }
   }, [publicId]);
@@ -245,7 +251,10 @@ const BusinessPage = () => {
                     >
                       <div
                         className="cursor-pointer"
-                        onClick={() => setSelectedProduct(product)}
+                        onClick={() => {
+                          trackProductClick(product.id, product.name, publicId || '');
+                          setSelectedProduct(product);
+                        }}
                       >
                         <div className="relative">
                           <AspectRatio ratio={1}>
