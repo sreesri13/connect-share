@@ -14,6 +14,7 @@ import { hashPassword } from "@/lib/crypto";
 import { format, addDays, addHours, addMinutes } from "date-fns";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
+import { QRShareButton } from "@/components/qr/QRShareButton";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
@@ -537,15 +538,20 @@ const QRGenerator = () => {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleDownloadQR(false)}>
                         <Download className="w-4 h-4 mr-1" />
-                        Download
+                        <span className="hidden xs:inline">Download</span>
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleDownloadQR(true)}>
                         <Download className="w-4 h-4 mr-1" />
-                        Hi-Res
+                        <span className="hidden xs:inline">Hi-Res</span>
                       </Button>
+                      <QRShareButton
+                        qrCanvasId="qr-code-canvas"
+                        title={qrTitle || "QR Code"}
+                        url={publicUrl}
+                      />
                     </div>
                     
                     <Button

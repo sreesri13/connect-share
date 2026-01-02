@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, ChevronDown, ChevronRight, QrCode, Download, Copy, Link } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, QrCode, Download, Copy, Link, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
+import { QRShareButton } from "@/components/qr/QRShareButton";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
@@ -289,8 +290,9 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col items-center gap-4">
-            <div ref={qrRef} className="bg-card p-4 rounded-lg border">
+            <div ref={qrRef} className="bg-card p-4 rounded-lg border w-full max-w-[240px]">
               <CustomQRCode
+                id="business-qr-canvas"
                 value={generatedQR.url}
                 style={enableCustomization ? qrStyle : defaultQRStyle}
               />
@@ -299,16 +301,21 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg w-full max-w-md">
               <Link className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm truncate flex-1">{generatedQR.url}</span>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleCopyUrl}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0" onClick={handleCopyUrl}>
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 justify-center">
               <Button onClick={handleDownload}>
                 <Download className="w-4 h-4 mr-2" />
-                Download QR
+                Download
               </Button>
+              <QRShareButton
+                qrCanvasId="business-qr-canvas"
+                title={qrTitle || "Business QR"}
+                url={generatedQR.url}
+              />
               <Button variant="outline" onClick={handleReset}>
                 Create Another
               </Button>
@@ -441,10 +448,13 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-            <CustomQRCode
-              value={`${window.location.origin}/business/preview`}
-              style={enableCustomization ? qrStyle : defaultQRStyle}
-            />
+            <div className="w-full max-w-[200px]">
+              <CustomQRCode
+                id="business-qr-preview"
+                value={`${window.location.origin}/business/preview`}
+                style={enableCustomization ? qrStyle : defaultQRStyle}
+              />
+            </div>
           </div>
 
           {enableCustomization && (

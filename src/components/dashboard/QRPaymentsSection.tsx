@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   IndianRupee,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -442,15 +443,18 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
             >
               <Card>
                 <CardContent className="p-4 sm:p-6 space-y-4">
-                  {/* QR Code */}
+                {/* QR Code */}
                   <div className="flex justify-center p-4 bg-white rounded-xl">
-                    <QRCodeSVG
-                      id={`upi-qr-code-${payment.id}`}
-                      value={getRedirectUrl(payment.public_code)}
-                      size={160}
-                      level="H"
-                      includeMargin={true}
-                    />
+                    <div className="w-full max-w-[180px]">
+                      <QRCodeSVG
+                        id={`upi-qr-code-${payment.id}`}
+                        value={getRedirectUrl(payment.public_code)}
+                        size={180}
+                        level="H"
+                        includeMargin={true}
+                        style={{ width: '100%', height: 'auto' }}
+                      />
+                    </div>
                   </div>
 
                   {/* Info or Edit Form */}
@@ -570,12 +574,13 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDownloadQR(payment.id)}
                       className="min-h-[36px]"
+                      title="Download"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -584,14 +589,38 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
                       size="sm"
                       onClick={() => handleCopyLink(payment.public_code)}
                       className="min-h-[36px]"
+                      title="Copy Link"
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => {
+                        const url = getRedirectUrl(payment.public_code);
+                        const shareText = `📱 Scan to pay: ${payment.display_name}\n\n💰 ${payment.amount ? `Amount: ₹${payment.amount}` : 'Enter amount when paying'}\n\n🔗 ${url}`;
+                        if (navigator.share) {
+                          navigator.share({
+                            title: `Pay ${payment.display_name}`,
+                            text: shareText,
+                            url: url,
+                          }).catch(() => {});
+                        } else {
+                          navigator.clipboard.writeText(shareText);
+                          window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+                        }
+                      }}
+                      className="min-h-[36px]"
+                      title="Share"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => window.open(getRedirectUrl(payment.public_code), "_blank")}
                       className="min-h-[36px]"
+                      title="Preview"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </Button>
