@@ -8,6 +8,7 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
+import { LocationVerification } from "@/components/qr/LocationVerification";
 
 interface Category {
   id: string;
@@ -29,8 +30,19 @@ interface CartItem {
   quantity: number;
 }
 
+interface BusinessPageData {
+  id: string;
+  title: string | null;
+  is_deleted: boolean;
+  location_locked: boolean | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_name: string | null;
+}
+
 const BusinessPage = () => {
   const { publicId } = useParams<{ publicId: string }>();
+  const [pageData, setPageData] = useState<BusinessPageData | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,6 +52,10 @@ const BusinessPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // Location verification states
+  const [isLocationLocked, setIsLocationLocked] = useState(false);
+  const [isLocationVerified, setIsLocationVerified] = useState(false);
+
   useEffect(() => {
     // Initialize GA tracking on business pages
     initGA();
@@ -47,33 +63,62 @@ const BusinessPage = () => {
     if (publicId) {
       // Track QR scan event when page is accessed
       trackQRScan(publicId, undefined, 'business');
-      fetchPageData();
+      checkSecurityRequirements();
     }
   }, [publicId]);
 
-  const fetchPageData = async () => {
+  const checkSecurityRequirements = async () => {
     try {
       // Fetch page details
-      const { data: pageData, error: pageError } = await supabase
+      const { data: pageDataResult, error: pageError } = await supabase
         .from("qr_business_pages")
-        .select("id, title, is_deleted")
+        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name")
         .eq("public_id", publicId)
         .maybeSingle();
 
       if (pageError) throw pageError;
 
-      if (!pageData) {
+      if (!pageDataResult) {
         setError("Page not found");
+        setIsLoading(false);
         return;
       }
 
-      if (pageData.is_deleted) {
+      if (pageDataResult.is_deleted) {
         setError("This QR code is no longer active");
+        setIsLoading(false);
         return;
       }
 
-      setPageTitle(pageData.title);
+      setPageData(pageDataResult);
+      setPageTitle(pageDataResult.title);
 
+      // Check for location lock
+      if (pageDataResult.location_locked && pageDataResult.location_lat && pageDataResult.location_lng) {
+        setIsLocationLocked(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // No location lock, proceed to fetch products
+      fetchPageProducts(pageDataResult.id);
+    } catch (error: any) {
+      console.error(error);
+      setError("Failed to load page");
+      setIsLoading(false);
+    }
+  };
+
+  const handleLocationVerified = () => {
+    setIsLocationVerified(true);
+    if (pageData) {
+      setIsLoading(true);
+      fetchPageProducts(pageData.id);
+    }
+  };
+
+  const fetchPageProducts = async (pageId: string) => {
+    try {
       // Fetch products for this page
       const { data: pageProducts, error: productsError } = await supabase
         .from("qr_business_page_products")
@@ -91,7 +136,7 @@ const BusinessPage = () => {
             status
           )
         `)
-        .eq("qr_page_id", pageData.id)
+        .eq("qr_page_id", pageId)
         .order("display_order");
 
       if (productsError) throw productsError;
@@ -117,7 +162,7 @@ const BusinessPage = () => {
       }
     } catch (error: any) {
       console.error(error);
-      setError("Failed to load page");
+      setError("Failed to load products");
     } finally {
       setIsLoading(false);
     }
@@ -181,6 +226,18 @@ const BusinessPage = () => {
     });
     return total;
   };
+
+  // Location verification screen
+  if (isLocationLocked && !isLocationVerified && pageData) {
+    return (
+      <LocationVerification
+        targetLat={pageData.location_lat!}
+        targetLng={pageData.location_lng!}
+        targetName={pageData.location_name || "Selected Location"}
+        onVerified={handleLocationVerified}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -483,14 +540,11 @@ const BusinessPage = () => {
                   </div>
                 </div>
               ))}
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between text-lg font-bold">
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between text-lg font-bold">
                   <span>Total</span>
                   <span className="text-primary">₹{getTotalPrice().toFixed(2)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Contact the business to complete your order
-                </p>
               </div>
             </div>
           )}

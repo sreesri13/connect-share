@@ -7,12 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
-declare global {
-  interface Window {
-    google: any;
-    initGoogleMaps: () => void;
-  }
-}
+// Helper to get google maps safely
+const getGoogleMaps = () => (window as any).google?.maps;
 
 export interface LocationData {
   lat: number;
@@ -49,7 +45,8 @@ export const LocationPicker = ({
     if (!enabled) return;
 
     const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
+      const maps = getGoogleMaps();
+      if (maps) {
         setIsMapLoaded(true);
         return;
       }
@@ -76,11 +73,14 @@ export const LocationPicker = ({
   useEffect(() => {
     if (!isMapLoaded || !mapRef.current || !enabled) return;
 
+    const maps = getGoogleMaps();
+    if (!maps) return;
+
     const defaultCenter = location
       ? { lat: location.lat, lng: location.lng }
       : { lat: 20.5937, lng: 78.9629 }; // Default to India center
 
-    mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+    mapInstanceRef.current = new maps.Map(mapRef.current, {
       center: defaultCenter,
       zoom: location ? 15 : 5,
       mapTypeControl: false,
@@ -88,9 +88,9 @@ export const LocationPicker = ({
       fullscreenControl: false,
     });
 
-    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-    placesServiceRef.current = new window.google.maps.places.PlacesService(mapInstanceRef.current);
-    geocoderRef.current = new window.google.maps.Geocoder();
+    autocompleteServiceRef.current = new maps.places.AutocompleteService();
+    placesServiceRef.current = new maps.places.PlacesService(mapInstanceRef.current);
+    geocoderRef.current = new maps.Geocoder();
 
     if (location) {
       placeMarker({ lat: location.lat, lng: location.lng }, location.name);
@@ -106,15 +106,18 @@ export const LocationPicker = ({
   const placeMarker = useCallback((position: { lat: number; lng: number }, title: string) => {
     if (!mapInstanceRef.current) return;
 
+    const maps = getGoogleMaps();
+    if (!maps) return;
+
     if (markerRef.current) {
       markerRef.current.setMap(null);
     }
 
-    markerRef.current = new window.google.maps.Marker({
+    markerRef.current = new maps.Marker({
       position,
       map: mapInstanceRef.current,
       title,
-      animation: window.google.maps.Animation.DROP,
+      animation: maps.Animation.DROP,
     });
 
     mapInstanceRef.current.setCenter(position);
@@ -130,10 +133,13 @@ export const LocationPicker = ({
       return;
     }
 
+    const maps = getGoogleMaps();
+    if (!maps) return;
+
     autocompleteServiceRef.current.getPlacePredictions(
       { input: query },
       (results: any[], status: string) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+        if (status === maps.places.PlacesServiceStatus.OK && results) {
           setPredictions(results.slice(0, 5));
         } else {
           setPredictions([]);
@@ -146,10 +152,13 @@ export const LocationPicker = ({
   const handleSelectPlace = useCallback((placeId: string, description: string) => {
     if (!placesServiceRef.current) return;
 
+    const maps = getGoogleMaps();
+    if (!maps) return;
+
     placesServiceRef.current.getDetails(
       { placeId, fields: ["geometry", "name", "formatted_address"] },
       (place: any, status: string) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+        if (status === maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           const name = place.name || place.formatted_address || description;

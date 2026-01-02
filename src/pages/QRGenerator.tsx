@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, ChevronDown, ChevronUp } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +14,7 @@ import { hashPassword } from "@/lib/crypto";
 import { format, addDays, addHours, addMinutes } from "date-fns";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
+import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
 import { defaultQRStyle } from "@/lib/qr-styles";
@@ -54,6 +54,10 @@ const QRGenerator = () => {
   const [expirationDays, setExpirationDays] = useState(0);
   const [expirationHours, setExpirationHours] = useState(1);
   const [expirationMinutes, setExpirationMinutes] = useState(0);
+
+  // Location lock settings
+  const [enableLocationLock, setEnableLocationLock] = useState(false);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
 
   // Load default style when customization is enabled and default style exists
   useEffect(() => {
@@ -140,6 +144,11 @@ const QRGenerator = () => {
       return;
     }
 
+    if (enableLocationLock && !locationData) {
+      toast.error("Please select a location for location-based access");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const publicId = generatePublicId();
@@ -163,6 +172,10 @@ const QRGenerator = () => {
           password_hash: passwordHash,
           expires_at: expiresAt,
           style_config: enableCustomization ? (qrStyle as any) : null,
+          location_locked: enableLocationLock,
+          location_lat: locationData?.lat || null,
+          location_lng: locationData?.lng || null,
+          location_name: locationData?.name || null,
         })
         .select()
         .single();
@@ -473,6 +486,14 @@ const QRGenerator = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Location Lock Option */}
+                    <LocationPicker
+                      enabled={enableLocationLock}
+                      onEnabledChange={setEnableLocationLock}
+                      location={locationData}
+                      onLocationChange={setLocationData}
+                    />
                     
                     <Button onClick={handleSaveQR} className="w-full" disabled={isSaving}>
                       {isSaving ? (
