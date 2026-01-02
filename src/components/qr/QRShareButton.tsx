@@ -87,7 +87,7 @@ export const QRShareButton = ({
       variant={variant}
       size={size}
       onClick={handleShare}
-      className={className}
+      className={`min-h-[44px] ${className || ''}`}
     >
       <Share2 className="w-4 h-4 mr-1" />
       Share

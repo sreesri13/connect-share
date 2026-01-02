@@ -282,9 +282,10 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
       id={id}
       className={className}
       style={{ 
+        display: 'block',
         width: '100%', 
         height: 'auto',
-        maxWidth: mergedStyle.size, 
+        maxWidth: '100%',
         aspectRatio: '1 / 1'
       }}
     />

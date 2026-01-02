@@ -251,11 +251,11 @@ export const LocationPicker = ({
   }, [onLocationChange]);
 
   return (
-    <div className="space-y-4 p-4 rounded-lg bg-secondary/30 border border-border/50">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="location-toggle" className="flex items-center gap-2 cursor-pointer">
-          <MapPin className="w-4 h-4 text-primary" />
-          Enable Location-Based Access (Google Maps)
+    <div className="space-y-4 p-3 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <Label htmlFor="location-toggle" className="flex items-center gap-2 cursor-pointer text-sm sm:text-base">
+          <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+          <span>Enable Location-Based Access</span>
         </Label>
         <Switch
           id="location-toggle"
@@ -280,7 +280,7 @@ export const LocationPicker = ({
                   placeholder="Search for a location..."
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 min-h-[44px] text-sm"
                 />
               </div>
               <Button
@@ -288,6 +288,7 @@ export const LocationPicker = ({
                 variant="outline"
                 onClick={handleDetectLocation}
                 disabled={isLoadingLocation}
+                className="min-h-[44px] min-w-[44px]"
               >
                 {isLoadingLocation ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -345,7 +346,7 @@ export const LocationPicker = ({
           {/* Map Container */}
           <div
             ref={mapRef}
-            className="w-full h-[200px] rounded-lg border border-border overflow-hidden bg-muted"
+            className="w-full h-[180px] sm:h-[200px] rounded-lg border border-border overflow-hidden bg-muted"
           >
             {!isMapLoaded && (
               <div className="w-full h-full flex items-center justify-center">
