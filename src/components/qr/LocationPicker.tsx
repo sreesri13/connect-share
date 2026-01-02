@@ -70,7 +70,7 @@ export const LocationPicker = ({
       center: defaultCenter,
       zoom: location ? 15 : 5,
       zoomControl: true,
-      attributionControl: true,
+      attributionControl: false,
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -219,30 +219,46 @@ export const LocationPicker = ({
 
     setIsLoadingLocation(true);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude: lat, longitude: lng } = position.coords;
-        await reverseGeocode(lat, lng);
-        setIsLoadingLocation(false);
-      },
-      (error) => {
-        setIsLoadingLocation(false);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            toast.error("Location permission denied");
-            break;
-          case error.POSITION_UNAVAILABLE:
-            toast.error("Location unavailable");
-            break;
-          case error.TIMEOUT:
-            toast.error("Location request timed out");
-            break;
-          default:
-            toast.error("Failed to detect location");
+    // First try with high accuracy, then fallback to low accuracy if it fails
+    const tryGetLocation = (highAccuracy: boolean, attempt: number) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude: lat, longitude: lng } = position.coords;
+          await reverseGeocode(lat, lng);
+          setIsLoadingLocation(false);
+        },
+        (error) => {
+          // If high accuracy fails with timeout, retry with low accuracy
+          if (highAccuracy && (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE)) {
+            console.log("High accuracy failed, trying with low accuracy...");
+            tryGetLocation(false, attempt + 1);
+            return;
+          }
+
+          setIsLoadingLocation(false);
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              toast.error("Location permission denied. Please allow location access in your browser settings.");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              toast.error("Location unavailable. Please check your device's location settings.");
+              break;
+            case error.TIMEOUT:
+              toast.error("Could not detect location. Please try again or search for your location.");
+              break;
+            default:
+              toast.error("Failed to detect location. Please try searching instead.");
+          }
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 15000 : 30000,
+          maximumAge: 60000, // Accept cached position up to 1 minute old
         }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      );
+    };
+
+    tryGetLocation(true, 1);
   }, []);
 
   // Clear location
