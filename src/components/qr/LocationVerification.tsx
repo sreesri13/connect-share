@@ -39,11 +39,12 @@ export const LocationVerification = ({
   const [status, setStatus] = useState<"requesting" | "verifying" | "success" | "failed" | "denied">("requesting");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [retryCount, setRetryCount] = useState(0);
+  const [userDistance, setUserDistance] = useState<number | null>(null);
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
       setStatus("denied");
-      setErrorMessage("Geolocation is not supported by your browser");
+      setErrorMessage("Geolocation is not supported by your browser. Please use a modern browser with location support.");
       return;
     }
 
@@ -53,6 +54,7 @@ export const LocationVerification = ({
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const distance = calculateDistance(latitude, longitude, targetLat, targetLng);
+        setUserDistance(distance);
 
         // Consider accuracy - if user's accuracy is poor, be more lenient
         const effectiveTolerance = Math.max(DISTANCE_TOLERANCE_METERS, accuracy * 2);
@@ -64,21 +66,27 @@ export const LocationVerification = ({
           }, 1500);
         } else {
           setStatus("failed");
-          const distanceKm = (distance / 1000).toFixed(2);
-          setErrorMessage(
-            `You are approximately ${distanceKm} km away from the authorized location.`
-          );
+          if (distance < 1000) {
+            setErrorMessage(
+              `You are approximately ${Math.round(distance)} meters away from the authorized location.`
+            );
+          } else {
+            const distanceKm = (distance / 1000).toFixed(2);
+            setErrorMessage(
+              `You are approximately ${distanceKm} km away from the authorized location.`
+            );
+          }
         }
       },
       (error) => {
         switch (error.code) {
           case error.PERMISSION_DENIED:
             setStatus("denied");
-            setErrorMessage("Location access is required to view this content. Please enable location permissions and try again.");
+            setErrorMessage("Location access is required to view this QR content. Please allow location access and try again.");
             break;
           case error.POSITION_UNAVAILABLE:
             setStatus("denied");
-            setErrorMessage("Unable to determine your location. Please ensure GPS is enabled.");
+            setErrorMessage("Unable to determine your location. Please ensure GPS is enabled and try again.");
             break;
           case error.TIMEOUT:
             setStatus("denied");
@@ -86,7 +94,7 @@ export const LocationVerification = ({
             break;
           default:
             setStatus("denied");
-            setErrorMessage("An error occurred while accessing your location.");
+            setErrorMessage("An error occurred while accessing your location. Please try again.");
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -104,6 +112,7 @@ export const LocationVerification = ({
 
   const handleRetry = () => {
     setStatus("requesting");
+    setUserDistance(null);
     setRetryCount((prev) => prev + 1);
   };
 
@@ -126,7 +135,7 @@ export const LocationVerification = ({
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2">Location Required</h2>
               <p className="text-muted-foreground text-sm mb-6">
-                This QR code content is accessible only at a specific location. Please allow location access to continue.
+                This QR content is accessible only at a specific location. Please allow location access to continue.
               </p>
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -169,16 +178,17 @@ export const LocationVerification = ({
               <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
                 <XCircle className="w-7 h-7 sm:w-8 sm:h-8 text-destructive" />
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2">Access Denied</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2">Location Not Authorized</h2>
               <p className="text-muted-foreground text-sm mb-2">
-                This QR content is accessible only at the authorized location.
+                Your current location is not authorized for this QR content.
               </p>
               <p className="text-xs text-muted-foreground mb-4 px-3 py-2 bg-muted/50 rounded">
                 {errorMessage}
               </p>
-              <p className="text-xs text-muted-foreground mb-6">
-                <strong>Required location:</strong> {targetName}
-              </p>
+              <div className="text-xs text-muted-foreground mb-6 p-3 bg-secondary/50 rounded-lg">
+                <p className="font-medium mb-1">Required location:</p>
+                <p className="line-clamp-2">{targetName}</p>
+              </div>
               <Button onClick={handleRetry} variant="outline" className="w-full min-h-[44px]">
                 Try Again
               </Button>
