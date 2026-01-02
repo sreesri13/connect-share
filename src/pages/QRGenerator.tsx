@@ -341,10 +341,10 @@ const QRGenerator = () => {
               <CardHeader className="text-center">
                 <CardTitle>Your QR Code</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4 sm:gap-6 pb-6 sm:pb-8">
+              <CardContent className="flex flex-col items-center gap-4 sm:gap-6 pb-6 sm:pb-8 px-4 sm:px-6">
                 {/* QR Preview */}
                 <div 
-                  className="p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-elevated"
+                  className="p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-elevated w-full max-w-[220px] sm:max-w-[260px]"
                   style={{ backgroundColor: enableCustomization ? qrStyle.backgroundColor : '#ffffff' }}
                 >
                   {enableCustomization ? (
@@ -352,14 +352,12 @@ const QRGenerator = () => {
                       id="qr-code-canvas"
                       value={qrPageId ? publicUrl : previewUrl}
                       style={qrStyle}
-                      className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
                     />
                   ) : (
                     <CustomQRCode
                       id="qr-code-canvas"
                       value={qrPageId ? publicUrl : previewUrl}
                       style={defaultQRStyle}
-                      className="w-[160px] h-[160px] sm:w-[200px] sm:h-[200px]"
                     />
                   )}
                 </div>
@@ -538,19 +536,20 @@ const QRGenerator = () => {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(false)}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(false)} className="min-h-[44px]">
                         <Download className="w-4 h-4 mr-1" />
-                        <span className="hidden xs:inline">Download</span>
+                        Download
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(true)}>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(true)} className="min-h-[44px]">
                         <Download className="w-4 h-4 mr-1" />
-                        <span className="hidden xs:inline">Hi-Res</span>
+                        Hi-Res
                       </Button>
                       <QRShareButton
                         qrCanvasId="qr-code-canvas"
                         title={qrTitle || "QR Code"}
                         url={publicUrl}
+                        className="col-span-2 sm:col-span-1"
                       />
                     </div>
                     

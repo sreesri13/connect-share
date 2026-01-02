@@ -445,14 +445,14 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
                 <CardContent className="p-4 sm:p-6 space-y-4">
                 {/* QR Code */}
                   <div className="flex justify-center p-4 bg-white rounded-xl">
-                    <div className="w-full max-w-[180px]">
+                    <div className="w-full max-w-[160px] sm:max-w-[180px]">
                       <QRCodeSVG
                         id={`upi-qr-code-${payment.id}`}
                         value={getRedirectUrl(payment.public_code)}
                         size={180}
                         level="H"
                         includeMargin={true}
-                        style={{ width: '100%', height: 'auto' }}
+                        style={{ width: '100%', height: 'auto', display: 'block' }}
                       />
                     </div>
                   </div>
