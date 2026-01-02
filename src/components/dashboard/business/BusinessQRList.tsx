@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Copy, ExternalLink, Eye, MoreVertical } from "lucide-react";
+import { Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -128,6 +128,30 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     toast.success("URL copied to clipboard");
   };
 
+  const handleShare = async (page: BusinessQRPage) => {
+    const url = `${window.location.origin}/business/${page.public_id}`;
+    const shareText = `📱 Check out this catalog: ${page.title || 'Business Products'}\n\n🔗 ${url}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: page.title || 'Business QR',
+          text: shareText,
+          url: url,
+        });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          navigator.clipboard.writeText(shareText);
+          toast.success("Link copied!");
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+      toast.success("Link copied! Opening WhatsApp...");
+    }
+  };
+
   const handleOpenPage = (page: BusinessQRPage) => {
     window.open(`/business/${page.public_id}`, "_blank");
   };
@@ -191,6 +215,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                           <Copy className="w-4 h-4 mr-2" />
                           Copy URL
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShare(page)}>
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Share
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDownload(page)}>
                           <Download className="w-4 h-4 mr-2" />
                           Download QR
@@ -212,10 +240,13 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     }}
                     className="flex justify-center p-3 bg-muted/30 rounded-lg"
                   >
-                    <CustomQRCode 
-                      value={url} 
-                      style={{ ...styleConfig, size: 120 }} 
-                    />
+                    <div className="w-full max-w-[140px]">
+                      <CustomQRCode 
+                        id={`biz-list-qr-${page.id}`}
+                        value={url} 
+                        style={{ ...styleConfig, size: 140 }} 
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between">

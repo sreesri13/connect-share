@@ -281,7 +281,12 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
       ref={canvasRef}
       id={id}
       className={className}
-      style={{ width: mergedStyle.size, height: mergedStyle.size }}
+      style={{ 
+        width: '100%', 
+        height: 'auto',
+        maxWidth: mergedStyle.size, 
+        aspectRatio: '1 / 1'
+      }}
     />
   );
 }
