@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
+import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -44,6 +45,10 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
   const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Location lock settings
+  const [enableLocationLock, setEnableLocationLock] = useState(false);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
 
   const qrRef = useRef<HTMLDivElement>(null);
   const { styles, saveStyle, getStyleById } = useQRStyles();
@@ -150,6 +155,11 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
       return;
     }
 
+    if (enableLocationLock && !locationData) {
+      toast.error("Please select a location for location-based access");
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const publicId = generatePublicId();
@@ -163,6 +173,10 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           public_id: publicId,
           title: qrTitle.trim() || null,
           style_config: enableCustomization ? (qrStyle as any) : null,
+          location_locked: enableLocationLock,
+          location_lat: locationData?.lat || null,
+          location_lng: locationData?.lng || null,
+          location_name: locationData?.name || null,
         })
         .select("id")
         .single();
@@ -224,6 +238,8 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setQrTitle("");
     setQrStyle(defaultQRStyle);
     setEnableCustomization(false);
+    setEnableLocationLock(false);
+    setLocationData(null);
   };
 
   const handleSaveStyle = async (name: string) => {
@@ -440,6 +456,14 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
               onLoadStyle={handleLoadStyle}
             />
           )}
+
+          {/* Location Lock Option */}
+          <LocationPicker
+            enabled={enableLocationLock}
+            onEnabledChange={setEnableLocationLock}
+            location={locationData}
+            onLocationChange={setLocationData}
+          />
 
           <Button
             onClick={handleGenerate}

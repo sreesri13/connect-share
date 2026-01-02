@@ -11,6 +11,7 @@ import { verifyPassword } from "@/lib/crypto";
 import { toast } from "sonner";
 import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } from "@/lib/analytics";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { LocationVerification } from "@/components/qr/LocationVerification";
 
 interface ProfileItem {
   id: string;
@@ -23,6 +24,17 @@ interface ProfileItem {
 interface ProfileData {
   display_name: string | null;
   bio: string | null;
+}
+
+interface QRPageData {
+  id: string;
+  user_id: string;
+  title: string | null;
+  password_hash: string | null;
+  location_locked: boolean | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_name: string | null;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
@@ -42,6 +54,7 @@ const PublicProfile = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [items, setItems] = useState<ProfileItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
+  const [qrPageData, setQrPageData] = useState<QRPageData | null>(null);
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -51,6 +64,10 @@ const PublicProfile = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
+  // Location verification states
+  const [isLocationLocked, setIsLocationLocked] = useState(false);
+  const [isLocationVerified, setIsLocationVerified] = useState(false);
+
   useEffect(() => {
     // Initialize GA tracking on public profile pages
     initGA();
@@ -59,15 +76,15 @@ const PublicProfile = () => {
       // Track QR scan event when profile is accessed
       trackQRScan(profileId);
       trackProfileView(profileId);
-      checkPasswordProtection();
+      checkSecurityRequirements();
     }
   }, [profileId]);
 
-  const checkPasswordProtection = async () => {
+  const checkSecurityRequirements = async () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("password_hash")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -79,17 +96,39 @@ const PublicProfile = () => {
         return;
       }
 
+      setQrPageData(qrPage);
+
+      // Check for location lock first
+      if (qrPage.location_locked && qrPage.location_lat && qrPage.location_lng) {
+        setIsLocationLocked(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Then check for password
       if (qrPage.password_hash) {
         setIsPasswordProtected(true);
         setIsLoading(false);
       } else {
         setIsPasswordVerified(true);
-        fetchPublicProfile();
+        fetchPublicProfile(qrPage);
       }
     } catch (err) {
       console.error(err);
       setError("Failed to load profile");
       setIsLoading(false);
+    }
+  };
+
+  const handleLocationVerified = () => {
+    setIsLocationVerified(true);
+    // After location verification, check for password
+    if (qrPageData?.password_hash) {
+      setIsPasswordProtected(true);
+    } else {
+      setIsPasswordVerified(true);
+      setIsLoading(true);
+      fetchPublicProfile(qrPageData!);
     }
   };
 
@@ -116,7 +155,7 @@ const PublicProfile = () => {
       if (qrPage?.password_hash && verifyPassword(password.trim(), qrPage.password_hash)) {
         setIsPasswordVerified(true);
         setIsLoading(true);
-        fetchPublicProfile();
+        fetchPublicProfile(qrPageData!);
       } else {
         setPasswordError("Incorrect password");
       }
@@ -128,27 +167,8 @@ const PublicProfile = () => {
     }
   };
 
-  const fetchPublicProfile = async () => {
+  const fetchPublicProfile = async (qrPage: QRPageData) => {
     try {
-      // Fetch QR page
-      const { data: qrPage, error: qrError } = await supabase
-        .from("qr_pages")
-        .select(`
-          id,
-          user_id,
-          title
-        `)
-        .eq("public_id", profileId)
-        .maybeSingle();
-
-      if (qrError) throw qrError;
-
-      if (!qrPage) {
-        setError("Profile not found");
-        setIsLoading(false);
-        return;
-      }
-
       // Fetch profile of the owner
       const { data: profileData } = await supabase
         .from("profiles")
@@ -276,6 +296,18 @@ const PublicProfile = () => {
     acc[item.category_name].push(item);
     return acc;
   }, {} as Record<string, ProfileItem[]>);
+
+  // Location verification screen
+  if (isLocationLocked && !isLocationVerified && qrPageData) {
+    return (
+      <LocationVerification
+        targetLat={qrPageData.location_lat!}
+        targetLng={qrPageData.location_lng!}
+        targetName={qrPageData.location_name || "Selected Location"}
+        onVerified={handleLocationVerified}
+      />
+    );
+  }
 
   // Password entry screen
   if (isPasswordProtected && !isPasswordVerified) {
@@ -499,93 +531,102 @@ const PublicProfile = () => {
 
       {/* Media/Text Preview Modal */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-2">
-              <span className="truncate">{selectedItem?.title}</span>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {selectedItem?.type === "text" ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => selectedItem && handleCopyText(selectedItem.content)}
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => selectedItem && handleOpenInNewTab(selectedItem.content)}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => selectedItem && handleDownload(selectedItem)}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                  </>
-                )}
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="mt-4">
+            <DialogTitle>{selectedItem?.title}</DialogTitle>
             {selectedItem?.type === "text" && (
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-foreground whitespace-pre-wrap break-words">{selectedItem.content}</p>
-              </div>
+              <DialogDescription>Text content</DialogDescription>
             )}
-            
-            {selectedItem?.type === "image" && (
+          </DialogHeader>
+
+          {selectedItem?.type === "text" && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-secondary/30 border border-border whitespace-pre-wrap">
+                {selectedItem.content}
+              </div>
+              <Button 
+                onClick={() => handleCopyText(selectedItem.content)}
+                variant="outline"
+                className="w-full"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Text
+              </Button>
+            </div>
+          )}
+
+          {selectedItem?.type === "image" && (
+            <div className="space-y-4">
               <img
                 src={selectedItem.content}
                 alt={selectedItem.title}
-                className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  toast.error("Image couldn't load. Try 'Open' button.");
-                }}
+                className="w-full rounded-lg"
               />
-            )}
-            
-            {selectedItem?.type === "video" && (
+              <div className="flex gap-2">
+                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleOpenInNewTab(selectedItem.content)}
+                  className="flex-1"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {selectedItem?.type === "video" && (
+            <div className="space-y-4">
               <video
                 src={selectedItem.content}
                 controls
-                autoPlay
-                className="w-full h-auto max-h-[70vh] rounded-lg"
-                onError={() => toast.error("Video couldn't load. Try 'Open' button.")}
-              >
-                Your browser does not support the video tag.
-              </video>
-            )}
-            
-            {selectedItem?.type === "audio" && (
-              <div className="p-8 bg-muted rounded-lg flex flex-col items-center gap-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Music className="w-12 h-12 text-primary" />
-                </div>
-                <p className="font-medium text-lg">{selectedItem.title}</p>
-                <audio
-                  src={selectedItem.content}
-                  controls
-                  autoPlay
-                  className="w-full max-w-md"
-                  onError={() => toast.error("Audio couldn't load. Try 'Open' button.")}
+                className="w-full rounded-lg"
+                playsInline
+              />
+              <div className="flex gap-2">
+                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleOpenInNewTab(selectedItem.content)}
+                  className="flex-1"
                 >
-                  Your browser does not support the audio element.
-                </audio>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open
+                </Button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {selectedItem?.type === "audio" && (
+            <div className="space-y-4">
+              <audio
+                src={selectedItem.content}
+                controls
+                className="w-full"
+              />
+              <div className="flex gap-2">
+                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleOpenInNewTab(selectedItem.content)}
+                  className="flex-1"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
