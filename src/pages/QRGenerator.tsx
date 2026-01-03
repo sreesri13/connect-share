@@ -307,7 +307,7 @@ const QRGenerator = () => {
   const previewUrl = "https://example.com/preview";
 
   return (
-    <div className="min-h-screen bg-gradient-hero p-3 sm:p-6 md:p-12 pb-20 sm:pb-12">
+    <div className="min-h-screen bg-gradient-hero px-2 py-3 sm:p-6 md:p-12 pb-24 sm:pb-12">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
@@ -318,18 +318,18 @@ const QRGenerator = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-4 sm:mb-8"
+          className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-8"
         >
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="min-h-[44px] min-w-[44px]">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="h-10 w-10 sm:min-h-[44px] sm:min-w-[44px] flex-shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Generate QR Code</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-foreground leading-tight">Generate QR Code</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Share your content with a single scan</p>
           </div>
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* QR Code Section */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -338,13 +338,13 @@ const QRGenerator = () => {
             className="lg:col-span-1"
           >
             <Card className="overflow-hidden">
-              <CardHeader className="text-center py-3 sm:py-4">
-                <CardTitle className="text-base sm:text-lg">Your QR Code</CardTitle>
+              <CardHeader className="text-center py-2 sm:py-4">
+                <CardTitle className="text-sm sm:text-lg">Your QR Code</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col items-center gap-3 sm:gap-4 pb-4 sm:pb-6 px-3 sm:px-6">
-                {/* QR Preview - Always visible and properly sized for mobile */}
+              <CardContent className="flex flex-col items-center gap-2 sm:gap-4 pb-3 sm:pb-6 px-2 sm:px-6">
+                {/* QR Preview - Compact for mobile */}
                 <div 
-                  className="p-3 sm:p-4 rounded-xl shadow-elevated w-full max-w-[180px] sm:max-w-[220px] mx-auto aspect-square flex items-center justify-center"
+                  className="p-2 sm:p-4 rounded-xl shadow-elevated w-[140px] sm:w-[200px] aspect-square flex items-center justify-center mx-auto"
                   style={{ backgroundColor: enableCustomization ? qrStyle.backgroundColor : '#ffffff' }}
                 >
                   {enableCustomization ? (
@@ -365,24 +365,24 @@ const QRGenerator = () => {
                 </div>
 
                 {!qrPageId && (
-                  <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-                    {enableCustomization ? 'Live preview - customize below' : 'Standard QR code'}
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    {enableCustomization ? 'Live preview' : 'Standard QR'}
                   </p>
                 )}
 
                 {!qrPageId && (
-                  <div className="w-full space-y-3 sm:space-y-4">
+                  <div className="w-full space-y-2 sm:space-y-4">
                     {/* Customize QR Code Toggle */}
-                    <div className="flex items-center space-x-2 p-3 sm:p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <div className="flex items-center space-x-2 p-2 sm:p-4 rounded-lg bg-primary/10 border border-primary/20">
                       <Checkbox
                         id="enableCustomization"
                         checked={enableCustomization}
                         onCheckedChange={(checked) => setEnableCustomization(checked as boolean)}
-                        className="min-h-[20px] min-w-[20px]"
+                        className="h-4 w-4 sm:min-h-[20px] sm:min-w-[20px]"
                       />
-                      <Label htmlFor="enableCustomization" className="flex items-center gap-2 cursor-pointer font-medium text-sm">
-                        <Palette className="w-4 h-4 text-primary flex-shrink-0" />
-                        <span>Customize QR Design</span>
+                      <Label htmlFor="enableCustomization" className="flex items-center gap-1.5 sm:gap-2 cursor-pointer font-medium text-xs sm:text-sm">
+                        <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+                        <span>Customize QR</span>
                       </Label>
                     </div>
 
@@ -390,38 +390,38 @@ const QRGenerator = () => {
                       placeholder="QR Code title (optional)"
                       value={qrTitle}
                       onChange={(e) => setQrTitle(e.target.value)}
-                      className="min-h-[44px] text-sm"
+                      className="h-10 sm:min-h-[44px] text-xs sm:text-sm"
                     />
                     
                     {/* Password Protection Option */}
-                    <div className="space-y-2 sm:space-y-3 p-3 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+                    <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="enablePassword"
                           checked={enablePassword}
                           onCheckedChange={(checked) => setEnablePassword(checked as boolean)}
-                          className="min-h-[20px] min-w-[20px]"
+                          className="h-4 w-4"
                         />
-                        <Label htmlFor="enablePassword" className="flex items-center gap-2 cursor-pointer text-sm">
-                          <Lock className="w-4 h-4 text-primary flex-shrink-0" />
-                          <span>Password protect</span>
+                        <Label htmlFor="enablePassword" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+                          <span>Password</span>
                         </Label>
                       </div>
                       
                       {enablePassword && (
-                        <div className="relative mt-2">
+                        <div className="relative mt-1.5">
                           <Input
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="pr-10 min-h-[44px] text-sm"
+                            className="pr-10 h-10 text-xs sm:text-sm"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="absolute right-0 top-0 h-full px-3 min-h-[44px]"
+                            className="absolute right-0 top-0 h-full px-2 sm:px-3"
                             onClick={() => setShowPassword(!showPassword)}
                           >
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -431,59 +431,59 @@ const QRGenerator = () => {
                     </div>
 
                     {/* Expiration Option */}
-                    <div className="space-y-2 sm:space-y-3 p-3 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+                    <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="enableExpiration"
                           checked={enableExpiration}
                           onCheckedChange={(checked) => setEnableExpiration(checked as boolean)}
-                          className="min-h-[20px] min-w-[20px]"
+                          className="h-4 w-4"
                         />
-                        <Label htmlFor="enableExpiration" className="flex items-center gap-2 cursor-pointer text-sm">
-                          <Clock className="w-4 h-4 text-primary flex-shrink-0" />
-                          <span>Set expiration</span>
+                        <Label htmlFor="enableExpiration" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+                          <span>Expiration</span>
                         </Label>
                       </div>
                       
                       {enableExpiration && (
-                        <div className="space-y-2 sm:space-y-3 mt-2">
-                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] sm:text-xs text-muted-foreground">Days</Label>
+                        <div className="space-y-1.5 mt-1.5">
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <div className="space-y-0.5">
+                              <Label className="text-[9px] sm:text-xs text-muted-foreground">Days</Label>
                               <Input
                                 type="number"
                                 min="0"
                                 max="365"
                                 value={expirationDays}
                                 onChange={(e) => setExpirationDays(parseInt(e.target.value) || 0)}
-                                className="text-center min-h-[40px] text-sm px-1"
+                                className="text-center h-9 text-xs px-1"
                               />
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] sm:text-xs text-muted-foreground">Hours</Label>
+                            <div className="space-y-0.5">
+                              <Label className="text-[9px] sm:text-xs text-muted-foreground">Hours</Label>
                               <Input
                                 type="number"
                                 min="0"
                                 max="23"
                                 value={expirationHours}
                                 onChange={(e) => setExpirationHours(parseInt(e.target.value) || 0)}
-                                className="text-center min-h-[40px] text-sm px-1"
+                                className="text-center h-9 text-xs px-1"
                               />
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] sm:text-xs text-muted-foreground">Mins</Label>
+                            <div className="space-y-0.5">
+                              <Label className="text-[9px] sm:text-xs text-muted-foreground">Mins</Label>
                               <Input
                                 type="number"
                                 min="0"
                                 max="59"
                                 value={expirationMinutes}
                                 onChange={(e) => setExpirationMinutes(parseInt(e.target.value) || 0)}
-                                className="text-center min-h-[40px] text-sm px-1"
+                                className="text-center h-9 text-xs px-1"
                               />
                             </div>
                           </div>
                           {getExpirationPreview() && (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+                            <p className="text-[9px] sm:text-xs text-muted-foreground flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                               Expires: {getExpirationPreview()}
                             </p>
@@ -500,7 +500,7 @@ const QRGenerator = () => {
                       onLocationChange={setLocationData}
                     />
                     
-                    <Button onClick={handleSaveQR} className="w-full min-h-[48px] text-sm sm:text-base" disabled={isSaving}>
+                    <Button onClick={handleSaveQR} className="w-full h-11 sm:min-h-[48px] text-sm" disabled={isSaving}>
                       {isSaving ? (
                         <span className="flex items-center gap-2">
                           <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
@@ -509,7 +509,7 @@ const QRGenerator = () => {
                       ) : (
                         <>
                           <QrCode className="w-4 h-4 mr-2" />
-                          Generate QR Code
+                          Generate QR
                         </>
                       )}
                     </Button>
