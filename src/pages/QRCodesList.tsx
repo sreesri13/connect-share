@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check, Clock, Plus } from "lucide-react";
+import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check, Clock, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -332,6 +332,57 @@ const QRCodesList = () => {
     }
   };
 
+  const handleDownloadEditQR = () => {
+    if (!editingQR) return;
+    
+    const canvas = document.querySelector("#edit-qr-canvas") as HTMLCanvasElement;
+    if (!canvas) {
+      toast.error("QR code not ready");
+      return;
+    }
+
+    // Create high-res version
+    const downloadCanvas = document.createElement("canvas");
+    const scale = 4;
+    downloadCanvas.width = canvas.width * scale;
+    downloadCanvas.height = canvas.height * scale;
+    const ctx = downloadCanvas.getContext("2d");
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.scale(scale, scale);
+      ctx.drawImage(canvas, 0, 0);
+    }
+
+    const link = document.createElement("a");
+    link.download = `connecthub-qr-${editingQR.public_id}.png`;
+    link.href = downloadCanvas.toDataURL("image/png");
+    link.click();
+    toast.success("QR code downloaded!");
+  };
+
+  const handleRemoveExpiration = async () => {
+    if (!editingQR) return;
+
+    try {
+      const { error } = await supabase
+        .from("qr_pages")
+        .update({ expires_at: null })
+        .eq("id", editingQR.id);
+
+      if (error) throw error;
+
+      setQrPages(qrPages.map((p) =>
+        p.id === editingQR.id ? { ...p, expires_at: null } : p
+      ));
+      setEditingQR({ ...editingQR, expires_at: null });
+      setEditEnableExpiration(false);
+      toast.success("Expiration removed!");
+    } catch (error) {
+      toast.error("Failed to remove expiration");
+      console.error(error);
+    }
+  };
+
   const getPublicUrl = (publicId: string) => {
     return `${window.location.origin}/p/${publicId}`;
   };
@@ -458,8 +509,9 @@ const QRCodesList = () => {
             {editingQR && (
               <div className="flex flex-col items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/50">
                 <Label className="text-sm text-muted-foreground">QR Code Preview</Label>
-                <div className="bg-white p-4 rounded-lg">
+                <div id="edit-qr-preview" className="bg-white p-4 rounded-lg">
                   <CustomQRCode
+                    id="edit-qr-canvas"
                     value={getPublicUrl(editingQR.public_id)}
                     style={editingQR.style_config || defaultQRStyle}
                     className="w-[140px] h-[140px]"
@@ -468,6 +520,15 @@ const QRCodesList = () => {
                 <p className="text-xs text-muted-foreground truncate max-w-full">
                   {getPublicUrl(editingQR.public_id)}
                 </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadEditQR}
+                  className="w-full"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download QR Code
+                </Button>
               </div>
             )}
 
@@ -524,11 +585,23 @@ const QRCodesList = () => {
               )}
             </div>
 
-            {/* Expiration Extension */}
+            {/* Expiration Settings */}
             <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-primary" />
-                <Label className="font-medium">Expiration Settings</Label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <Label className="font-medium">Expiration Settings</Label>
+                </div>
+                {editingQR?.expires_at && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-destructive text-xs h-7" 
+                    onClick={handleRemoveExpiration}
+                  >
+                    Remove Expiration
+                  </Button>
+                )}
               </div>
               
               {editingQR?.expires_at && (
