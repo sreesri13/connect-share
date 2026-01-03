@@ -278,11 +278,11 @@ export const LocationPicker = ({
   }, [onLocationChange]);
 
   return (
-    <div className="space-y-4 p-3 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <Label htmlFor="location-toggle" className="flex items-center gap-2 cursor-pointer text-sm sm:text-base">
-          <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
-          <span>Location Access (Optional)</span>
+    <div className="space-y-2 sm:space-y-4 p-2 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="location-toggle" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+          <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
+          <span>Location Lock</span>
         </Label>
         <Switch
           id="location-toggle"
@@ -293,24 +293,25 @@ export const LocationPicker = ({
               handleClearLocation();
             }
           }}
+          className="scale-90 sm:scale-100"
         />
       </div>
 
       {enabled && (
-        <div className="space-y-4 pt-2">
+        <div className="space-y-2 sm:space-y-4 pt-1">
           {/* Search Input */}
           <div className="relative">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="flex gap-1.5 sm:gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search place, address, city..."
+                  placeholder="Search location..."
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10 min-h-[44px] text-sm"
+                  className="pl-7 sm:pl-10 h-9 sm:min-h-[44px] text-xs sm:text-sm"
                 />
                 {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
                 )}
               </div>
               <Button
@@ -318,7 +319,7 @@ export const LocationPicker = ({
                 variant="outline"
                 onClick={handleDetectLocation}
                 disabled={isLoadingLocation}
-                className="min-h-[44px] min-w-[44px] shrink-0"
+                className="h-9 w-9 sm:min-h-[44px] sm:min-w-[44px] shrink-0 p-0"
                 title="Detect My Location"
               >
                 {isLoadingLocation ? (
@@ -353,23 +354,20 @@ export const LocationPicker = ({
 
           {/* Selected Location Display */}
           {location && (
-            <div className="flex items-start gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
-              <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-1.5 p-2 sm:p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-foreground">Selected Location</p>
-                <p className="text-xs text-muted-foreground line-clamp-2">{location.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                </p>
+                <p className="font-medium text-xs sm:text-sm text-foreground">Location Set</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1">{location.name}</p>
               </div>
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 shrink-0"
+                className="h-7 w-7 shrink-0"
                 onClick={handleClearLocation}
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </Button>
             </div>
           )}
@@ -377,12 +375,12 @@ export const LocationPicker = ({
           {/* Map Container */}
           <div
             ref={mapContainerRef}
-            className="w-full h-[180px] sm:h-[220px] rounded-lg border border-border overflow-hidden bg-muted z-0"
+            className="w-full h-[140px] sm:h-[200px] rounded-lg border border-border overflow-hidden bg-muted z-0"
             style={{ position: "relative" }}
           />
 
-          <p className="text-xs text-muted-foreground">
-            Tap on the map or search to select a location. Users must be at this location to view the QR content.
+          <p className="text-[9px] sm:text-xs text-muted-foreground">
+            Tap map or search to set location.
           </p>
         </div>
       )}
