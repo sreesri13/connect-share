@@ -143,7 +143,7 @@ export function QRCustomizationPanel({
             {/* Body Shape */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Body Shape</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 {bodyShapeOptions.map((option) => (
                   <button
                     key={option.value}
@@ -154,12 +154,18 @@ export function QRCustomizationPanel({
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <div className={`w-4 h-4 ${value.bodyShape === option.value ? 'bg-primary' : 'bg-foreground'} ${
-                      option.value === 'dots' ? 'rounded-full' :
-                      option.value === 'rounded' ? 'rounded-md' :
-                      option.value === 'diamond' ? 'rotate-45' :
-                      ''
-                    }`} />
+                    {option.value === 'star' ? (
+                      <svg viewBox="0 0 24 24" className={`w-4 h-4 ${value.bodyShape === option.value ? 'fill-primary' : 'fill-foreground'}`}>
+                        <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" />
+                      </svg>
+                    ) : (
+                      <div className={`w-4 h-4 ${value.bodyShape === option.value ? 'bg-primary' : 'bg-foreground'} ${
+                        option.value === 'dots' ? 'rounded-full' :
+                        option.value === 'rounded' ? 'rounded-md' :
+                        option.value === 'diamond' ? 'rotate-45' :
+                        ''
+                      }`} />
+                    )}
                     <span className="text-[10px]">{option.label}</span>
                   </button>
                 ))}

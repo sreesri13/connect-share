@@ -208,7 +208,7 @@ const QRGenerator = () => {
     ? `${window.location.origin}/p/${qrPageId}` 
     : "";
   
-  const handleDownloadQR = (highRes: boolean = false) => {
+  const handleDownloadQR = () => {
     if (!qrPageId) {
       toast.error("Please save the QR code first");
       return;
@@ -216,28 +216,24 @@ const QRGenerator = () => {
     
     const canvas = document.querySelector("#qr-code-canvas") as HTMLCanvasElement;
     if (canvas) {
-      let downloadCanvas = canvas;
-      
-      if (highRes) {
-        // Create high-res version
-        downloadCanvas = document.createElement("canvas");
-        const scale = 4;
-        downloadCanvas.width = canvas.width * scale;
-        downloadCanvas.height = canvas.height * scale;
-        const ctx = downloadCanvas.getContext("2d");
-        if (ctx) {
-          ctx.imageSmoothingEnabled = false;
-          ctx.scale(scale, scale);
-          ctx.drawImage(canvas, 0, 0);
-        }
+      // Create high-res version by default
+      const downloadCanvas = document.createElement("canvas");
+      const scale = 4;
+      downloadCanvas.width = canvas.width * scale;
+      downloadCanvas.height = canvas.height * scale;
+      const ctx = downloadCanvas.getContext("2d");
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.scale(scale, scale);
+        ctx.drawImage(canvas, 0, 0);
       }
       
       const pngFile = downloadCanvas.toDataURL("image/png");
       const downloadLink = document.createElement("a");
-      downloadLink.download = `connecthub-qr-${qrPageId}${highRes ? '-hires' : ''}.png`;
+      downloadLink.download = `connecthub-qr-${qrPageId}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
-      toast.success(highRes ? "High-res QR code downloaded!" : "QR code downloaded!");
+      toast.success("QR code downloaded!");
     }
   };
 
@@ -548,15 +544,10 @@ const QRGenerator = () => {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(false)} className="min-h-[40px] text-xs px-2">
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR()} className="min-h-[40px] text-xs px-2">
                         <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden sm:inline">Download</span>
-                        <span className="sm:hidden">Save</span>
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadQR(true)} className="min-h-[40px] text-xs px-2">
-                        <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span>HD</span>
+                        <span>Download</span>
                       </Button>
                       <QRShareButton
                         qrCanvasId="qr-code-canvas"

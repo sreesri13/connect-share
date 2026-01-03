@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 import { LocationVerification } from "@/components/qr/LocationVerification";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface Category {
   id: string;
@@ -268,17 +269,18 @@ const BusinessPage = () => {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center flex-shrink-0">
             <Store className="w-5 h-5 text-primary-foreground" />
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-foreground">
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-lg text-foreground truncate">
               {pageTitle || "Product Catalog"}
             </h1>
             <p className="text-xs text-muted-foreground">
               {products.length} product{products.length !== 1 ? "s" : ""}
             </p>
           </div>
+          <LanguageToggle inline />
         </div>
       </header>
 

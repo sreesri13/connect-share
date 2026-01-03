@@ -217,9 +217,21 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         return;
       }
 
+      // Create high-res version by default
+      const downloadCanvas = document.createElement("canvas");
+      const scale = 4;
+      downloadCanvas.width = canvas.width * scale;
+      downloadCanvas.height = canvas.height * scale;
+      const ctx = downloadCanvas.getContext("2d");
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.scale(scale, scale);
+        ctx.drawImage(canvas, 0, 0);
+      }
+
       const link = document.createElement("a");
       link.download = `business-qr-${generatedQR.publicId}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = downloadCanvas.toDataURL("image/png");
       link.click();
       toast.success("QR code downloaded");
     } catch (error) {
