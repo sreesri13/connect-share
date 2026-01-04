@@ -13,7 +13,7 @@ import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
 import { QRShareButton } from "@/components/qr/QRShareButton";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
-import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
+import { defaultQRStyle, oceanPresetStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Category {
@@ -57,6 +57,15 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   useEffect(() => {
     fetchData();
   }, [userId]);
+
+  // Apply Ocean preset when customization is enabled
+  useEffect(() => {
+    if (enableCustomization) {
+      setQrStyle(oceanPresetStyle);
+    } else {
+      setQrStyle(defaultQRStyle);
+    }
+  }, [enableCustomization]);
 
   const fetchData = async () => {
     try {
