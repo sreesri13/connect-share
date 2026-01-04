@@ -23,14 +23,37 @@ const AuthPage = () => {
   const [displayName, setDisplayName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   
   const recaptchaRef = useRef<HTMLDivElement>(null);
   const { isLoaded: recaptchaLoaded, token: recaptchaToken, renderRecaptcha, resetRecaptcha, isVerified } = useRecaptcha("recaptcha-container");
 
+  // Check if we're processing an OAuth callback (hash contains access_token)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && (hash.includes('access_token') || hash.includes('error'))) {
+      setIsProcessingOAuth(true);
+      
+      // If there's an error in the hash, show it and stop processing
+      if (hash.includes('error')) {
+        const errorMatch = hash.match(/error_description=([^&]*)/);
+        const errorMessage = errorMatch 
+          ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' '))
+          : 'Authentication failed';
+        toast.error(errorMessage);
+        setIsProcessingOAuth(false);
+        // Clear the hash
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+  }, []);
+
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      navigate("/dashboard");
+      // Clear processing state when user is authenticated
+      setIsProcessingOAuth(false);
+      navigate("/dashboard", { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -140,10 +163,14 @@ const AuthPage = () => {
     }
   };
 
-  if (authLoading) {
+  // Show loading while auth is loading OR processing OAuth callback
+  if (authLoading || isProcessingOAuth) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center flex-col gap-4">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        {isProcessingOAuth && (
+          <p className="text-muted-foreground text-sm">Completing sign in...</p>
+        )}
       </div>
     );
   }
