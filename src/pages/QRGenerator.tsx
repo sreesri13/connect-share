@@ -18,7 +18,7 @@ import { QRShareButton } from "@/components/qr/QRShareButton";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
-import { defaultQRStyle } from "@/lib/qr-styles";
+import { defaultQRStyle, oceanPresetStyle } from "@/lib/qr-styles";
 
 interface ItemWithCategory {
   id: string;
@@ -60,11 +60,16 @@ const QRGenerator = () => {
   const [enableLocationLock, setEnableLocationLock] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
 
-  // Load default style when customization is enabled and default style exists
+  // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
-    if (enableCustomization && defaultStyle) {
-      setQrStyle(defaultStyle);
-    } else if (!enableCustomization) {
+    if (enableCustomization) {
+      if (defaultStyle) {
+        setQrStyle(defaultStyle);
+      } else {
+        // Default to Ocean preset when customization is enabled
+        setQrStyle(oceanPresetStyle);
+      }
+    } else {
       setQrStyle(defaultQRStyle);
     }
   }, [defaultStyle, enableCustomization]);

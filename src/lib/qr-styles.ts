@@ -2,7 +2,7 @@
 
 export type BodyShape = 'square' | 'dots' | 'rounded' | 'diamond' | 'star';
 export type EyeFrameShape = 'square' | 'rounded' | 'circle' | 'leaf' | 'dotted';
-export type EyeBallShape = 'square' | 'rounded' | 'circle' | 'star' | 'dot';
+export type EyeBallShape = 'square' | 'rounded' | 'circle' | 'diamond' | 'leaf';
 export type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
 
 export interface QRStyleConfig {
@@ -31,6 +31,20 @@ export const defaultQRStyle: QRStyleConfig = {
   errorCorrectionLevel: 'H',
 };
 
+// Ocean preset for when customization is enabled
+export const oceanPresetStyle: QRStyleConfig = {
+  bodyShape: 'rounded',
+  eyeFrameShape: 'rounded',
+  eyeBallShape: 'circle',
+  bodyColor: '#0077b6',
+  eyeFrameColor: '#023e8a',
+  eyeBallColor: '#0096c7',
+  backgroundColor: '#ffffff',
+  size: 200,
+  margin: 4,
+  errorCorrectionLevel: 'H',
+};
+
 export const bodyShapeOptions: { value: BodyShape; label: string }[] = [
   { value: 'square', label: 'Square' },
   { value: 'dots', label: 'Dots' },
@@ -51,8 +65,8 @@ export const eyeBallShapeOptions: { value: EyeBallShape; label: string }[] = [
   { value: 'square', label: 'Square' },
   { value: 'rounded', label: 'Rounded' },
   { value: 'circle', label: 'Circle' },
-  { value: 'star', label: 'Star' },
-  { value: 'dot', label: 'Dot' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'leaf', label: 'Leaf' },
 ];
 
 export const errorCorrectionOptions: { value: ErrorCorrectionLevel; label: string; description: string }[] = [
@@ -92,7 +106,7 @@ export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = 
     config: {
       bodyShape: 'dots',
       eyeFrameShape: 'circle',
-      eyeBallShape: 'dot',
+      eyeBallShape: 'circle',
       bodyColor: '#333333',
       eyeFrameColor: '#333333',
       eyeBallColor: '#333333',

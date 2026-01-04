@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check, Clock, Plus, Download } from "lucide-react";
+import { QrCode, ExternalLink, Trash2, Calendar, ArrowLeft, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check, Clock, Plus, Download, MapPin, MapPinOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { hashPassword } from "@/lib/crypto";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { defaultQRStyle } from "@/lib/qr-styles";
+import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { format, addDays, addHours, addMinutes } from "date-fns";
 
 interface QRPage {
@@ -39,6 +41,10 @@ interface QRPage {
   has_password: boolean;
   expires_at: string | null;
   style_config: any;
+  location_locked: boolean;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_name: string | null;
 }
 
 interface QRItem {
@@ -72,6 +78,10 @@ const QRCodesList = () => {
   const [editExpirationHours, setEditExpirationHours] = useState(0);
   const [editExpirationMinutes, setEditExpirationMinutes] = useState(0);
 
+  // Location lock states
+  const [editEnableLocationLock, setEditEnableLocationLock] = useState(false);
+  const [editLocationData, setEditLocationData] = useState<LocationData | null>(null);
+
   useEffect(() => {
     if (!user && !authLoading) {
       navigate("/auth");
@@ -96,6 +106,10 @@ const QRCodesList = () => {
           password_hash,
           expires_at,
           style_config,
+          location_locked,
+          location_lat,
+          location_lng,
+          location_name,
           qr_page_items (id)
         `)
         .eq("user_id", user!.id)
@@ -113,6 +127,10 @@ const QRCodesList = () => {
         has_password: !!page.password_hash,
         expires_at: page.expires_at,
         style_config: page.style_config,
+        location_locked: page.location_locked || false,
+        location_lat: page.location_lat,
+        location_lng: page.location_lng,
+        location_name: page.location_name,
       }));
 
       setQrPages(pages);
@@ -184,6 +202,13 @@ const QRCodesList = () => {
     setEditExpirationDays(0);
     setEditExpirationHours(0);
     setEditExpirationMinutes(0);
+    // Set location states
+    setEditEnableLocationLock(qrPage.location_locked);
+    setEditLocationData(qrPage.location_lat && qrPage.location_lng ? {
+      lat: qrPage.location_lat,
+      lng: qrPage.location_lng,
+      name: qrPage.location_name || undefined,
+    } : null);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
@@ -231,6 +256,18 @@ const QRCodesList = () => {
         updateData.expires_at = newExpiration;
       }
 
+      // Handle location lock settings
+      updateData.location_locked = editEnableLocationLock;
+      if (editEnableLocationLock && editLocationData) {
+        updateData.location_lat = editLocationData.lat;
+        updateData.location_lng = editLocationData.lng;
+        updateData.location_name = editLocationData.name || null;
+      } else if (!editEnableLocationLock) {
+        updateData.location_lat = null;
+        updateData.location_lng = null;
+        updateData.location_name = null;
+      }
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
@@ -245,6 +282,10 @@ const QRCodesList = () => {
               title: editQRTitle, 
               has_password: editEnablePassword,
               expires_at: newExpiration || p.expires_at,
+              location_locked: editEnableLocationLock,
+              location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
+              location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
+              location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
             }
           : p
       ));
@@ -660,6 +701,41 @@ const QRCodesList = () => {
                     />
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Location Lock Settings */}
+            <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {editEnableLocationLock ? (
+                    <MapPin className="w-4 h-4 text-primary" />
+                  ) : (
+                    <MapPinOff className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <Label className="font-medium">Location Lock</Label>
+                </div>
+                <Switch
+                  checked={editEnableLocationLock}
+                  onCheckedChange={setEditEnableLocationLock}
+                />
+              </div>
+
+              {editEnableLocationLock && (
+                <div className="mt-3">
+                  <LocationPicker
+                    enabled={editEnableLocationLock}
+                    onEnabledChange={setEditEnableLocationLock}
+                    location={editLocationData}
+                    onLocationChange={setEditLocationData}
+                  />
+                </div>
+              )}
+
+              {!editEnableLocationLock && editingQR?.location_locked && (
+                <p className="text-xs text-muted-foreground">
+                  Location lock will be disabled when you save changes.
+                </p>
               )}
             </div>
 

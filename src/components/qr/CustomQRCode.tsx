@@ -53,8 +53,6 @@ const renderBodyModule = (
   shape: BodyShape, color: string
 ) => {
   ctx.fillStyle = color;
-  const padding = size * 0.1;
-  const adjustedSize = size - padding;
 
   switch (shape) {
     case 'dots':
@@ -64,24 +62,24 @@ const renderBodyModule = (
       break;
     case 'rounded':
       ctx.beginPath();
-      const r = size * 0.3;
-      ctx.roundRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize, r);
+      const r = size * 0.25;
+      ctx.roundRect(x, y, size, size, r);
       ctx.fill();
       break;
     case 'diamond':
       ctx.beginPath();
-      ctx.moveTo(x + size / 2, y + padding / 2);
-      ctx.lineTo(x + size - padding / 2, y + size / 2);
-      ctx.lineTo(x + size / 2, y + size - padding / 2);
-      ctx.lineTo(x + padding / 2, y + size / 2);
+      ctx.moveTo(x + size / 2, y);
+      ctx.lineTo(x + size, y + size / 2);
+      ctx.lineTo(x + size / 2, y + size);
+      ctx.lineTo(x, y + size / 2);
       ctx.closePath();
       ctx.fill();
       break;
     case 'star':
       const cx = x + size / 2;
       const cy = y + size / 2;
-      const outerR = size * 0.45;
-      const innerR = size * 0.2;
+      const outerR = size * 0.5;
+      const innerR = size * 0.22;
       ctx.beginPath();
       for (let i = 0; i < 5; i++) {
         const angle = (i * 72 - 90) * Math.PI / 180;
@@ -95,8 +93,8 @@ const renderBodyModule = (
       ctx.closePath();
       ctx.fill();
       break;
-    default: // square
-      ctx.fillRect(x + padding / 2, y + padding / 2, adjustedSize, adjustedSize);
+    default: // square - fill completely with no padding
+      ctx.fillRect(x, y, size, size);
   }
 };
 
@@ -190,25 +188,20 @@ const renderEyeBall = (
       ctx.arc(centerX, centerY, size * 1.5, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'star':
-      const outerR = size * 1.4;
-      const innerR = size * 0.6;
+    case 'diamond':
+      // Diamond shape for eye center
       ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const angle = (i * 72 - 90) * Math.PI / 180;
-        const px = centerX + outerR * Math.cos(angle);
-        const py = centerY + outerR * Math.sin(angle);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        const innerAngle = ((i * 72) + 36 - 90) * Math.PI / 180;
-        ctx.lineTo(centerX + innerR * Math.cos(innerAngle), centerY + innerR * Math.sin(innerAngle));
-      }
+      ctx.moveTo(centerX, y);
+      ctx.lineTo(x + size * 3, centerY);
+      ctx.lineTo(centerX, y + size * 3);
+      ctx.lineTo(x, centerY);
       ctx.closePath();
       ctx.fill();
       break;
-    case 'dot':
+    case 'leaf':
+      // Leaf/teardrop shape for eye center
       ctx.beginPath();
-      ctx.arc(centerX, centerY, size * 1.2, 0, Math.PI * 2);
+      ctx.roundRect(x, y, size * 3, size * 3, [0, size * 1.2, 0, size * 1.2]);
       ctx.fill();
       break;
     default: // square
