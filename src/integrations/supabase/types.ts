@@ -388,6 +388,57 @@ export type Database = {
           },
         ]
       }
+      qr_scans: {
+        Row: {
+          city: string | null
+          country: string | null
+          device_type: string | null
+          id: string
+          ip_hash: string | null
+          qr_business_page_id: string | null
+          qr_page_id: string | null
+          scanned_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
+          id?: string
+          ip_hash?: string | null
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          scanned_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
+          id?: string
+          ip_hash?: string | null
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          scanned_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_scans_qr_business_page_id_fkey"
+            columns: ["qr_business_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_business_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scans_qr_page_id_fkey"
+            columns: ["qr_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qr_styles: {
         Row: {
           config: Json

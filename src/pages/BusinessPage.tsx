@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 import { LocationVerification } from "@/components/qr/LocationVerification";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { recordQRScan } from "@/hooks/useQRScans";
 
 interface Category {
   id: string;
@@ -120,6 +121,9 @@ const BusinessPage = () => {
 
   const fetchPageProducts = async (pageId: string) => {
     try {
+      // Record scan in database
+      recordQRScan(pageId, true);
+
       // Fetch products for this page
       const { data: pageProducts, error: productsError } = await supabase
         .from("qr_business_page_products")
