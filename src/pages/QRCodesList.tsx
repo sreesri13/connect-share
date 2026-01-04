@@ -31,6 +31,7 @@ import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { defaultQRStyle } from "@/lib/qr-styles";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { format, addDays, addHours, addMinutes } from "date-fns";
+import { QRAnalyticsDisplay } from "@/components/dashboard/QRAnalyticsDisplay";
 
 interface QRPage {
   id: string;
@@ -571,6 +572,11 @@ const QRCodesList = () => {
                   Download QR Code
                 </Button>
               </div>
+            )}
+
+            {/* Analytics Section */}
+            {editingQR && (
+              <QRAnalyticsDisplay qrPageId={editingQR.id} />
             )}
 
             {/* Title */}

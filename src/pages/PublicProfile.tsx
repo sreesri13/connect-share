@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } from "@/lib/analytics";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { LocationVerification } from "@/components/qr/LocationVerification";
+import { recordQRScan } from "@/hooks/useQRScans";
 
 interface ProfileItem {
   id: string;
@@ -169,6 +170,9 @@ const PublicProfile = () => {
 
   const fetchPublicProfile = async (qrPage: QRPageData) => {
     try {
+      // Record scan in database
+      recordQRScan(qrPage.id, false);
+
       // Fetch profile of the owner
       const { data: profileData } = await supabase
         .from("profiles")
