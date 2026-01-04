@@ -44,7 +44,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [qrTitle, setQrTitle] = useState("");
   const [enableCustomization, setEnableCustomization] = useState(false);
   const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
-  const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string } | null>(null);
+  const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string; style: QRStyleConfig } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Location lock settings
@@ -206,7 +206,8 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
       if (productsError) throw productsError;
 
-      setGeneratedQR({ publicId, url: qrUrl });
+      // Store the style used at generation time to lock it
+      setGeneratedQR({ publicId, url: qrUrl, style: enableCustomization ? qrStyle : defaultQRStyle });
       toast.success("QR code generated successfully!");
     } catch (error: any) {
       toast.error("Failed to generate QR code");
@@ -315,7 +316,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
               <CustomQRCode
                 id="business-qr-canvas"
                 value={generatedQR.url}
-                style={enableCustomization ? qrStyle : defaultQRStyle}
+                style={generatedQR.style}
               />
             </div>
 

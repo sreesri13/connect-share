@@ -44,6 +44,8 @@ const QRGenerator = () => {
   // QR Style
   const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
   const [enableCustomization, setEnableCustomization] = useState(false);
+  // Store the final style at generation time to prevent changes
+  const [generatedStyle, setGeneratedStyle] = useState<QRStyleConfig | null>(null);
   
   // Password protection
   const [enablePassword, setEnablePassword] = useState(false);
@@ -200,6 +202,8 @@ const QRGenerator = () => {
       if (itemsError) throw itemsError;
 
       setQrPageId(publicId);
+      // Lock in the style used at generation time
+      setGeneratedStyle(enableCustomization ? qrStyle : defaultQRStyle);
       toast.success("QR code saved successfully!");
     } catch (error: any) {
       toast.error("Failed to save QR code");
@@ -346,23 +350,14 @@ const QRGenerator = () => {
                 {/* QR Preview - Compact for mobile */}
                 <div 
                   className="p-2 sm:p-4 rounded-xl shadow-elevated w-[140px] sm:w-[200px] aspect-square flex items-center justify-center mx-auto"
-                  style={{ backgroundColor: enableCustomization ? qrStyle.backgroundColor : '#ffffff' }}
+                  style={{ backgroundColor: qrPageId && generatedStyle ? generatedStyle.backgroundColor : (enableCustomization ? qrStyle.backgroundColor : '#ffffff') }}
                 >
-                  {enableCustomization ? (
-                    <CustomQRCode
-                      id="qr-code-canvas"
-                      value={qrPageId ? publicUrl : previewUrl}
-                      style={qrStyle}
-                      className="w-full h-full"
-                    />
-                  ) : (
-                    <CustomQRCode
-                      id="qr-code-canvas"
-                      value={qrPageId ? publicUrl : previewUrl}
-                      style={defaultQRStyle}
-                      className="w-full h-full"
-                    />
-                  )}
+                  <CustomQRCode
+                    id="qr-code-canvas"
+                    value={qrPageId ? publicUrl : previewUrl}
+                    style={qrPageId && generatedStyle ? generatedStyle : (enableCustomization ? qrStyle : defaultQRStyle)}
+                    className="w-full h-full"
+                  />
                 </div>
 
                 {!qrPageId && (
@@ -576,8 +571,8 @@ const QRGenerator = () => {
             </Card>
           </motion.div>
 
-          {/* Customization Panel - only show if enabled */}
-          {enableCustomization && (
+          {/* Customization Panel - only show if enabled AND before QR generation */}
+          {enableCustomization && !qrPageId && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
