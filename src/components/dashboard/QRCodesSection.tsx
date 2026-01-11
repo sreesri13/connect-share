@@ -1,12 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, Eye, EyeOff, X, Check } from "lucide-react";
+import { 
+  QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
+  Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -21,10 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
 import { hashPassword } from "@/lib/crypto";
+import { CustomQRCode } from "@/components/qr/CustomQRCode";
+import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
+import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
+import { format, isPast, addDays, addHours, addMonths } from "date-fns";
 
 interface QRPage {
   id: string;
@@ -33,6 +48,12 @@ interface QRPage {
   created_at: string;
   item_count: number;
   has_password: boolean;
+  expires_at: string | null;
+  style_config: QRStyleConfig | null;
+  location_locked: boolean;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_name: string | null;
 }
 
 interface QRItem {
@@ -47,21 +68,37 @@ interface QRCodesSectionProps {
   userId: string;
 }
 
+type ExpiryExtension = "none" | "1h" | "24h" | "7d" | "30d" | "custom" | "remove";
+
 export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [qrPages, setQrPages] = useState<QRPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Edit QR state
   const [editingQR, setEditingQR] = useState<QRPage | null>(null);
   const [isEditQROpen, setIsEditQROpen] = useState(false);
   const [editQRTitle, setEditQRTitle] = useState("");
   const [editEnablePassword, setEditEnablePassword] = useState(false);
   const [editPassword, setEditPassword] = useState("");
   const [showEditPassword, setShowEditPassword] = useState(false);
+  
+  // Location lock state
+  const [editEnableLocationLock, setEditEnableLocationLock] = useState(false);
+  const [editLocationData, setEditLocationData] = useState<LocationData | null>(null);
+  
+  // Expiry state
+  const [editExpiryExtension, setEditExpiryExtension] = useState<ExpiryExtension>("none");
+  const [editCustomExpiryDate, setEditCustomExpiryDate] = useState<Date | undefined>(undefined);
+  
+  // Items state
   const [qrItems, setQrItems] = useState<QRItem[]>([]);
   const [editingItem, setEditingItem] = useState<QRItem | null>(null);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+  
+  const qrPreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchQRPages();
@@ -77,6 +114,12 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           title,
           created_at,
           password_hash,
+          expires_at,
+          style_config,
+          location_locked,
+          location_lat,
+          location_lng,
+          location_name,
           is_deleted,
           qr_page_items (id)
         `)
@@ -93,6 +136,12 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         created_at: page.created_at,
         item_count: page.qr_page_items?.length || 0,
         has_password: !!page.password_hash,
+        expires_at: page.expires_at,
+        style_config: page.style_config as QRStyleConfig | null,
+        location_locked: page.location_locked || false,
+        location_lat: page.location_lat,
+        location_lng: page.location_lng,
+        location_name: page.location_name,
       }));
 
       setQrPages(pages);
@@ -139,7 +188,6 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
   const handleDelete = async (id: string) => {
     try {
-      // Soft delete - move to recycle bin
       const { error } = await supabase
         .from("qr_pages")
         .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -164,7 +212,6 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setIsDeleting(true);
     try {
       for (const id of selectedIds) {
-        // Soft delete - move to recycle bin
         await supabase
           .from("qr_pages")
           .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -203,12 +250,37 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setEditQRTitle(qrPage.title || "");
     setEditEnablePassword(qrPage.has_password);
     setEditPassword("");
+    setEditEnableLocationLock(qrPage.location_locked);
+    setEditLocationData(
+      qrPage.location_lat && qrPage.location_lng
+        ? { lat: qrPage.location_lat, lng: qrPage.location_lng, name: qrPage.location_name || "" }
+        : null
+    );
+    setEditExpiryExtension("none");
+    setEditCustomExpiryDate(undefined);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
 
+  const calculateNewExpirationDate = (): string | null | undefined => {
+    if (editExpiryExtension === "none") return undefined;
+    if (editExpiryExtension === "remove") return null;
+    
+    const baseDate = new Date();
+    
+    switch (editExpiryExtension) {
+      case "1h": return addHours(baseDate, 1).toISOString();
+      case "24h": return addHours(baseDate, 24).toISOString();
+      case "7d": return addDays(baseDate, 7).toISOString();
+      case "30d": return addDays(baseDate, 30).toISOString();
+      case "custom": return editCustomExpiryDate ? editCustomExpiryDate.toISOString() : undefined;
+      default: return undefined;
+    }
+  };
+
   const handleSaveQRChanges = async () => {
     if (!editingQR) return;
+    setIsSaving(true);
 
     try {
       let passwordHash: string | null | undefined = undefined;
@@ -220,8 +292,27 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       }
 
       const updateData: any = { title: editQRTitle };
+      
       if (passwordHash !== undefined) {
         updateData.password_hash = passwordHash;
+      }
+      
+      // Handle expiration
+      const newExpiration = calculateNewExpirationDate();
+      if (newExpiration !== undefined) {
+        updateData.expires_at = newExpiration;
+      }
+
+      // Handle location lock settings
+      updateData.location_locked = editEnableLocationLock;
+      if (editEnableLocationLock && editLocationData) {
+        updateData.location_lat = editLocationData.lat;
+        updateData.location_lng = editLocationData.lng;
+        updateData.location_name = editLocationData.name || null;
+      } else if (!editEnableLocationLock) {
+        updateData.location_lat = null;
+        updateData.location_lng = null;
+        updateData.location_name = null;
       }
 
       const { error } = await supabase
@@ -233,7 +324,16 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id
-          ? { ...p, title: editQRTitle, has_password: editEnablePassword }
+          ? { 
+              ...p, 
+              title: editQRTitle, 
+              has_password: editEnablePassword,
+              expires_at: newExpiration !== undefined ? newExpiration : p.expires_at,
+              location_locked: editEnableLocationLock,
+              location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
+              location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
+              location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+            }
           : p
       ));
 
@@ -243,6 +343,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     } catch (error) {
       toast.error("Failed to update QR code");
       console.error(error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -266,6 +368,34 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       toast.error("Failed to remove password");
       console.error(error);
     }
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrPreviewRef.current || !editingQR) return;
+    
+    const canvas = qrPreviewRef.current.querySelector("canvas");
+    if (!canvas) {
+      toast.error("QR code not ready");
+      return;
+    }
+
+    // Create high-res version (4x scale)
+    const downloadCanvas = document.createElement("canvas");
+    const scale = 4;
+    downloadCanvas.width = canvas.width * scale;
+    downloadCanvas.height = canvas.height * scale;
+    const ctx = downloadCanvas.getContext("2d");
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.scale(scale, scale);
+      ctx.drawImage(canvas, 0, 0);
+    }
+
+    const link = document.createElement("a");
+    link.download = `qr-${editingQR.public_id}.png`;
+    link.href = downloadCanvas.toDataURL("image/png");
+    link.click();
+    toast.success("QR code downloaded (high quality)");
   };
 
   const handleEditItem = async () => {
@@ -322,6 +452,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
   const getPublicUrl = (publicId: string) => {
     return `${window.location.origin}/p/${publicId}`;
+  };
+
+  const isExpired = (expiresAt: string | null) => {
+    return expiresAt ? isPast(new Date(expiresAt)) : false;
   };
 
   if (isLoading) {
@@ -401,7 +535,25 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                           {page.title || `QR Code`}
                         </h3>
                         {page.has_password && (
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">Protected</span>
+                          <Badge variant="secondary" className="text-xs">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Protected
+                          </Badge>
+                        )}
+                        {page.location_locked && (
+                          <Badge variant="secondary" className="text-xs">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            Location
+                          </Badge>
+                        )}
+                        {page.expires_at && (
+                          <Badge 
+                            variant={isExpired(page.expires_at) ? "destructive" : "secondary"} 
+                            className="text-xs"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            {isExpired(page.expires_at) ? "Expired" : format(new Date(page.expires_at), "MMM d")}
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground flex-wrap">
@@ -451,22 +603,50 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
       {/* Edit QR Dialog */}
       <Dialog open={isEditQROpen} onOpenChange={(open) => { setIsEditQROpen(open); if (!open) { setEditingQR(null); setQrItems([]); } }}>
-        <DialogContent className="max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit QR Code</DialogTitle>
-            <DialogDescription>Update QR code settings and manage items</DialogDescription>
+            <DialogDescription>Update QR code settings, security, and access rules</DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-5 pr-2">
+            {/* QR Preview and Download */}
+            {editingQR && (
+              <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-lg bg-muted/30 border border-border/50">
+                <div 
+                  ref={qrPreviewRef}
+                  className="w-32 h-32 sm:w-40 sm:h-40 mx-auto sm:mx-0 flex-shrink-0"
+                >
+                  <CustomQRCode 
+                    id="edit-qr-preview"
+                    value={getPublicUrl(editingQR.public_id)} 
+                    style={editingQR.style_config || defaultQRStyle}
+                  />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground mb-1">Public URL</p>
+                    <p className="text-xs break-all">{getPublicUrl(editingQR.public_id)}</p>
+                  </div>
+                  <Button onClick={handleDownloadQR} variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download High Quality
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* QR Title */}
             <div className="space-y-2">
-              <Label>QR Code Title</Label>
+              <Label>QR Code Name</Label>
               <Input
                 value={editQRTitle}
                 onChange={(e) => setEditQRTitle(e.target.value)}
-                placeholder="Enter title"
+                placeholder="Enter a name for this QR code"
               />
             </div>
 
+            {/* Password Protection */}
             <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center space-x-2">
@@ -477,7 +657,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                   />
                   <Label htmlFor="editEnablePassword" className="flex items-center gap-2 cursor-pointer">
                     {editEnablePassword ? <Lock className="w-4 h-4 text-primary" /> : <LockOpen className="w-4 h-4" />}
-                    Password protection
+                    Password Protection
                   </Label>
                 </div>
                 {editingQR?.has_password && (
@@ -509,6 +689,69 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               )}
             </div>
 
+            {/* Location Lock */}
+            <LocationPicker
+              enabled={editEnableLocationLock}
+              onEnabledChange={setEditEnableLocationLock}
+              location={editLocationData}
+              onLocationChange={setEditLocationData}
+            />
+
+            {/* Expiry Management */}
+            <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <Label>QR Code Expiry</Label>
+              </div>
+              
+              {editingQR?.expires_at && (
+                <div className={`flex items-center gap-2 p-2 rounded text-sm ${isExpired(editingQR.expires_at) ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
+                  <AlertCircle className="w-4 h-4" />
+                  <span>
+                    {isExpired(editingQR.expires_at) 
+                      ? `Expired on ${format(new Date(editingQR.expires_at), "MMM d, yyyy 'at' h:mm a")}` 
+                      : `Expires on ${format(new Date(editingQR.expires_at), "MMM d, yyyy 'at' h:mm a")}`}
+                  </span>
+                </div>
+              )}
+
+              <Select value={editExpiryExtension} onValueChange={(v) => setEditExpiryExtension(v as ExpiryExtension)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Set or modify expiry" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Keep current setting</SelectItem>
+                  <SelectItem value="1h">Set to expire in 1 hour</SelectItem>
+                  <SelectItem value="24h">Set to expire in 24 hours</SelectItem>
+                  <SelectItem value="7d">Set to expire in 7 days</SelectItem>
+                  <SelectItem value="30d">Set to expire in 30 days</SelectItem>
+                  <SelectItem value="custom">Set custom date</SelectItem>
+                  <SelectItem value="remove">Remove expiry (never expires)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {editExpiryExtension === "custom" && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {editCustomExpiryDate ? format(editCustomExpiryDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={editCustomExpiryDate}
+                      onSelect={setEditCustomExpiryDate}
+                      disabled={(date) => date < new Date()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            {/* Items in QR Code */}
             <div className="space-y-3">
               <Label>Items in this QR Code ({qrItems.length})</Label>
               <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -545,13 +788,16 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                     </Button>
                   </div>
                 ))}
+                {qrItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No items linked to this QR code</p>
+                )}
               </div>
             </div>
           </div>
 
           <div className="flex-shrink-0 pt-4 border-t mt-4">
-            <Button onClick={handleSaveQRChanges} className="w-full">
-              <Check className="w-4 h-4 mr-2" />
+            <Button onClick={handleSaveQRChanges} className="w-full" disabled={isSaving}>
+              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
               Save Changes
             </Button>
           </div>
