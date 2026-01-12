@@ -235,12 +235,14 @@ export type Database = {
         Row: {
           created_at: string
           deleted_at: string | null
+          expires_at: string | null
           id: string
           is_deleted: boolean | null
           location_lat: number | null
           location_lng: number | null
           location_locked: boolean | null
           location_name: string | null
+          password_hash: string | null
           public_id: string
           style_config: Json | null
           style_id: string | null
@@ -251,12 +253,14 @@ export type Database = {
         Insert: {
           created_at?: string
           deleted_at?: string | null
+          expires_at?: string | null
           id?: string
           is_deleted?: boolean | null
           location_lat?: number | null
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          password_hash?: string | null
           public_id: string
           style_config?: Json | null
           style_id?: string | null
@@ -267,12 +271,14 @@ export type Database = {
         Update: {
           created_at?: string
           deleted_at?: string | null
+          expires_at?: string | null
           id?: string
           is_deleted?: boolean | null
           location_lat?: number | null
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          password_hash?: string | null
           public_id?: string
           style_config?: Json | null
           style_id?: string | null

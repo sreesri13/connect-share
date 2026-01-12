@@ -1,13 +1,41 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2 } from "lucide-react";
+import { 
+  Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
+import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
+import { hashPassword } from "@/lib/crypto";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
-import { format } from "date-fns";
+import { format, isPast, addDays, addHours } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,17 +61,46 @@ interface BusinessQRPage {
   is_deleted: boolean;
   created_at: string;
   product_count: number;
+  password_hash: string | null;
+  expires_at: string | null;
+  location_locked: boolean;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_name: string | null;
 }
 
 interface BusinessQRListProps {
   userId: string;
 }
 
+type ExpiryExtension = "none" | "1h" | "24h" | "7d" | "30d" | "custom" | "remove";
+
 export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [pages, setPages] = useState<BusinessQRPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const qrRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Edit state
+  const [editingQR, setEditingQR] = useState<BusinessQRPage | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Password state
+  const [editEnablePassword, setEditEnablePassword] = useState(false);
+  const [editPassword, setEditPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  
+  // Location lock state
+  const [editEnableLocationLock, setEditEnableLocationLock] = useState(false);
+  const [editLocationData, setEditLocationData] = useState<LocationData | null>(null);
+  
+  // Expiry state
+  const [editExpiryExtension, setEditExpiryExtension] = useState<ExpiryExtension>("none");
+  const [editCustomExpiryDate, setEditCustomExpiryDate] = useState<Date | undefined>(undefined);
+  
+  const qrPreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchPages();
@@ -53,7 +110,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     try {
       const { data: pagesData, error: pagesError } = await supabase
         .from("qr_business_pages")
-        .select("id, public_id, title, style_config, is_deleted, created_at")
+        .select("id, public_id, title, style_config, is_deleted, created_at, password_hash, expires_at, location_locked, location_lat, location_lng, location_name")
         .eq("user_id", userId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: false });
@@ -105,6 +162,157 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     }
   };
 
+  const handleEditQR = (page: BusinessQRPage) => {
+    setEditingQR(page);
+    setEditTitle(page.title || "");
+    setEditEnablePassword(!!page.password_hash);
+    setEditPassword("");
+    setEditEnableLocationLock(page.location_locked || false);
+    setEditLocationData(
+      page.location_lat && page.location_lng
+        ? { lat: page.location_lat, lng: page.location_lng, name: page.location_name || "" }
+        : null
+    );
+    setEditExpiryExtension("none");
+    setEditCustomExpiryDate(undefined);
+    setIsEditOpen(true);
+  };
+
+  const calculateNewExpirationDate = (): string | null | undefined => {
+    if (editExpiryExtension === "none") return undefined;
+    if (editExpiryExtension === "remove") return null;
+    
+    const baseDate = new Date();
+    
+    switch (editExpiryExtension) {
+      case "1h": return addHours(baseDate, 1).toISOString();
+      case "24h": return addHours(baseDate, 24).toISOString();
+      case "7d": return addDays(baseDate, 7).toISOString();
+      case "30d": return addDays(baseDate, 30).toISOString();
+      case "custom": return editCustomExpiryDate ? editCustomExpiryDate.toISOString() : undefined;
+      default: return undefined;
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!editingQR) return;
+    setIsSaving(true);
+
+    try {
+      let passwordHash: string | null | undefined = undefined;
+
+      if (editEnablePassword && editPassword.trim()) {
+        passwordHash = hashPassword(editPassword.trim());
+      } else if (!editEnablePassword) {
+        passwordHash = null;
+      }
+
+      const updateData: any = { title: editTitle };
+      
+      if (passwordHash !== undefined) {
+        updateData.password_hash = passwordHash;
+      }
+      
+      // Handle expiration
+      const newExpiration = calculateNewExpirationDate();
+      if (newExpiration !== undefined) {
+        updateData.expires_at = newExpiration;
+      }
+
+      // Handle location lock settings
+      updateData.location_locked = editEnableLocationLock;
+      if (editEnableLocationLock && editLocationData) {
+        updateData.location_lat = editLocationData.lat;
+        updateData.location_lng = editLocationData.lng;
+        updateData.location_name = editLocationData.name || null;
+      } else if (!editEnableLocationLock) {
+        updateData.location_lat = null;
+        updateData.location_lng = null;
+        updateData.location_name = null;
+      }
+
+      const { error } = await supabase
+        .from("qr_business_pages")
+        .update(updateData)
+        .eq("id", editingQR.id);
+
+      if (error) throw error;
+
+      setPages(pages.map((p) =>
+        p.id === editingQR.id
+          ? { 
+              ...p, 
+              title: editTitle, 
+              password_hash: passwordHash !== undefined ? passwordHash : p.password_hash,
+              expires_at: newExpiration !== undefined ? newExpiration : p.expires_at,
+              location_locked: editEnableLocationLock,
+              location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
+              location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
+              location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+            }
+          : p
+      ));
+
+      toast.success("QR code updated!");
+      setIsEditOpen(false);
+      setEditingQR(null);
+    } catch (error) {
+      toast.error("Failed to update QR code");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    if (!editingQR) return;
+
+    try {
+      const { error } = await supabase
+        .from("qr_business_pages")
+        .update({ password_hash: null })
+        .eq("id", editingQR.id);
+
+      if (error) throw error;
+
+      setEditEnablePassword(false);
+      setPages(pages.map((p) =>
+        p.id === editingQR.id ? { ...p, password_hash: null } : p
+      ));
+      toast.success("Password removed!");
+    } catch (error) {
+      toast.error("Failed to remove password");
+      console.error(error);
+    }
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrPreviewRef.current || !editingQR) return;
+    
+    const canvas = qrPreviewRef.current.querySelector("canvas");
+    if (!canvas) {
+      toast.error("QR code not ready");
+      return;
+    }
+
+    const downloadCanvas = document.createElement("canvas");
+    const scale = 4;
+    downloadCanvas.width = canvas.width * scale;
+    downloadCanvas.height = canvas.height * scale;
+    const ctx = downloadCanvas.getContext("2d");
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.scale(scale, scale);
+      ctx.drawImage(canvas, 0, 0);
+    }
+
+    const link = document.createElement("a");
+    link.download = `business-qr-${editingQR.public_id}.png`;
+    link.href = downloadCanvas.toDataURL("image/png");
+    link.click();
+    toast.success("QR code downloaded (high quality)");
+  };
+
   const handleDownload = (page: BusinessQRPage) => {
     const ref = qrRefs.current.get(page.id);
     if (!ref) return;
@@ -115,7 +323,6 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       return;
     }
 
-    // Create high-res version by default
     const downloadCanvas = document.createElement("canvas");
     const scale = 4;
     downloadCanvas.width = canvas.width * scale;
@@ -168,6 +375,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     window.open(`/business/${page.public_id}`, "_blank");
   };
 
+  const isExpired = (expiresAt: string | null) => {
+    return expiresAt ? isPast(new Date(expiresAt)) : false;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -197,20 +408,45 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             {pages.map((page) => {
               const url = `${window.location.origin}/business/${page.public_id}`;
               const styleConfig = page.style_config || defaultQRStyle;
+              const expired = isExpired(page.expires_at);
 
               return (
                 <div
                   key={page.id}
-                  className="border rounded-lg p-4 space-y-3 bg-card hover:shadow-md transition-shadow"
+                  className={`border rounded-lg p-4 space-y-3 bg-card hover:shadow-md transition-shadow ${expired ? 'opacity-60' : ''}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <h3 className="font-medium text-sm truncate">
                         {page.title || "Untitled"}
                       </h3>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(page.created_at), "MMM d, yyyy")}
                       </p>
+                      {/* Status badges */}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {page.password_hash && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Password
+                          </Badge>
+                        )}
+                        {page.location_locked && (
+                          <Badge variant="secondary" className="text-xs">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            Location
+                          </Badge>
+                        )}
+                        {page.expires_at && (
+                          <Badge 
+                            variant={expired ? "destructive" : "secondary"} 
+                            className="text-xs"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            {expired ? "Expired" : format(new Date(page.expires_at), "MMM d")}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -219,6 +455,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditQR(page)}>
+                          <Edit2 className="w-4 h-4 mr-2" />
+                          Edit Settings
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenPage(page)}>
                           <ExternalLink className="w-4 h-4 mr-2" />
                           Open Page
@@ -268,11 +508,11 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleOpenPage(page)}
+                      onClick={() => handleEditQR(page)}
                       className="text-xs"
                     >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Preview
+                      <Edit2 className="w-3 h-3 mr-1" />
+                      Edit
                     </Button>
                   </div>
                 </div>
@@ -281,6 +521,204 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit QR Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="w-5 h-5" />
+              Edit Business QR Code
+            </DialogTitle>
+            <DialogDescription>
+              Update settings for this QR code. Changes take effect immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingQR && (
+            <div className="space-y-6">
+              {/* QR Preview & Download */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                <div 
+                  ref={qrPreviewRef}
+                  className="bg-muted/30 rounded-lg p-4 flex justify-center"
+                >
+                  <CustomQRCode
+                    id={`edit-biz-qr-${editingQR.id}`}
+                    value={`${window.location.origin}/business/${editingQR.public_id}`}
+                    style={{ ...(editingQR.style_config || defaultQRStyle), size: 160 }}
+                  />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <Button onClick={handleDownloadQR} variant="outline" className="w-full">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download High-Quality PNG
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    URL: {window.location.origin}/business/{editingQR.public_id}
+                  </p>
+                </div>
+              </div>
+
+              {/* Edit Name */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">QR Code Name</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Enter a name for this QR code"
+                />
+              </div>
+
+              {/* Password Protection */}
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {editEnablePassword ? (
+                      <Lock className="w-4 h-4 text-primary" />
+                    ) : (
+                      <LockOpen className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <Label>Password Protection</Label>
+                  </div>
+                  <Switch
+                    checked={editEnablePassword}
+                    onCheckedChange={setEditEnablePassword}
+                  />
+                </div>
+                
+                {editEnablePassword && (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        type={showEditPassword ? "text" : "password"}
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder={editingQR.password_hash ? "Enter new password (leave empty to keep current)" : "Enter password"}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                      >
+                        {showEditPassword ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    {editingQR.password_hash && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemovePassword}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove Password
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Location Lock */}
+              <LocationPicker
+                enabled={editEnableLocationLock}
+                onEnabledChange={setEditEnableLocationLock}
+                location={editLocationData}
+                onLocationChange={setEditLocationData}
+              />
+
+              {/* Expiry Settings */}
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <Label>QR Code Expiration</Label>
+                </div>
+                
+                {editingQR.expires_at && (
+                  <div className={`flex items-center gap-2 text-sm ${isExpired(editingQR.expires_at) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    <AlertCircle className="w-4 h-4" />
+                    {isExpired(editingQR.expires_at) 
+                      ? `Expired on ${format(new Date(editingQR.expires_at), "PPp")}`
+                      : `Expires on ${format(new Date(editingQR.expires_at), "PPp")}`
+                    }
+                  </div>
+                )}
+
+                <Select
+                  value={editExpiryExtension}
+                  onValueChange={(value) => setEditExpiryExtension(value as ExpiryExtension)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Set expiration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No change</SelectItem>
+                    <SelectItem value="1h">Expire in 1 hour</SelectItem>
+                    <SelectItem value="24h">Expire in 24 hours</SelectItem>
+                    <SelectItem value="7d">Expire in 7 days</SelectItem>
+                    <SelectItem value="30d">Expire in 30 days</SelectItem>
+                    <SelectItem value="custom">Custom date</SelectItem>
+                    <SelectItem value="remove">Remove expiration</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {editExpiryExtension === "custom" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start">
+                        {editCustomExpiryDate 
+                          ? format(editCustomExpiryDate, "PPP") 
+                          : "Pick a date"
+                        }
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={editCustomExpiryDate}
+                        onSelect={setEditCustomExpiryDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+
+              {/* Save Button */}
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditOpen(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
