@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, X, Store } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 import { LocationVerification } from "@/components/qr/LocationVerification";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { recordQRScan } from "@/hooks/useQRScans";
+import { hashPassword } from "@/lib/crypto";
 
 interface Category {
   id: string;
@@ -40,6 +42,8 @@ interface BusinessPageData {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  password_hash: string | null;
+  expires_at: string | null;
 }
 
 const BusinessPage = () => {
@@ -58,6 +62,13 @@ const BusinessPage = () => {
   const [isLocationLocked, setIsLocationLocked] = useState(false);
   const [isLocationVerified, setIsLocationVerified] = useState(false);
 
+  // Password protection states
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     // Initialize GA tracking on business pages
     initGA();
@@ -74,7 +85,7 @@ const BusinessPage = () => {
       // Fetch page details
       const { data: pageDataResult, error: pageError } = await supabase
         .from("qr_business_pages")
-        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name")
+        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name, password_hash, expires_at")
         .eq("public_id", publicId)
         .maybeSingle();
 
@@ -92,8 +103,22 @@ const BusinessPage = () => {
         return;
       }
 
+      // Check for expiration
+      if (pageDataResult.expires_at && new Date(pageDataResult.expires_at) < new Date()) {
+        setError("This QR code has expired");
+        setIsLoading(false);
+        return;
+      }
+
       setPageData(pageDataResult);
       setPageTitle(pageDataResult.title);
+
+      // Check for password protection first
+      if (pageDataResult.password_hash) {
+        setIsPasswordProtected(true);
+        setIsLoading(false);
+        return;
+      }
 
       // Check for location lock
       if (pageDataResult.location_locked && pageDataResult.location_lat && pageDataResult.location_lng) {
@@ -102,12 +127,33 @@ const BusinessPage = () => {
         return;
       }
 
-      // No location lock, proceed to fetch products
+      // No security, proceed to fetch products
       fetchPageProducts(pageDataResult.id);
     } catch (error: any) {
       console.error(error);
       setError("Failed to load page");
       setIsLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = () => {
+    if (!pageData || !passwordInput.trim()) return;
+
+    const inputHash = hashPassword(passwordInput.trim());
+    
+    if (inputHash === pageData.password_hash) {
+      setIsPasswordVerified(true);
+      setPasswordError("");
+      
+      // Check if location lock is also needed
+      if (pageData.location_locked && pageData.location_lat && pageData.location_lng) {
+        setIsLocationLocked(true);
+      } else {
+        setIsLoading(true);
+        fetchPageProducts(pageData.id);
+      }
+    } else {
+      setPasswordError("Incorrect password");
     }
   };
 
@@ -231,6 +277,58 @@ const BusinessPage = () => {
     });
     return total;
   };
+
+  // Password verification screen
+  if (isPasswordProtected && !isPasswordVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-card rounded-2xl border shadow-lg p-6 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Lock className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-xl font-bold">Password Protected</h1>
+            <p className="text-sm text-muted-foreground">
+              Enter the password to view this catalog
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError("");
+                }}
+                placeholder="Enter password"
+                className="pr-10"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handlePasswordSubmit();
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </Button>
+            </div>
+            {passwordError && (
+              <p className="text-sm text-destructive">{passwordError}</p>
+            )}
+            <Button onClick={handlePasswordSubmit} className="w-full">
+              Submit
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Location verification screen
   if (isLocationLocked && !isLocationVerified && pageData) {
