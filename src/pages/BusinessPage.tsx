@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ interface BusinessPageData {
   location_name: string | null;
   password_hash: string | null;
   expires_at: string | null;
+  show_expires_at: boolean | null;
 }
 
 const BusinessPage = () => {
@@ -85,7 +86,7 @@ const BusinessPage = () => {
       // Fetch page details
       const { data: pageDataResult, error: pageError } = await supabase
         .from("qr_business_pages")
-        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name, password_hash, expires_at")
+        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name, password_hash, expires_at, show_expires_at")
         .eq("public_id", publicId)
         .maybeSingle();
 
@@ -382,6 +383,12 @@ const BusinessPage = () => {
               {products.length} product{products.length !== 1 ? "s" : ""}
             </p>
           </div>
+          {pageData?.show_expires_at && pageData?.expires_at && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-destructive/10 text-destructive rounded text-xs">
+              <Clock className="w-3 h-3" />
+              <span>Expires: {new Date(pageData.expires_at).toLocaleDateString()}</span>
+            </div>
+          )}
           <LanguageToggle inline />
         </div>
       </header>

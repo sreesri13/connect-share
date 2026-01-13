@@ -244,6 +244,7 @@ export type Database = {
           location_name: string | null
           password_hash: string | null
           public_id: string
+          show_expires_at: boolean | null
           style_config: Json | null
           style_id: string | null
           title: string | null
@@ -262,6 +263,7 @@ export type Database = {
           location_name?: string | null
           password_hash?: string | null
           public_id: string
+          show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
@@ -280,6 +282,7 @@ export type Database = {
           location_name?: string | null
           password_hash?: string | null
           public_id?: string
+          show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
@@ -345,6 +348,7 @@ export type Database = {
           location_name: string | null
           password_hash: string | null
           public_id: string
+          show_expires_at: boolean | null
           style_config: Json | null
           style_id: string | null
           title: string | null
@@ -362,6 +366,7 @@ export type Database = {
           location_name?: string | null
           password_hash?: string | null
           public_id: string
+          show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
@@ -379,6 +384,7 @@ export type Database = {
           location_name?: string | null
           password_hash?: string | null
           public_id?: string
+          show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, ChevronDown, ChevronRight, QrCode, Download, Copy, Link, Share2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, QrCode, Download, Copy, Link, Share2, Lock, LockOpen, Clock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,21 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import { defaultQRStyle, oceanPresetStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { hashPassword } from "@/lib/crypto";
+import { addHours, addDays, format } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 interface Category {
   id: string;
@@ -50,6 +65,17 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   // Location lock settings
   const [enableLocationLock, setEnableLocationLock] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
+
+  // Password settings
+  const [enablePassword, setEnablePassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Expiry settings
+  type ExpiryOption = "none" | "1h" | "24h" | "7d" | "30d" | "custom";
+  const [expiryOption, setExpiryOption] = useState<ExpiryOption>("none");
+  const [customExpiryDate, setCustomExpiryDate] = useState<Date | undefined>(undefined);
+  const [showExpiryToVisitors, setShowExpiryToVisitors] = useState(false);
 
   const qrRef = useRef<HTMLDivElement>(null);
   const { styles, saveStyle, getStyleById } = useQRStyles();
@@ -159,6 +185,21 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     return `biz_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
   };
 
+  const calculateExpirationDate = (): string | null => {
+    if (expiryOption === "none") return null;
+    
+    const baseDate = new Date();
+    
+    switch (expiryOption) {
+      case "1h": return addHours(baseDate, 1).toISOString();
+      case "24h": return addHours(baseDate, 24).toISOString();
+      case "7d": return addDays(baseDate, 7).toISOString();
+      case "30d": return addDays(baseDate, 30).toISOString();
+      case "custom": return customExpiryDate ? customExpiryDate.toISOString() : null;
+      default: return null;
+    }
+  };
+
   const handleGenerate = async () => {
     if (selectedProducts.size === 0) {
       toast.error("Please select at least one product");
@@ -170,10 +211,22 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
       return;
     }
 
+    if (enablePassword && !password.trim()) {
+      toast.error("Please enter a password");
+      return;
+    }
+
+    if (expiryOption === "custom" && !customExpiryDate) {
+      toast.error("Please select an expiry date");
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const publicId = generatePublicId();
       const qrUrl = `${window.location.origin}/business/${publicId}`;
+      const expiresAt = calculateExpirationDate();
+      const passwordHash = enablePassword && password.trim() ? hashPassword(password.trim()) : null;
 
       // Create QR business page
       const { data: pageData, error: pageError } = await supabase
@@ -187,6 +240,9 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           location_lat: locationData?.lat || null,
           location_lng: locationData?.lng || null,
           location_name: locationData?.name || null,
+          password_hash: passwordHash,
+          expires_at: expiresAt,
+          show_expires_at: showExpiryToVisitors,
         })
         .select("id")
         .single();
@@ -263,6 +319,12 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setEnableCustomization(false);
     setEnableLocationLock(false);
     setLocationData(null);
+    setEnablePassword(false);
+    setPassword("");
+    setShowPassword(false);
+    setExpiryOption("none");
+    setCustomExpiryDate(undefined);
+    setShowExpiryToVisitors(false);
   };
 
   const handleSaveStyle = async (name: string) => {
@@ -489,6 +551,44 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
             />
           )}
 
+          {/* Password Protection */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {enablePassword ? (
+                  <Lock className="w-4 h-4 text-primary" />
+                ) : (
+                  <LockOpen className="w-4 h-4 text-muted-foreground" />
+                )}
+                <Label>Password Protection</Label>
+              </div>
+              <Switch
+                checked={enablePassword}
+                onCheckedChange={setEnablePassword}
+              />
+            </div>
+            
+            {enablePassword && (
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* Location Lock Option */}
           <LocationPicker
             enabled={enableLocationLock}
@@ -496,6 +596,67 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
             location={locationData}
             onLocationChange={setLocationData}
           />
+
+          {/* Expiry Settings */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <Label>QR Code Expiration</Label>
+            </div>
+
+            <Select
+              value={expiryOption}
+              onValueChange={(value) => setExpiryOption(value as ExpiryOption)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Set expiration" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Never expires</SelectItem>
+                <SelectItem value="1h">Expire in 1 hour</SelectItem>
+                <SelectItem value="24h">Expire in 24 hours</SelectItem>
+                <SelectItem value="7d">Expire in 7 days</SelectItem>
+                <SelectItem value="30d">Expire in 30 days</SelectItem>
+                <SelectItem value="custom">Custom date</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {expiryOption === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    {customExpiryDate 
+                      ? format(customExpiryDate, "PPP") 
+                      : "Pick a date"
+                    }
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customExpiryDate}
+                    onSelect={setCustomExpiryDate}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {expiryOption !== "none" && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="show-expiry" className="text-sm">Show countdown to visitors</Label>
+                </div>
+                <Switch
+                  id="show-expiry"
+                  checked={showExpiryToVisitors}
+                  onCheckedChange={setShowExpiryToVisitors}
+                />
+              </div>
+            )}
+          </div>
 
           <Button
             onClick={handleGenerate}
