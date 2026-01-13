@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
@@ -67,6 +68,7 @@ interface BusinessQRPage {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  show_expires_at: boolean;
 }
 
 interface BusinessQRListProps {
@@ -80,6 +82,22 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const qrRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Selection state for batch operations
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchOperation, setBatchOperation] = useState<"password" | "location" | "expiry" | null>(null);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
+  // Batch operation values
+  const [batchEnablePassword, setBatchEnablePassword] = useState(false);
+  const [batchPassword, setBatchPassword] = useState("");
+  const [showBatchPassword, setShowBatchPassword] = useState(false);
+  const [batchEnableLocation, setBatchEnableLocation] = useState(false);
+  const [batchLocationData, setBatchLocationData] = useState<LocationData | null>(null);
+  const [batchExpiryOption, setBatchExpiryOption] = useState<ExpiryExtension>("none");
+  const [batchCustomExpiryDate, setBatchCustomExpiryDate] = useState<Date | undefined>(undefined);
+  const [batchShowExpiryToVisitors, setBatchShowExpiryToVisitors] = useState(false);
 
   // Edit state
   const [editingQR, setEditingQR] = useState<BusinessQRPage | null>(null);
@@ -99,6 +117,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   // Expiry state
   const [editExpiryExtension, setEditExpiryExtension] = useState<ExpiryExtension>("none");
   const [editCustomExpiryDate, setEditCustomExpiryDate] = useState<Date | undefined>(undefined);
+  const [editShowExpiryToVisitors, setEditShowExpiryToVisitors] = useState(false);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +129,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     try {
       const { data: pagesData, error: pagesError } = await supabase
         .from("qr_business_pages")
-        .select("id, public_id, title, style_config, is_deleted, created_at, password_hash, expires_at, location_locked, location_lat, location_lng, location_name")
+        .select("id, public_id, title, style_config, is_deleted, created_at, password_hash, expires_at, location_locked, location_lat, location_lng, location_name, show_expires_at")
         .eq("user_id", userId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: false });
@@ -129,6 +148,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             ...page,
             style_config: page.style_config as unknown as QRStyleConfig | null,
             product_count: count || 0,
+            show_expires_at: page.show_expires_at || false,
           };
         })
       );
@@ -175,7 +195,111 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     );
     setEditExpiryExtension("none");
     setEditCustomExpiryDate(undefined);
+    setEditShowExpiryToVisitors(page.show_expires_at || false);
     setIsEditOpen(true);
+  };
+
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pages.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pages.map((p) => p.id)));
+    }
+  };
+
+  const openBatchOperation = (operation: "password" | "location" | "expiry") => {
+    setBatchOperation(operation);
+    setBatchEnablePassword(false);
+    setBatchPassword("");
+    setShowBatchPassword(false);
+    setBatchEnableLocation(false);
+    setBatchLocationData(null);
+    setBatchExpiryOption("none");
+    setBatchCustomExpiryDate(undefined);
+    setBatchShowExpiryToVisitors(false);
+    setIsBatchOpen(true);
+  };
+
+  const calculateBatchExpirationDate = (): string | null | undefined => {
+    if (batchExpiryOption === "none") return undefined;
+    if (batchExpiryOption === "remove") return null;
+    
+    const baseDate = new Date();
+    
+    switch (batchExpiryOption) {
+      case "1h": return addHours(baseDate, 1).toISOString();
+      case "24h": return addHours(baseDate, 24).toISOString();
+      case "7d": return addDays(baseDate, 7).toISOString();
+      case "30d": return addDays(baseDate, 30).toISOString();
+      case "custom": return batchCustomExpiryDate ? batchCustomExpiryDate.toISOString() : undefined;
+      default: return undefined;
+    }
+  };
+
+  const handleBatchApply = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBatchProcessing(true);
+
+    try {
+      const updateData: any = {};
+
+      if (batchOperation === "password") {
+        if (batchEnablePassword && batchPassword.trim()) {
+          updateData.password_hash = hashPassword(batchPassword.trim());
+        } else if (!batchEnablePassword) {
+          updateData.password_hash = null;
+        }
+      } else if (batchOperation === "location") {
+        updateData.location_locked = batchEnableLocation;
+        if (batchEnableLocation && batchLocationData) {
+          updateData.location_lat = batchLocationData.lat;
+          updateData.location_lng = batchLocationData.lng;
+          updateData.location_name = batchLocationData.name || null;
+        } else {
+          updateData.location_lat = null;
+          updateData.location_lng = null;
+          updateData.location_name = null;
+        }
+      } else if (batchOperation === "expiry") {
+        const newExpiration = calculateBatchExpirationDate();
+        if (newExpiration !== undefined) {
+          updateData.expires_at = newExpiration;
+          updateData.show_expires_at = batchShowExpiryToVisitors;
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast.error("No changes to apply");
+        return;
+      }
+
+      for (const id of selectedIds) {
+        await supabase
+          .from("qr_business_pages")
+          .update(updateData)
+          .eq("id", id);
+      }
+
+      toast.success(`Updated ${selectedIds.size} QR code(s)`);
+      setIsBatchOpen(false);
+      setSelectedIds(new Set());
+      fetchPages();
+    } catch (error) {
+      toast.error("Failed to apply batch changes");
+      console.error(error);
+    } finally {
+      setIsBatchProcessing(false);
+    }
   };
 
   const calculateNewExpirationDate = (): string | null | undefined => {
@@ -219,6 +343,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         updateData.expires_at = newExpiration;
       }
 
+      // Handle show expires at setting
+      updateData.show_expires_at = editShowExpiryToVisitors;
+
       // Handle location lock settings
       updateData.location_locked = editEnableLocationLock;
       if (editEnableLocationLock && editLocationData) {
@@ -249,6 +376,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+              show_expires_at: editShowExpiryToVisitors,
             }
           : p
       ));
@@ -400,9 +528,43 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-lg">Generated QR Codes</CardTitle>
+          <div className="flex items-center gap-2">
+            {pages.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedIds.size === pages.length && pages.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
+                </span>
+              </div>
+            )}
+          </div>
         </CardHeader>
+
+        {/* Batch Operations Bar */}
+        {selectedIds.size > 0 && (
+          <div className="px-6 pb-4">
+            <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+              <Button size="sm" variant="outline" onClick={() => openBatchOperation("password")}>
+                <Lock className="w-4 h-4 mr-1" />
+                Set Password
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openBatchOperation("location")}>
+                <MapPin className="w-4 h-4 mr-1" />
+                Set Location
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openBatchOperation("expiry")}>
+                <Clock className="w-4 h-4 mr-1" />
+                Set Expiry
+              </Button>
+            </div>
+          </div>
+        )}
+        
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pages.map((page) => {
@@ -413,10 +575,16 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
               return (
                 <div
                   key={page.id}
-                  className={`border rounded-lg p-4 space-y-3 bg-card hover:shadow-md transition-shadow ${expired ? 'opacity-60' : ''}`}
+                  className={`border rounded-lg p-4 space-y-3 bg-card hover:shadow-md transition-shadow ${expired ? 'opacity-60' : ''} ${selectedIds.has(page.id) ? 'ring-2 ring-primary' : ''}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        checked={selectedIds.has(page.id)}
+                        onCheckedChange={() => toggleSelect(page.id)}
+                        className="mt-1"
+                      />
+                      <div className="space-y-1 flex-1 min-w-0">
                       <h3 className="font-medium text-sm truncate">
                         {page.title || "Untitled"}
                       </h3>
@@ -448,6 +616,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                         )}
                       </div>
                     </div>
+                  </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -687,6 +856,19 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     </PopoverContent>
                   </Popover>
                 )}
+
+                {/* Show expiry to visitors toggle */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="edit-show-expiry" className="text-sm">Show countdown to visitors</Label>
+                  </div>
+                  <Switch
+                    id="edit-show-expiry"
+                    checked={editShowExpiryToVisitors}
+                    onCheckedChange={setEditShowExpiryToVisitors}
+                  />
+                </div>
               </div>
 
               {/* Save Button */}
@@ -741,6 +923,157 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Batch Operations Dialog */}
+      <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {batchOperation === "password" && <Lock className="w-5 h-5" />}
+              {batchOperation === "location" && <MapPin className="w-5 h-5" />}
+              {batchOperation === "expiry" && <Clock className="w-5 h-5" />}
+              Batch {batchOperation === "password" ? "Password" : batchOperation === "location" ? "Location" : "Expiry"} Settings
+            </DialogTitle>
+            <DialogDescription>
+              Apply settings to {selectedIds.size} selected QR code(s)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {batchOperation === "password" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {batchEnablePassword ? (
+                      <Lock className="w-4 h-4 text-primary" />
+                    ) : (
+                      <LockOpen className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <Label>Enable Password Protection</Label>
+                  </div>
+                  <Switch
+                    checked={batchEnablePassword}
+                    onCheckedChange={setBatchEnablePassword}
+                  />
+                </div>
+                
+                {batchEnablePassword && (
+                  <div className="relative">
+                    <Input
+                      type={showBatchPassword ? "text" : "password"}
+                      value={batchPassword}
+                      onChange={(e) => setBatchPassword(e.target.value)}
+                      placeholder="Enter password for all selected QR codes"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowBatchPassword(!showBatchPassword)}
+                    >
+                      {showBatchPassword ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {batchOperation === "location" && (
+              <LocationPicker
+                enabled={batchEnableLocation}
+                onEnabledChange={setBatchEnableLocation}
+                location={batchLocationData}
+                onLocationChange={setBatchLocationData}
+              />
+            )}
+
+            {batchOperation === "expiry" && (
+              <div className="space-y-3">
+                <Select
+                  value={batchExpiryOption}
+                  onValueChange={(value) => setBatchExpiryOption(value as ExpiryExtension)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Set expiration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No change</SelectItem>
+                    <SelectItem value="1h">Expire in 1 hour</SelectItem>
+                    <SelectItem value="24h">Expire in 24 hours</SelectItem>
+                    <SelectItem value="7d">Expire in 7 days</SelectItem>
+                    <SelectItem value="30d">Expire in 30 days</SelectItem>
+                    <SelectItem value="custom">Custom date</SelectItem>
+                    <SelectItem value="remove">Remove expiration</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {batchExpiryOption === "custom" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start">
+                        {batchCustomExpiryDate 
+                          ? format(batchCustomExpiryDate, "PPP") 
+                          : "Pick a date"
+                        }
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={batchCustomExpiryDate}
+                        onSelect={setBatchCustomExpiryDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+
+                {batchExpiryOption !== "none" && batchExpiryOption !== "remove" && (
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="batch-show-expiry" className="text-sm">Show countdown to visitors</Label>
+                    </div>
+                    <Switch
+                      id="batch-show-expiry"
+                      checked={batchShowExpiryToVisitors}
+                      onCheckedChange={setBatchShowExpiryToVisitors}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setIsBatchOpen(false)}
+                disabled={isBatchProcessing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBatchApply}
+                disabled={isBatchProcessing}
+              >
+                {isBatchProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Apply to {selectedIds.size} QR(s)
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
