@@ -13,6 +13,7 @@ import { LocationVerification } from "@/components/qr/LocationVerification";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { recordQRScan } from "@/hooks/useQRScans";
 import { hashPassword } from "@/lib/crypto";
+import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 
 interface Category {
   id: string;
@@ -384,10 +385,7 @@ const BusinessPage = () => {
             </p>
           </div>
           {pageData?.show_expires_at && pageData?.expires_at && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-destructive/10 text-destructive rounded text-xs">
-              <Clock className="w-3 h-3" />
-              <span>Expires: {new Date(pageData.expires_at).toLocaleDateString()}</span>
-            </div>
+            <ExpiryCountdown expiresAt={pageData.expires_at} />
           )}
           <LanguageToggle inline />
         </div>
