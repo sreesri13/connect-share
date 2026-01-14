@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } from "@/lib/analytics";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { LocationVerification } from "@/components/qr/LocationVerification";
+import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { recordQRScan } from "@/hooks/useQRScans";
 
 interface ProfileItem {
@@ -36,6 +37,8 @@ interface QRPageData {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  expires_at: string | null;
+  show_expires_at: boolean | null;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
@@ -85,7 +88,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -451,6 +454,17 @@ const PublicProfile = () => {
             >
               {profile.bio}
             </motion.p>
+          )}
+          {/* Expiry Countdown */}
+          {qrPageData?.show_expires_at && qrPageData?.expires_at && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              className="mt-3 flex justify-center"
+            >
+              <ExpiryCountdown expiresAt={qrPageData.expires_at} />
+            </motion.div>
           )}
         </div>
 

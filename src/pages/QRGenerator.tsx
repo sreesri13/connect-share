@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, MapPin } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, MapPin, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +58,7 @@ const QRGenerator = () => {
   const [expirationDays, setExpirationDays] = useState(0);
   const [expirationHours, setExpirationHours] = useState(1);
   const [expirationMinutes, setExpirationMinutes] = useState(0);
+  const [showExpiryToVisitors, setShowExpiryToVisitors] = useState(false);
 
   // Location lock settings
   const [enableLocationLock, setEnableLocationLock] = useState(false);
@@ -179,6 +181,7 @@ const QRGenerator = () => {
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
           password_hash: passwordHash,
           expires_at: expiresAt,
+          show_expires_at: enableExpiration ? showExpiryToVisitors : false,
           style_config: enableCustomization ? (qrStyle as any) : null,
           location_locked: enableLocationLock,
           location_lat: locationData?.lat || null,
@@ -484,6 +487,22 @@ const QRGenerator = () => {
                               Expires: {getExpirationPreview()}
                             </p>
                           )}
+                          
+                          {/* Show countdown to visitors toggle */}
+                          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground" />
+                              <Label htmlFor="show-expiry" className="text-[10px] sm:text-xs text-muted-foreground cursor-pointer">
+                                Show countdown to visitors
+                              </Label>
+                            </div>
+                            <Switch
+                              id="show-expiry"
+                              checked={showExpiryToVisitors}
+                              onCheckedChange={setShowExpiryToVisitors}
+                              className="scale-75 sm:scale-90"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
