@@ -12,6 +12,7 @@ import {
   CreditCard,
   BarChart3,
   Store,
+  ScanLine,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,9 +29,10 @@ import { QRPaymentsSection } from "@/components/dashboard/QRPaymentsSection";
 import { SettingsSection } from "@/components/dashboard/SettingsSection";
 import { AnalyticsSection } from "@/components/dashboard/AnalyticsSection";
 import { QRBusinessSection } from "@/components/dashboard/QRBusinessSection";
+import { QRScannerSection } from "@/components/dashboard/QRScannerSection";
 import { cn } from "@/lib/utils";
 
-type DashboardSection = "profile" | "qrcodes" | "qrpayments" | "qrbusiness" | "analytics" | "settings";
+type DashboardSection = "profile" | "qrcodes" | "qrscanner" | "qrpayments" | "qrbusiness" | "analytics" | "settings";
 
 interface Profile {
   display_name: string | null;
@@ -123,6 +125,7 @@ const Dashboard = () => {
   const sidebarItems = [
     { id: "profile" as DashboardSection, label: "My Profile", icon: Folder },
     { id: "qrcodes" as DashboardSection, label: "QR Codes", icon: QrCode },
+    { id: "qrscanner" as DashboardSection, label: "QR Scanner", icon: ScanLine },
     { id: "qrpayments" as DashboardSection, label: "QR Payments", icon: CreditCard },
     { id: "qrbusiness" as DashboardSection, label: "QR Business", icon: Store },
     { id: "analytics" as DashboardSection, label: "Dashboard", icon: BarChart3 },
@@ -303,6 +306,9 @@ const Dashboard = () => {
           )}
           {activeSection === "qrcodes" && user && (
             <QRCodesSection userId={user.id} />
+          )}
+          {activeSection === "qrscanner" && user && (
+            <QRScannerSection userId={user.id} />
           )}
           {activeSection === "qrpayments" && user && (
             <QRPaymentsSection userId={user.id} />

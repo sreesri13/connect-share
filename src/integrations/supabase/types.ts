@@ -481,6 +481,33 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_history: {
+        Row: {
+          content_type: string
+          id: string
+          scanned_at: string
+          scanned_content: string
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          content_type?: string
+          id?: string
+          scanned_at?: string
+          scanned_content: string
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          content_type?: string
+          id?: string
+          scanned_at?: string
+          scanned_content?: string
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       upi_payments: {
         Row: {
           amount: number | null
