@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { QrCode, Layers, Share2, Shield, Zap, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { PublicQRScanner } from "@/components/scanner/PublicQRScanner";
 
 const LandingPage = () => {
   return (
@@ -85,6 +86,9 @@ const LandingPage = () => {
             transition={{ duration: 0.7, delay: 0.5 }}
             className="flex flex-col items-center gap-4 sm:gap-6"
           >
+            {/* Public QR Scanner - No login required */}
+            <PublicQRScanner />
+            
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full">
               <Button variant="hero" size="lg" asChild className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px]">
                 <Link to="/auth?mode=signup">
