@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { QRScanner } from "./QRScanner";
-import { ScanLine, ExternalLink, Copy, Check, X, Link2 } from "lucide-react";
+import { ScanLine, ExternalLink, Copy, Check, X, Link2, Upload, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,10 +17,16 @@ interface ScanResult {
   timestamp: Date;
 }
 
-export function PublicQRScanner() {
+interface PublicQRScannerProps {
+  variant?: "button" | "nav";
+}
+
+export function PublicQRScanner({ variant = "button" }: PublicQRScannerProps) {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const detectContentType = (content: string): ScanResult["contentType"] => {
     if (content.match(/^https?:\/\//i)) return "url";
@@ -40,6 +47,39 @@ export function PublicQRScanner() {
     setIsScannerOpen(false);
     toast.success("QR Code scanned successfully!");
   }, []);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingImage(true);
+    
+    try {
+      const html5QrCode = new Html5Qrcode("qr-image-scanner-temp");
+      const result = await html5QrCode.scanFile(file, true);
+      
+      const contentType = detectContentType(result);
+      setScanResult({
+        content: result,
+        contentType,
+        timestamp: new Date(),
+      });
+      
+      toast.success("QR Code scanned from image!");
+      
+      // Clean up
+      html5QrCode.clear();
+    } catch (err: any) {
+      console.error("Image scan error:", err);
+      toast.error("Could not detect QR code in the image. Please try another image.");
+    } finally {
+      setIsProcessingImage(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleCopy = async () => {
     if (!scanResult) return;
@@ -94,21 +134,61 @@ export function PublicQRScanner() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="lg"
-        onClick={() => setIsScannerOpen(true)}
-        className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px] bg-background/50 backdrop-blur-sm border-primary/30 hover:border-primary hover:bg-primary/10"
-      >
-        <ScanLine className="w-4 sm:w-5 h-4 sm:h-5 mr-2" />
-        Scan QR Code
-      </Button>
+      {/* Hidden element for image scanning */}
+      <div id="qr-image-scanner-temp" style={{ display: "none" }} />
+      
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
+
+      {variant === "nav" ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsScannerOpen(true)}
+          className="min-h-[44px] px-3 sm:px-4"
+        >
+          <ScanLine className="w-4 h-4 mr-2" />
+          <span className="hidden sm:inline">Scan</span>
+        </Button>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setIsScannerOpen(true)}
+            className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px] bg-background/50 backdrop-blur-sm border-primary/30 hover:border-primary hover:bg-primary/10"
+          >
+            <Camera className="w-4 sm:w-5 h-4 sm:h-5 mr-2" />
+            Scan with Camera
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessingImage}
+            className="w-full sm:w-auto min-h-[48px] sm:min-h-[56px] bg-background/50 backdrop-blur-sm border-primary/30 hover:border-primary hover:bg-primary/10"
+          >
+            <Upload className="w-4 sm:w-5 h-4 sm:h-5 mr-2" />
+            {isProcessingImage ? "Processing..." : "Upload QR Image"}
+          </Button>
+        </div>
+      )}
 
       {/* QR Scanner Modal */}
       <QRScanner
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
+        onUploadClick={() => {
+          setIsScannerOpen(false);
+          setTimeout(() => fileInputRef.current?.click(), 100);
+        }}
       />
 
       {/* Scan Result Dialog */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
-import { Camera, X, Flashlight, SwitchCamera, Loader2 } from "lucide-react";
+import { Camera, X, Flashlight, SwitchCamera, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +8,10 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onClose: () => void;
   isOpen: boolean;
+  onUploadClick?: () => void;
 }
 
-export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
+export function QRScanner({ onScanSuccess, onClose, isOpen, onUploadClick }: QRScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -363,9 +364,22 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
           </div>
         )}
         
-        <p className="text-sm text-muted-foreground mt-6 text-center max-w-xs">
-          Position the QR code within the frame. It will be scanned automatically.
-        </p>
+        <div className="mt-6 text-center space-y-3 max-w-xs">
+          <p className="text-sm text-muted-foreground">
+            Position the QR code within the frame. It will be scanned automatically.
+          </p>
+          
+          {onUploadClick && (
+            <Button
+              variant="outline"
+              onClick={onUploadClick}
+              className="w-full"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Or upload QR image
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
