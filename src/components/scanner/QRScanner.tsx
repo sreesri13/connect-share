@@ -22,6 +22,8 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScannedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const isStartingRef = useRef(false);
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
@@ -37,82 +39,163 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
     setIsScanning(false);
   }, []);
 
-  const startScanner = useCallback(async () => {
-    if (!containerRef.current || isScanning || hasScannedRef.current) return;
+  const startScanner = useCallback(async (cameraIdOverride?: string) => {
+    // Prevent multiple simultaneous start attempts
+    if (isStartingRef.current || hasScannedRef.current) {
+      console.log("Scanner start blocked - already starting or scanned");
+      return;
+    }
+    
+    isStartingRef.current = true;
 
     try {
       setError(null);
+      setHasPermission(null); // Show loading state
       
-      // Get available cameras
+      console.log("Requesting camera permissions...");
+      
+      // First, explicitly request camera permission
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "environment" } 
+        });
+        // Stop the stream immediately - we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log("Camera permission granted");
+      } catch (permErr: any) {
+        console.error("Permission request failed:", permErr);
+        if (permErr.name === "NotAllowedError") {
+          setError("Camera permission denied. Please allow camera access in your browser settings and try again.");
+          setHasPermission(false);
+          isStartingRef.current = false;
+          return;
+        }
+        if (permErr.name === "NotFoundError") {
+          setError("No camera found on this device.");
+          setHasPermission(false);
+          isStartingRef.current = false;
+          return;
+        }
+        throw permErr;
+      }
+
+      // Get available cameras after permission granted
       const devices = await Html5Qrcode.getCameras();
-      if (devices && devices.length > 0) {
-        setCameras(devices);
-        setHasPermission(true);
-        
-        // Prefer back camera on mobile
+      console.log("Available cameras:", devices);
+      
+      if (!devices || devices.length === 0) {
+        setError("No cameras found on this device");
+        setHasPermission(false);
+        isStartingRef.current = false;
+        return;
+      }
+
+      if (!isMountedRef.current) {
+        isStartingRef.current = false;
+        return;
+      }
+
+      setCameras(devices);
+      setHasPermission(true);
+      
+      // Prefer back camera on mobile
+      let cameraIndex = 0;
+      if (!cameraIdOverride) {
         const backCameraIndex = devices.findIndex(
           (d) => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("rear")
         );
-        const cameraIndex = backCameraIndex >= 0 ? backCameraIndex : 0;
+        cameraIndex = backCameraIndex >= 0 ? backCameraIndex : 0;
         setCurrentCameraIndex(cameraIndex);
-        
-        // Initialize scanner
-        if (!scannerRef.current) {
-          scannerRef.current = new Html5Qrcode("qr-scanner-region");
-        }
-
-        const config = {
-          fps: 15,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true,
-          },
-        };
-
-        await scannerRef.current.start(
-          devices[cameraIndex].id,
-          config,
-          (decodedText) => {
-            if (!hasScannedRef.current) {
-              hasScannedRef.current = true;
-              // Vibrate on successful scan (if supported)
-              if (navigator.vibrate) {
-                navigator.vibrate(100);
-              }
-              onScanSuccess(decodedText);
-              stopScanner();
-            }
-          },
-          () => {
-            // Ignore QR not detected errors
-          }
-        );
-
-        setIsScanning(true);
-
-        // Check torch support
-        try {
-          const track = scannerRef.current.getRunningTrackSettings();
-          // @ts-ignore - torch capability check
-          setTorchSupported(!!track?.torch || document.querySelector('video')?.srcObject);
-        } catch {
-          setTorchSupported(false);
-        }
       } else {
-        setError("No cameras found on this device");
-        setHasPermission(false);
+        cameraIndex = devices.findIndex(d => d.id === cameraIdOverride);
+        if (cameraIndex === -1) cameraIndex = 0;
+      }
+      
+      const cameraId = cameraIdOverride || devices[cameraIndex].id;
+      
+      // Wait for DOM element to be ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const scannerElement = document.getElementById("qr-scanner-region");
+      if (!scannerElement) {
+        console.error("Scanner element not found");
+        setError("Scanner element not found. Please try again.");
+        isStartingRef.current = false;
+        return;
+      }
+
+      // Initialize scanner if needed
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode("qr-scanner-region");
+      } else {
+        // Stop existing scanner if running
+        try {
+          const state = scannerRef.current.getState();
+          if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+            await scannerRef.current.stop();
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      const config = {
+        fps: 15,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
+      };
+
+      console.log("Starting scanner with camera:", cameraId);
+
+      await scannerRef.current.start(
+        cameraId,
+        config,
+        (decodedText) => {
+          if (!hasScannedRef.current) {
+            hasScannedRef.current = true;
+            console.log("QR Code scanned:", decodedText);
+            // Vibrate on successful scan (if supported)
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
+            onScanSuccess(decodedText);
+            stopScanner();
+          }
+        },
+        () => {
+          // Ignore QR not detected errors - this is called continuously
+        }
+      );
+
+      setIsScanning(true);
+      console.log("Scanner started successfully");
+
+      // Check torch support
+      try {
+        const track = scannerRef.current.getRunningTrackSettings();
+        // @ts-ignore - torch capability check
+        setTorchSupported(!!track?.torch || !!document.querySelector('video')?.srcObject);
+      } catch {
+        setTorchSupported(false);
       }
     } catch (err: any) {
       console.error("Scanner error:", err);
       if (err.name === "NotAllowedError" || err.message?.includes("Permission")) {
-        setError("Camera permission denied. Please allow camera access to scan QR codes.");
+        setError("Camera permission denied. Please allow camera access in your browser settings.");
+        setHasPermission(false);
+      } else if (err.message?.includes("Camera already in use") || err.name === "NotReadableError") {
+        setError("Camera is in use by another application. Please close other apps using the camera.");
         setHasPermission(false);
       } else {
-        setError(err.message || "Failed to start scanner");
+        setError(err.message || "Failed to start scanner. Please try again.");
       }
+    } finally {
+      isStartingRef.current = false;
     }
-  }, [isScanning, onScanSuccess, stopScanner]);
+  }, [onScanSuccess, stopScanner]);
 
   const switchCamera = useCallback(async () => {
     if (cameras.length <= 1) return;
@@ -124,8 +207,8 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
     // Restart with new camera
     setTimeout(() => {
       hasScannedRef.current = false;
-      startScanner();
-    }, 100);
+      startScanner(cameras[nextIndex].id);
+    }, 200);
   }, [cameras, currentCameraIndex, stopScanner, startScanner]);
 
   const toggleTorch = useCallback(async () => {
@@ -142,22 +225,32 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
     }
   }, [torchEnabled, torchSupported]);
 
+  // Handle open/close
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (isOpen) {
       hasScannedRef.current = false;
-      startScanner();
+      setError(null);
+      setHasPermission(null);
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 150);
+      return () => clearTimeout(timer);
     } else {
       stopScanner();
     }
 
     return () => {
-      stopScanner();
+      isMountedRef.current = false;
     };
-  }, [isOpen, startScanner, stopScanner]);
+  }, [isOpen]); // Removed startScanner and stopScanner from deps to prevent loops
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (scannerRef.current) {
         try {
           scannerRef.current.stop().catch(() => {});
@@ -167,6 +260,17 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
       }
     };
   }, []);
+
+  const handleClose = useCallback(() => {
+    stopScanner();
+    onClose();
+  }, [stopScanner, onClose]);
+
+  const handleRetry = useCallback(() => {
+    setError(null);
+    hasScannedRef.current = false;
+    startScanner();
+  }, [startScanner]);
 
   if (!isOpen) return null;
 
@@ -178,10 +282,7 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => {
-            stopScanner();
-            onClose();
-          }}
+          onClick={handleClose}
           className="min-h-[44px] min-w-[44px]"
         >
           <X className="w-5 h-5" />
@@ -196,11 +297,7 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
               <Camera className="w-8 h-8 text-destructive" />
             </div>
             <p className="text-destructive">{error}</p>
-            <Button onClick={() => {
-              setError(null);
-              hasScannedRef.current = false;
-              startScanner();
-            }}>
+            <Button onClick={handleRetry}>
               Try Again
             </Button>
           </div>
@@ -208,6 +305,9 @@ export function QRScanner({ onScanSuccess, onClose, isOpen }: QRScannerProps) {
           <div className="text-center space-y-4">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
             <p className="text-muted-foreground">Requesting camera access...</p>
+            <p className="text-xs text-muted-foreground">
+              Please allow camera access when prompted
+            </p>
           </div>
         ) : (
           <div className="relative w-full max-w-sm">
