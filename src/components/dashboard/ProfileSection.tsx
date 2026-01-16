@@ -16,6 +16,7 @@ import {
   QrCode,
   Check,
   X,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
+import { FileViewer } from "@/components/FileViewer";
 import { useNavigate } from "react-router-dom";
 
 interface Item {
@@ -95,6 +97,7 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<Item | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -654,6 +657,12 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  {item.type !== "url" && (
+                                    <DropdownMenuItem onClick={() => setPreviewItem(item)}>
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      Preview
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setEditingItem({ ...item });
@@ -746,6 +755,17 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* File Preview Modal */}
+      <FileViewer
+        isOpen={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        file={previewItem ? {
+          title: previewItem.title,
+          content: previewItem.content,
+          type: previewItem.type
+        } : null}
+      />
     </div>
   );
 };

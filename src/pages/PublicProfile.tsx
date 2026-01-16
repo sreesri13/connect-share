@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Download, Play, Lock, Eye, EyeOff, Copy } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { LocationVerification } from "@/components/qr/LocationVerification";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { recordQRScan } from "@/hooks/useQRScans";
+import { FileViewer } from "@/components/FileViewer";
 
 interface ProfileItem {
   id: string;
@@ -242,57 +243,10 @@ const PublicProfile = () => {
         navigator.clipboard.writeText(url);
         toast.info("Link copied! Open it in a new tab.");
       }
-    } else if (item.type === "text") {
-      // Open text in modal for viewing
-      setSelectedItem(item);
-    } else if (item.type === "pdf" || item.type === "others") {
-      // Open PDF or other file in new tab
-      const newWindow = window.open(item.content, "_blank", "noopener,noreferrer");
-      if (!newWindow) {
-        navigator.clipboard.writeText(item.content);
-        toast.info("File link copied! Open it in a new tab.");
-      }
-    } else if (["image", "video", "audio"].includes(item.type)) {
-      // Open modal for media preview
+    } else {
+      // Open all file types in the FileViewer modal
       setSelectedItem(item);
     }
-  };
-
-  const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Text copied to clipboard!");
-  };
-
-  const handleDownload = (item: ProfileItem) => {
-    // For Supabase storage URLs, use fetch to download
-    const downloadUrl = item.content;
-    
-    // Use fetch to get the file and trigger download
-    fetch(downloadUrl)
-      .then(response => {
-        if (!response.ok) throw new Error('Download failed');
-        return response.blob();
-      })
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = item.title || "download";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        toast.success("Download started!");
-      })
-      .catch(() => {
-        // Fallback: open in new tab
-        window.open(downloadUrl, "_blank", "noopener,noreferrer");
-        toast.info("Opening file in new tab...");
-      });
-  };
-
-  const handleOpenInNewTab = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   // Group items by category
@@ -547,106 +501,16 @@ const PublicProfile = () => {
         </motion.div>
       </motion.div>
 
-      {/* Media/Text Preview Modal */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedItem?.title}</DialogTitle>
-            {selectedItem?.type === "text" && (
-              <DialogDescription>Text content</DialogDescription>
-            )}
-          </DialogHeader>
-
-          {selectedItem?.type === "text" && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-secondary/30 border border-border whitespace-pre-wrap">
-                {selectedItem.content}
-              </div>
-              <Button 
-                onClick={() => handleCopyText(selectedItem.content)}
-                variant="outline"
-                className="w-full"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Copy Text
-              </Button>
-            </div>
-          )}
-
-          {selectedItem?.type === "image" && (
-            <div className="space-y-4">
-              <img
-                src={selectedItem.content}
-                alt={selectedItem.title}
-                className="w-full rounded-lg"
-              />
-              <div className="flex gap-2">
-                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleOpenInNewTab(selectedItem.content)}
-                  className="flex-1"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {selectedItem?.type === "video" && (
-            <div className="space-y-4">
-              <video
-                src={selectedItem.content}
-                controls
-                className="w-full rounded-lg"
-                playsInline
-              />
-              <div className="flex gap-2">
-                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleOpenInNewTab(selectedItem.content)}
-                  className="flex-1"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {selectedItem?.type === "audio" && (
-            <div className="space-y-4">
-              <audio
-                src={selectedItem.content}
-                controls
-                className="w-full"
-              />
-              <div className="flex gap-2">
-                <Button onClick={() => handleDownload(selectedItem)} className="flex-1">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleOpenInNewTab(selectedItem.content)}
-                  className="flex-1"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* File Viewer Modal - Supports all file types */}
+      <FileViewer
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        file={selectedItem ? {
+          title: selectedItem.title,
+          content: selectedItem.content,
+          type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others"
+        } : null}
+      />
     </div>
   );
 };
