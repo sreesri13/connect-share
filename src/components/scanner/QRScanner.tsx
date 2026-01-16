@@ -276,109 +276,116 @@ export function QRScanner({ onScanSuccess, onClose, isOpen, onUploadClick }: QRS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-foreground">Scan QR Code</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClose}
-          className="min-h-[44px] min-w-[44px]"
-        >
-          <X className="w-5 h-5" />
-        </Button>
-      </div>
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Blurred background overlay */}
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" />
+      
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border/50 bg-background/50 backdrop-blur-sm">
+          <h2 className="text-lg font-semibold text-foreground">Scan QR Code</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="min-h-[44px] min-w-[44px] hover:bg-background/80"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
 
-      {/* Scanner Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        {error ? (
-          <div className="text-center space-y-4 max-w-sm">
-            <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-              <Camera className="w-8 h-8 text-destructive" />
+        {/* Scanner Area - Centered */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
+          {error ? (
+            <div className="text-center space-y-4 max-w-sm px-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+                <Camera className="w-8 h-8 text-destructive" />
+              </div>
+              <p className="text-destructive">{error}</p>
+              <Button onClick={handleRetry}>
+                Try Again
+              </Button>
             </div>
-            <p className="text-destructive">{error}</p>
-            <Button onClick={handleRetry}>
-              Try Again
-            </Button>
-          </div>
-        ) : hasPermission === null ? (
-          <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Requesting camera access...</p>
-            <p className="text-xs text-muted-foreground">
-              Please allow camera access when prompted
-            </p>
-          </div>
-        ) : (
-          <div className="relative w-full max-w-sm">
-            {/* Scanner container */}
-            <div 
-              ref={containerRef}
-              id="qr-scanner-region"
-              className="w-full aspect-square rounded-xl overflow-hidden bg-muted"
-            />
-            
-            {/* Scan frame overlay */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-[250px] h-[250px] relative">
-                  {/* Corner brackets */}
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
-                  
-                  {/* Scanning animation */}
-                  <div className="absolute inset-x-2 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse" />
+          ) : hasPermission === null ? (
+            <div className="text-center space-y-4 px-4">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+              <p className="text-foreground/80">Requesting camera access...</p>
+              <p className="text-xs text-muted-foreground">
+                Please allow camera access when prompted
+              </p>
+            </div>
+          ) : (
+            <div className="relative w-full max-w-[min(90vw,400px)] mx-auto">
+              {/* Scanner container with fixed aspect ratio */}
+              <div 
+                ref={containerRef}
+                id="qr-scanner-region"
+                className="w-full aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl"
+              />
+              
+              {/* Scan frame overlay */}
+              <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[70%] max-w-[250px] aspect-square relative">
+                    {/* Corner brackets */}
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                    
+                    {/* Scanning animation */}
+                    <div className="absolute inset-x-2 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse" />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Camera controls */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
-              {cameras.length > 1 && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={switchCamera}
-                  className="rounded-full bg-background/80 backdrop-blur-sm"
-                >
-                  <SwitchCamera className="w-5 h-5" />
-                </Button>
-              )}
-              {torchSupported && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={toggleTorch}
-                  className={cn(
-                    "rounded-full bg-background/80 backdrop-blur-sm",
-                    torchEnabled && "bg-primary text-primary-foreground"
-                  )}
-                >
-                  <Flashlight className="w-5 h-5" />
-                </Button>
-              )}
+              {/* Camera controls */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
+                {cameras.length > 1 && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={switchCamera}
+                    className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg"
+                  >
+                    <SwitchCamera className="w-5 h-5" />
+                  </Button>
+                )}
+                {torchSupported && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={toggleTorch}
+                    className={cn(
+                      "rounded-full bg-background/80 backdrop-blur-sm shadow-lg",
+                      torchEnabled && "bg-primary text-primary-foreground"
+                    )}
+                  >
+                    <Flashlight className="w-5 h-5" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-        
-        <div className="mt-6 text-center space-y-3 max-w-xs">
-          <p className="text-sm text-muted-foreground">
-            Position the QR code within the frame. It will be scanned automatically.
-          </p>
-          
-          {onUploadClick && (
-            <Button
-              variant="outline"
-              onClick={onUploadClick}
-              className="w-full"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Or upload QR image
-            </Button>
           )}
+          
+          {/* Instructions and upload option */}
+          <div className="mt-6 text-center space-y-3 max-w-xs px-4">
+            <p className="text-sm text-muted-foreground">
+              Position the QR code within the frame
+            </p>
+            
+            {onUploadClick && (
+              <Button
+                variant="outline"
+                onClick={onUploadClick}
+                className="w-full bg-background/50 backdrop-blur-sm"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Or upload QR image
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

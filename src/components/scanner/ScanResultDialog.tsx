@@ -118,10 +118,10 @@ export function ScanResultDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <QrCode className="w-5 h-5 text-primary" />
+            <QrCode className="w-5 h-5 text-primary flex-shrink-0" />
             QR Code Scanned
           </DialogTitle>
           <DialogDescription>
@@ -130,17 +130,20 @@ export function ScanResultDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Content preview */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+          {/* Content preview - Fixed overflow */}
+          <div className="p-4 rounded-lg bg-muted/50 border border-border overflow-hidden">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 {getIcon()}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <p className="text-sm font-medium text-foreground truncate">
                   {getTitle()}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1 break-all line-clamp-2">
+                <p 
+                  className="text-xs text-muted-foreground mt-1 break-all whitespace-pre-wrap" 
+                  style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
+                >
                   {scannedContent}
                 </p>
               </div>
