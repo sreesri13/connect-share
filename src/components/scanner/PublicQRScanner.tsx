@@ -193,10 +193,10 @@ export function PublicQRScanner({ variant = "button" }: PublicQRScannerProps) {
 
       {/* Scan Result Dialog */}
       <Dialog open={!!scanResult} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md mx-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Link2 className="w-4 h-4 text-primary" />
               </div>
               Scan Result
@@ -212,9 +212,9 @@ export function PublicQRScanner({ variant = "button" }: PublicQRScannerProps) {
                 </span>
               </div>
 
-              {/* Content Display */}
-              <div className="p-4 rounded-lg bg-muted border border-border">
-                <p className="text-sm break-all text-foreground font-mono">
+              {/* Content Display - Fixed overflow */}
+              <div className="p-4 rounded-lg bg-muted border border-border overflow-hidden">
+                <p className="text-sm text-foreground font-mono break-all whitespace-pre-wrap overflow-wrap-anywhere" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                   {scanResult.content}
                 </p>
               </div>
@@ -225,15 +225,15 @@ export function PublicQRScanner({ variant = "button" }: PublicQRScannerProps) {
               </p>
 
               {/* Actions */}
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col gap-2">
                 {isOpenable && (
-                  <Button onClick={handleOpenLink} className="flex-1">
+                  <Button onClick={handleOpenLink} className="w-full">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     {scanResult.contentType === "url" ? "Open Link" : 
                      scanResult.contentType === "email" ? "Send Email" : "Call"}
                   </Button>
                 )}
-                <Button variant="outline" onClick={handleCopy} className="flex-1">
+                <Button variant="outline" onClick={handleCopy} className="w-full">
                   {copied ? (
                     <>
                       <Check className="w-4 h-4 mr-2" />

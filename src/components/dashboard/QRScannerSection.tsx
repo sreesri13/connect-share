@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { 
   Camera, 
   History, 
@@ -12,7 +13,8 @@ import {
   Loader2,
   QrCode,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +54,8 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchHistory = async () => {
     try {
@@ -138,8 +142,46 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
     }
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingImage(true);
+    
+    try {
+      const html5QrCode = new Html5Qrcode("qr-image-scanner-dashboard");
+      const result = await html5QrCode.scanFile(file, true);
+      
+      setScanResult(result);
+      setShowResultDialog(true);
+      toast({ description: "QR Code scanned from image!" });
+      
+      html5QrCode.clear();
+    } catch (err: any) {
+      console.error("Image scan error:", err);
+      toast({ 
+        variant: "destructive", 
+        description: "Could not detect QR code in the image. Please try another image." 
+      });
+    } finally {
+      setIsProcessingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Hidden elements for image scanning */}
+      <div id="qr-image-scanner-dashboard" style={{ display: "none" }} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -150,14 +192,26 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
             Scan any QR code including highly customized designs
           </p>
         </div>
-        <Button
-          onClick={() => setIsScannerOpen(true)}
-          size="lg"
-          className="gap-2 shadow-glow"
-        >
-          <Camera className="w-5 h-5" />
-          Scan QR Code
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            onClick={() => setIsScannerOpen(true)}
+            size="lg"
+            className="gap-2 shadow-glow"
+          >
+            <Camera className="w-5 h-5" />
+            Scan with Camera
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessingImage}
+            className="gap-2"
+          >
+            <Upload className="w-5 h-5" />
+            {isProcessingImage ? "Processing..." : "Upload Image"}
+          </Button>
+        </div>
       </div>
 
       {/* Info Card */}
@@ -169,7 +223,7 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
           <div>
             <h3 className="font-medium text-foreground">Powerful QR Scanner</h3>
             <p className="text-sm text-muted-foreground">
-              Our scanner can read customized QR codes with colors, shapes, and designs that Google Lens cannot recognize.
+              Scan with camera or upload an image. Works with customized QR codes that other scanners can't recognize.
             </p>
           </div>
         </CardContent>
@@ -329,6 +383,10 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
+        onUploadClick={() => {
+          setIsScannerOpen(false);
+          setTimeout(() => fileInputRef.current?.click(), 100);
+        }}
       />
 
       {/* Result Dialog */}
