@@ -34,7 +34,7 @@ const LandingPage = () => {
           transition={{ duration: 0.5 }}
           className="flex items-center gap-2 sm:gap-3"
         >
-          <PublicQRScanner variant="nav" />
+          
           <Button variant="ghost" asChild size="sm" className="min-h-[44px] px-3 sm:px-4">
             <Link to="/auth">Sign In</Link>
           </Button>
