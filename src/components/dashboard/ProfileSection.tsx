@@ -93,6 +93,10 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: "", type: "url" as Item["type"], content: "" });
 
+  // Drag state for items
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
+
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -375,6 +379,49 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
     navigate(`/qr?items=${itemIds.join(",")}`);
   };
 
+  const handleOpenAddItemForCategory = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setNewItem({ title: "", type: "url", content: "" });
+    setIsAddItemOpen(true);
+  };
+
+  const handleDragStart = (itemId: string, categoryId: string) => {
+    setDragItemId(itemId);
+    setDragCategoryId(categoryId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetItemId: string, targetCategoryId: string) => {
+    e.preventDefault();
+    if (!dragItemId || dragCategoryId !== targetCategoryId || dragItemId === targetItemId) return;
+    
+    setCategories(prev => prev.map(cat => {
+      if (cat.id !== targetCategoryId) return cat;
+      const items = [...cat.items];
+      const dragIndex = items.findIndex(i => i.id === dragItemId);
+      const targetIndex = items.findIndex(i => i.id === targetItemId);
+      if (dragIndex === -1 || targetIndex === -1) return cat;
+      const [moved] = items.splice(dragIndex, 1);
+      items.splice(targetIndex, 0, moved);
+      return { ...cat, items };
+    }));
+  };
+
+  const handleDragEnd = async () => {
+    if (!dragCategoryId) { setDragItemId(null); setDragCategoryId(null); return; }
+    const category = categories.find(c => c.id === dragCategoryId);
+    if (category) {
+      try {
+        await Promise.all(
+          category.items.map((item, index) =>
+            supabase.from("items").update({ display_order: index }).eq("id", item.id)
+          )
+        );
+      } catch { toast.error("Failed to save order"); }
+    }
+    setDragItemId(null);
+    setDragCategoryId(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -622,6 +669,15 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleOpenAddItemForCategory(category.id)}
+                      title="Add item to this category"
+                    >
+                      <Plus className="w-4 h-4 text-primary" />
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-0">
                     {category.items.length === 0 ? (
@@ -633,9 +689,13 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                           return (
                             <li
                               key={item.id}
-                              className="flex items-center gap-4 p-4 hover:bg-secondary/20 transition-colors"
+                              className={`flex items-center gap-4 p-4 hover:bg-secondary/20 transition-colors ${dragItemId === item.id ? "opacity-50" : ""}`}
+                              draggable
+                              onDragStart={() => handleDragStart(item.id, category.id)}
+                              onDragOver={(e) => handleDragOver(e, item.id, category.id)}
+                              onDragEnd={handleDragEnd}
                             >
-                              <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+                              <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
                               <Checkbox
                                 checked={selectedItems.has(item.id)}
                                 onCheckedChange={() => toggleItemSelection(item.id)}
