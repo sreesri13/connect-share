@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
-  Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle 
+  Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
+  Folder, LinkIcon, FileText, Image, Video, Music, File
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -97,6 +98,16 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [qrItems, setQrItems] = useState<QRItem[]>([]);
   const [editingItem, setEditingItem] = useState<QRItem | null>(null);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+
+  // Add items from profile state
+  const [isAddItemToQROpen, setIsAddItemToQROpen] = useState(false);
+  const [profileCategories, setProfileCategories] = useState<{ id: string; name: string; items: { id: string; title: string; type: string; content: string }[] }[]>([]);
+  const [isAddNewItemOpen, setIsAddNewItemOpen] = useState(false);
+  const [newQRItem, setNewQRItem] = useState({ title: "", type: "url" as QRItem["type"], content: "" });
+  const [newItemCategoryId, setNewItemCategoryId] = useState<string>("");
+
+  // Drag state for QR items
+  const [dragQRItemId, setDragQRItemId] = useState<string | null>(null);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -454,6 +465,77 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     return `${window.location.origin}/p/${publicId}`;
   };
 
+  const fetchProfileCategories = async () => {
+    try {
+      const { data: cats } = await supabase.from("categories").select("*").eq("user_id", userId).order("display_order");
+      const { data: items } = await supabase.from("items").select("*").eq("user_id", userId).order("display_order");
+      setProfileCategories((cats || []).map(cat => ({
+        id: cat.id, name: cat.name,
+        items: (items || []).filter(i => i.category_id === cat.id).map(i => ({ id: i.id, title: i.title, type: i.type, content: i.content }))
+      })));
+    } catch { toast.error("Failed to load profile items"); }
+  };
+
+  const handleAddExistingItemToQR = async (itemId: string) => {
+    if (!editingQR) return;
+    if (qrItems.some(qi => qi.id === itemId)) { toast.error("Item already added"); return; }
+    try {
+      const { data, error } = await supabase.from("qr_page_items").insert({
+        qr_page_id: editingQR.id, item_id: itemId, display_order: qrItems.length
+      }).select("id, items(id, title, type, content)").single();
+      if (error) throw error;
+      const newItem: QRItem = { id: data.items.id, title: data.items.title, type: data.items.type, content: data.items.content, qr_page_item_id: data.id };
+      setQrItems(prev => [...prev, newItem]);
+      setQrPages(prev => prev.map(p => p.id === editingQR.id ? { ...p, item_count: p.item_count + 1 } : p));
+      toast.success("Item added to QR code");
+    } catch { toast.error("Failed to add item"); }
+  };
+
+  const handleAddNewItemToQR = async () => {
+    if (!editingQR || !newQRItem.title.trim() || !newQRItem.content.trim()) { toast.error("Please fill in all fields"); return; }
+    if (!newItemCategoryId) { toast.error("Please select a category"); return; }
+    try {
+      const { data: itemData, error: itemError } = await supabase.from("items").insert({
+        user_id: userId, category_id: newItemCategoryId,
+        title: newQRItem.title.trim(), type: newQRItem.type, content: newQRItem.content.trim(), display_order: 0,
+      }).select().single();
+      if (itemError) throw itemError;
+      const { data: linkData, error: linkError } = await supabase.from("qr_page_items").insert({
+        qr_page_id: editingQR.id, item_id: itemData.id, display_order: qrItems.length
+      }).select().single();
+      if (linkError) throw linkError;
+      setQrItems(prev => [...prev, { id: itemData.id, title: itemData.title, type: itemData.type, content: itemData.content, qr_page_item_id: linkData.id }]);
+      setQrPages(prev => prev.map(p => p.id === editingQR.id ? { ...p, item_count: p.item_count + 1 } : p));
+      setNewQRItem({ title: "", type: "url", content: "" });
+      setNewItemCategoryId("");
+      setIsAddNewItemOpen(false);
+      toast.success("New item created and added!");
+    } catch { toast.error("Failed to create item"); }
+  };
+
+  const handleQRDragStart = (qrPageItemId: string) => { setDragQRItemId(qrPageItemId); };
+  const handleQRDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!dragQRItemId || dragQRItemId === targetId) return;
+    setQrItems(prev => {
+      const items = [...prev];
+      const dragIndex = items.findIndex(i => i.qr_page_item_id === dragQRItemId);
+      const targetIndex = items.findIndex(i => i.qr_page_item_id === targetId);
+      if (dragIndex === -1 || targetIndex === -1) return prev;
+      const [moved] = items.splice(dragIndex, 1);
+      items.splice(targetIndex, 0, moved);
+      return items;
+    });
+  };
+  const handleQRDragEnd = async () => {
+    try {
+      await Promise.all(qrItems.map((item, index) =>
+        supabase.from("qr_page_items").update({ display_order: index }).eq("id", item.qr_page_item_id)
+      ));
+    } catch { toast.error("Failed to save order"); }
+    setDragQRItemId(null);
+  };
+
   const isExpired = (expiresAt: string | null) => {
     return expiresAt ? isPast(new Date(expiresAt)) : false;
   };
@@ -753,13 +835,30 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
             {/* Items in QR Code */}
             <div className="space-y-3">
-              <Label>Items in this QR Code ({qrItems.length})</Label>
+              <div className="flex items-center justify-between">
+                <Label>Items in this QR Code ({qrItems.length})</Label>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { fetchProfileCategories(); setIsAddItemToQROpen(true); }}>
+                    <Folder className="w-3 h-3 mr-1" />
+                    From Profile
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { fetchProfileCategories(); setIsAddNewItemOpen(true); }}>
+                    <Plus className="w-3 h-3 mr-1" />
+                    New Item
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {qrItems.map((item) => (
                   <div
                     key={item.qr_page_item_id}
-                    className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30"
+                    className={`flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30 ${dragQRItemId === item.qr_page_item_id ? "opacity-50" : ""}`}
+                    draggable
+                    onDragStart={() => handleQRDragStart(item.qr_page_item_id)}
+                    onDragOver={(e) => handleQRDragOver(e, item.qr_page_item_id)}
+                    onDragEnd={handleQRDragEnd}
                   >
+                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0" />
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.content}</p>
@@ -875,6 +974,117 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Item from Profile Dialog */}
+      <Dialog open={isAddItemToQROpen} onOpenChange={setIsAddItemToQROpen}>
+        <DialogContent className="max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Add from Profile</DialogTitle>
+            <DialogDescription>Select items from your profile categories to add to this QR code</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {profileCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No profile items found</p>
+            ) : (
+              profileCategories.map(cat => (
+                <div key={cat.id} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Folder className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-sm">{cat.name}</span>
+                  </div>
+                  {cat.items.length === 0 ? (
+                    <p className="text-xs text-muted-foreground pl-6">No items</p>
+                  ) : (
+                    <div className="space-y-1 pl-6">
+                      {cat.items.map(item => {
+                        const alreadyAdded = qrItems.some(qi => qi.id === item.id);
+                        return (
+                          <div key={item.id} className="flex items-center gap-2 p-2 rounded bg-secondary/30">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{item.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{item.type}</p>
+                            </div>
+                            <Button
+                              variant={alreadyAdded ? "ghost" : "outline"}
+                              size="sm"
+                              disabled={alreadyAdded}
+                              onClick={() => handleAddExistingItemToQR(item.id)}
+                              className="h-7 text-xs"
+                            >
+                              {alreadyAdded ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Item Dialog */}
+      <Dialog open={isAddNewItemOpen} onOpenChange={setIsAddNewItemOpen}>
+        <DialogContent className="max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Add New Item</DialogTitle>
+            <DialogDescription>Create a new item and add it to this QR code</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={newItemCategoryId} onValueChange={setNewItemCategoryId}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {profileCategories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input placeholder="Item title" value={newQRItem.title} onChange={e => setNewQRItem({ ...newQRItem, title: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={newQRItem.type} onValueChange={v => setNewQRItem({ ...newQRItem, type: v as QRItem["type"], content: "" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="url">URL</SelectItem>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="image">Image</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="audio">Audio (MP3)</SelectItem>
+                  <SelectItem value="others">Others (Any File)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Content</Label>
+              {["pdf", "image", "video", "audio", "others"].includes(newQRItem.type) ? (
+                <FileUpload
+                  type={newQRItem.type as "pdf" | "image" | "video" | "audio" | "others"}
+                  userId={userId}
+                  value={newQRItem.content}
+                  onUploadComplete={url => setNewQRItem({ ...newQRItem, content: url })}
+                />
+              ) : newQRItem.type === "text" ? (
+                <Textarea placeholder="Enter text content" value={newQRItem.content} onChange={e => setNewQRItem({ ...newQRItem, content: e.target.value })} rows={5} />
+              ) : (
+                <Input placeholder="https://..." value={newQRItem.content} onChange={e => setNewQRItem({ ...newQRItem, content: e.target.value })} />
+              )}
+            </div>
+            <Button onClick={handleAddNewItemToQR} className="w-full" disabled={!newQRItem.title.trim() || !newQRItem.content.trim()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create & Add Item
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
