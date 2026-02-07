@@ -233,6 +233,16 @@ export type Database = {
       }
       qr_business_pages: {
         Row: {
+          business_address: string | null
+          business_email: string | null
+          business_facebook: string | null
+          business_instagram: string | null
+          business_logo_url: string | null
+          business_name: string | null
+          business_phone: string | null
+          business_twitter: string | null
+          business_website: string | null
+          business_whatsapp: string | null
           created_at: string
           deleted_at: string | null
           expires_at: string | null
@@ -252,6 +262,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          business_address?: string | null
+          business_email?: string | null
+          business_facebook?: string | null
+          business_instagram?: string | null
+          business_logo_url?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          business_twitter?: string | null
+          business_website?: string | null
+          business_whatsapp?: string | null
           created_at?: string
           deleted_at?: string | null
           expires_at?: string | null
@@ -271,6 +291,16 @@ export type Database = {
           user_id: string
         }
         Update: {
+          business_address?: string | null
+          business_email?: string | null
+          business_facebook?: string | null
+          business_instagram?: string | null
+          business_logo_url?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          business_twitter?: string | null
+          business_website?: string | null
+          business_whatsapp?: string | null
           created_at?: string
           deleted_at?: string | null
           expires_at?: string | null

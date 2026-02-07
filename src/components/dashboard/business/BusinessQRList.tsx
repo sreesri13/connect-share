@@ -3,6 +3,7 @@ import {
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
   Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2 
 } from "lucide-react";
+import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,16 @@ interface BusinessQRPage {
   location_lng: number | null;
   location_name: string | null;
   show_expires_at: boolean;
+  business_name: string | null;
+  business_logo_url: string | null;
+  business_address: string | null;
+  business_phone: string | null;
+  business_email: string | null;
+  business_website: string | null;
+  business_instagram: string | null;
+  business_facebook: string | null;
+  business_twitter: string | null;
+  business_whatsapp: string | null;
 }
 
 interface BusinessQRListProps {
@@ -118,6 +129,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [editExpiryExtension, setEditExpiryExtension] = useState<ExpiryExtension>("none");
   const [editCustomExpiryDate, setEditCustomExpiryDate] = useState<Date | undefined>(undefined);
   const [editShowExpiryToVisitors, setEditShowExpiryToVisitors] = useState(false);
+  const [editBusinessInfo, setEditBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -129,7 +141,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     try {
       const { data: pagesData, error: pagesError } = await supabase
         .from("qr_business_pages")
-        .select("id, public_id, title, style_config, is_deleted, created_at, password_hash, expires_at, location_locked, location_lat, location_lng, location_name, show_expires_at")
+        .select("*")
         .eq("user_id", userId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: false });
@@ -149,6 +161,16 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             style_config: page.style_config as unknown as QRStyleConfig | null,
             product_count: count || 0,
             show_expires_at: page.show_expires_at || false,
+            business_name: (page as any).business_name || null,
+            business_logo_url: (page as any).business_logo_url || null,
+            business_address: (page as any).business_address || null,
+            business_phone: (page as any).business_phone || null,
+            business_email: (page as any).business_email || null,
+            business_website: (page as any).business_website || null,
+            business_instagram: (page as any).business_instagram || null,
+            business_facebook: (page as any).business_facebook || null,
+            business_twitter: (page as any).business_twitter || null,
+            business_whatsapp: (page as any).business_whatsapp || null,
           };
         })
       );
@@ -196,6 +218,18 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     setEditExpiryExtension("none");
     setEditCustomExpiryDate(undefined);
     setEditShowExpiryToVisitors(page.show_expires_at || false);
+    setEditBusinessInfo({
+      business_name: page.business_name || "",
+      business_logo_url: page.business_logo_url || "",
+      business_address: page.business_address || "",
+      business_phone: page.business_phone || "",
+      business_email: page.business_email || "",
+      business_website: page.business_website || "",
+      business_instagram: page.business_instagram || "",
+      business_facebook: page.business_facebook || "",
+      business_twitter: page.business_twitter || "",
+      business_whatsapp: page.business_whatsapp || "",
+    });
     setIsEditOpen(true);
   };
 
@@ -331,7 +365,19 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         passwordHash = null;
       }
 
-      const updateData: any = { title: editTitle };
+      const updateData: any = { 
+        title: editTitle,
+        business_name: editBusinessInfo.business_name || null,
+        business_logo_url: editBusinessInfo.business_logo_url || null,
+        business_address: editBusinessInfo.business_address || null,
+        business_phone: editBusinessInfo.business_phone || null,
+        business_email: editBusinessInfo.business_email || null,
+        business_website: editBusinessInfo.business_website || null,
+        business_instagram: editBusinessInfo.business_instagram || null,
+        business_facebook: editBusinessInfo.business_facebook || null,
+        business_twitter: editBusinessInfo.business_twitter || null,
+        business_whatsapp: editBusinessInfo.business_whatsapp || null,
+      };
       
       if (passwordHash !== undefined) {
         updateData.password_hash = passwordHash;
@@ -870,6 +916,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                   />
                 </div>
               </div>
+
+              {/* Business Information */}
+              <BusinessInfoForm value={editBusinessInfo} onChange={setEditBusinessInfo} userId={userId} />
 
               {/* Save Button */}
               <div className="flex gap-2 justify-end">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, ChevronDown, ChevronRight, QrCode, Download, Copy, Link, Share2, Lock, LockOpen, Clock, Eye, EyeOff } from "lucide-react";
+import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
   const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string; style: QRStyleConfig } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
 
   // Location lock settings
   const [enableLocationLock, setEnableLocationLock] = useState(false);
@@ -243,7 +245,17 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           password_hash: passwordHash,
           expires_at: expiresAt,
           show_expires_at: showExpiryToVisitors,
-        })
+          business_name: businessInfo.business_name || null,
+          business_logo_url: businessInfo.business_logo_url || null,
+          business_address: businessInfo.business_address || null,
+          business_phone: businessInfo.business_phone || null,
+          business_email: businessInfo.business_email || null,
+          business_website: businessInfo.business_website || null,
+          business_instagram: businessInfo.business_instagram || null,
+          business_facebook: businessInfo.business_facebook || null,
+          business_twitter: businessInfo.business_twitter || null,
+          business_whatsapp: businessInfo.business_whatsapp || null,
+        } as any)
         .select("id")
         .single();
 
@@ -325,6 +337,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setExpiryOption("none");
     setCustomExpiryDate(undefined);
     setShowExpiryToVisitors(false);
+    setBusinessInfo(defaultBusinessInfo);
   };
 
   const handleSaveStyle = async (name: string) => {
@@ -510,6 +523,13 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
               </Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Business Information */}
+      <Card className="lg:col-span-2">
+        <CardContent className="pt-6">
+          <BusinessInfoForm value={businessInfo} onChange={setBusinessInfo} userId={userId} />
         </CardContent>
       </Card>
 
