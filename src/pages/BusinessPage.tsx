@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,16 @@ interface BusinessPageData {
   password_hash: string | null;
   expires_at: string | null;
   show_expires_at: boolean | null;
+  business_name: string | null;
+  business_logo_url: string | null;
+  business_address: string | null;
+  business_phone: string | null;
+  business_email: string | null;
+  business_website: string | null;
+  business_instagram: string | null;
+  business_facebook: string | null;
+  business_twitter: string | null;
+  business_whatsapp: string | null;
 }
 
 const BusinessPage = () => {
@@ -59,6 +69,7 @@ const BusinessPage = () => {
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
 
   // Location verification states
   const [isLocationLocked, setIsLocationLocked] = useState(false);
@@ -87,7 +98,7 @@ const BusinessPage = () => {
       // Fetch page details
       const { data: pageDataResult, error: pageError } = await supabase
         .from("qr_business_pages")
-        .select("id, title, is_deleted, location_locked, location_lat, location_lng, location_name, password_hash, expires_at, show_expires_at")
+        .select("*")
         .eq("public_id", publicId)
         .maybeSingle();
 
@@ -112,7 +123,7 @@ const BusinessPage = () => {
         return;
       }
 
-      setPageData(pageDataResult);
+      setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
 
       // Check for password protection first
@@ -368,17 +379,69 @@ const BusinessPage = () => {
     );
   }
 
+  const hasBusinessInfo = pageData?.business_name || pageData?.business_logo_url;
+
+  // Intro animation
+  if (showIntro && hasBusinessInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          onAnimationComplete={() => {
+            setTimeout(() => setShowIntro(false), 1500);
+          }}
+          className="flex flex-col items-center gap-4 text-center px-6"
+        >
+          {pageData?.business_logo_url && (
+            <motion.img
+              src={pageData.business_logo_url}
+              alt={pageData.business_name || "Business Logo"}
+              className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl object-cover shadow-lg border"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            />
+          )}
+          {pageData?.business_name && (
+            <motion.h1
+              className="text-2xl sm:text-4xl font-bold text-foreground"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              {pageData.business_name}
+            </motion.h1>
+          )}
+          <motion.div
+            className="w-8 h-1 bg-primary rounded-full"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+          />
+        </motion.div>
+      </div>
+    );
+  }
+
+  const hasSocialLinks = pageData?.business_website || pageData?.business_instagram || pageData?.business_facebook || pageData?.business_twitter || pageData?.business_whatsapp;
+
   return (
     <div className="min-h-screen bg-gradient-hero pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center flex-shrink-0">
-            <Store className="w-5 h-5 text-primary-foreground" />
-          </div>
+          {pageData?.business_logo_url ? (
+            <img src={pageData.business_logo_url} alt="" className="w-10 h-10 rounded-xl object-cover border flex-shrink-0" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center flex-shrink-0">
+              <Store className="w-5 h-5 text-primary-foreground" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-lg text-foreground truncate">
-              {pageTitle || "Product Catalog"}
+              {pageData?.business_name || pageTitle || "Product Catalog"}
             </h1>
             <p className="text-xs text-muted-foreground">
               {products.length} product{products.length !== 1 ? "s" : ""}
@@ -391,11 +454,69 @@ const BusinessPage = () => {
         </div>
       </header>
 
+      {/* Business Info Section */}
+      {(pageData?.business_address || pageData?.business_phone || pageData?.business_email || hasSocialLinks) && (
+        <div className="max-w-3xl mx-auto px-4 py-4 border-b border-border/50">
+          <div className="space-y-3">
+            {pageData?.business_address && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{pageData.business_address}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-3">
+              {pageData?.business_phone && (
+                <a href={`tel:${pageData.business_phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>{pageData.business_phone}</span>
+                </a>
+              )}
+              {pageData?.business_email && (
+                <a href={`mailto:${pageData.business_email}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{pageData.business_email}</span>
+                </a>
+              )}
+            </div>
+            {hasSocialLinks && (
+              <div className="flex items-center gap-3">
+                {pageData?.business_website && (
+                  <a href={pageData.business_website.startsWith("http") ? pageData.business_website : `https://${pageData.business_website}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                  </a>
+                )}
+                {pageData?.business_instagram && (
+                  <a href={`https://instagram.com/${pageData.business_instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
+                    <Instagram className="w-4 h-4 text-muted-foreground" />
+                  </a>
+                )}
+                {pageData?.business_facebook && (
+                  <a href={pageData.business_facebook.startsWith("http") ? pageData.business_facebook : `https://facebook.com/${pageData.business_facebook}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
+                    <Facebook className="w-4 h-4 text-muted-foreground" />
+                  </a>
+                )}
+                {pageData?.business_twitter && (
+                  <a href={`https://x.com/${pageData.business_twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
+                    <Twitter className="w-4 h-4 text-muted-foreground" />
+                  </a>
+                )}
+                {pageData?.business_whatsapp && (
+                  <a href={`https://wa.me/${pageData.business_whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
+                    <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Products */}
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-8">
         {categories.map((category) => {
           const categoryProducts = getProductsByCategory(category.id);
           if (categoryProducts.length === 0) return null;
+
 
           return (
             <section key={category.id} className="space-y-4">
