@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Building2, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle, Upload, X, Crop } from "lucide-react";
+import { useState, useRef } from "react";
+import { Building2, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle, Upload, X, Crop, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,7 @@ export interface BusinessInfo {
   business_facebook: string;
   business_twitter: string;
   business_whatsapp: string;
+  business_hours: string;
 }
 
 interface BusinessInfoFormProps {
@@ -33,8 +34,8 @@ export const BusinessInfoForm = ({ value, onChange, userId }: BusinessInfoFormPr
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [rawImage, setRawImage] = useState<string | null>(null);
   const [rawFile, setRawFile] = useState<File | null>(null);
-  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [cropZoom, setCropZoom] = useState([1]);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -183,6 +184,17 @@ export const BusinessInfoForm = ({ value, onChange, userId }: BusinessInfoFormPr
         />
       </div>
 
+      {/* Business Hours */}
+      <div className="space-y-1">
+        <Label className="text-sm flex items-center gap-1"><Clock className="w-3 h-3" /> Business Hours</Label>
+        <Textarea
+          value={value.business_hours}
+          onChange={(e) => handleUpdate("business_hours", e.target.value)}
+          placeholder="e.g. Mon-Fri: 9AM - 6PM&#10;Sat: 10AM - 4PM&#10;Sun: Closed"
+          rows={3}
+        />
+      </div>
+
       {/* Contacts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -275,4 +287,5 @@ export const defaultBusinessInfo: BusinessInfo = {
   business_facebook: "",
   business_twitter: "",
   business_whatsapp: "",
+  business_hours: "",
 };

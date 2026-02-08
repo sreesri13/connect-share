@@ -229,6 +229,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       business_facebook: page.business_facebook || "",
       business_twitter: page.business_twitter || "",
       business_whatsapp: page.business_whatsapp || "",
+      business_hours: (page as any).business_hours || "",
     });
     setIsEditOpen(true);
   };
@@ -377,6 +378,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         business_facebook: editBusinessInfo.business_facebook || null,
         business_twitter: editBusinessInfo.business_twitter || null,
         business_whatsapp: editBusinessInfo.business_whatsapp || null,
+        business_hours: editBusinessInfo.business_hours || null,
       };
       
       if (passwordHash !== undefined) {

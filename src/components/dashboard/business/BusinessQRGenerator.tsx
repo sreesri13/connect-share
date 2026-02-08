@@ -255,6 +255,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           business_facebook: businessInfo.business_facebook || null,
           business_twitter: businessInfo.business_twitter || null,
           business_whatsapp: businessInfo.business_whatsapp || null,
+          business_hours: businessInfo.business_hours || null,
         } as any)
         .select("id")
         .single();
@@ -403,7 +404,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
               <Button onClick={handleDownload} className="min-h-[44px]">
                 <Download className="w-4 h-4 mr-2" />
                 Download
@@ -413,7 +414,15 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
                 title={qrTitle || "Business QR"}
                 url={generatedQR.url}
               />
-              <Button variant="outline" onClick={handleReset} className="col-span-2 sm:col-span-1 min-h-[44px]">
+              <Button
+                variant="secondary"
+                onClick={() => window.open(generatedQR.url, "_blank")}
+                className="min-h-[44px]"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Page
+              </Button>
+              <Button variant="outline" onClick={handleReset} className="min-h-[44px]">
                 Create Another
               </Button>
             </div>
@@ -424,7 +433,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Product Selection */}
       <Card>
         <CardHeader>
@@ -526,14 +535,14 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         </CardContent>
       </Card>
 
-      {/* Business Information */}
-      <Card className="lg:col-span-2">
-        <CardContent className="pt-6">
+      {/* Business Info + QR Preview */}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
           <BusinessInfoForm value={businessInfo} onChange={setBusinessInfo} userId={userId} />
         </CardContent>
       </Card>
 
-      {/* QR Customization */}
+      {/* QR Code Preview & Settings */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

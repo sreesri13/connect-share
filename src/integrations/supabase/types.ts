@@ -236,6 +236,7 @@ export type Database = {
           business_address: string | null
           business_email: string | null
           business_facebook: string | null
+          business_hours: string | null
           business_instagram: string | null
           business_logo_url: string | null
           business_name: string | null
@@ -265,6 +266,7 @@ export type Database = {
           business_address?: string | null
           business_email?: string | null
           business_facebook?: string | null
+          business_hours?: string | null
           business_instagram?: string | null
           business_logo_url?: string | null
           business_name?: string | null
@@ -294,6 +296,7 @@ export type Database = {
           business_address?: string | null
           business_email?: string | null
           business_facebook?: string | null
+          business_hours?: string | null
           business_instagram?: string | null
           business_logo_url?: string | null
           business_name?: string | null
