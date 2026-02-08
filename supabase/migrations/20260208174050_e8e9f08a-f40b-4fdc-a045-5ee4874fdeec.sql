@@ -1,0 +1,1 @@
+ALTER TABLE public.qr_business_pages ADD COLUMN business_hours text NULL;

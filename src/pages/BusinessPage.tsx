@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle, Search, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 import { LocationVerification } from "@/components/qr/LocationVerification";
@@ -56,6 +56,7 @@ interface BusinessPageData {
   business_facebook: string | null;
   business_twitter: string | null;
   business_whatsapp: string | null;
+  business_hours: string | null;
 }
 
 const BusinessPage = () => {
@@ -70,6 +71,9 @@ const BusinessPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
+  const [introPhase, setIntroPhase] = useState<"logo" | "name" | "line" | "done">("logo");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // Location verification states
   const [isLocationLocked, setIsLocationLocked] = useState(false);
@@ -83,11 +87,8 @@ const BusinessPage = () => {
   const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
-    // Initialize GA tracking on business pages
     initGA();
-    
     if (publicId) {
-      // Track QR scan event when page is accessed
       trackQRScan(publicId, undefined, 'business');
       checkSecurityRequirements();
     }
@@ -95,7 +96,6 @@ const BusinessPage = () => {
 
   const checkSecurityRequirements = async () => {
     try {
-      // Fetch page details
       const { data: pageDataResult, error: pageError } = await supabase
         .from("qr_business_pages")
         .select("*")
@@ -116,7 +116,6 @@ const BusinessPage = () => {
         return;
       }
 
-      // Check for expiration
       if (pageDataResult.expires_at && new Date(pageDataResult.expires_at) < new Date()) {
         setError("This QR code has expired");
         setIsLoading(false);
@@ -126,21 +125,18 @@ const BusinessPage = () => {
       setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
 
-      // Check for password protection first
       if (pageDataResult.password_hash) {
         setIsPasswordProtected(true);
         setIsLoading(false);
         return;
       }
 
-      // Check for location lock
       if (pageDataResult.location_locked && pageDataResult.location_lat && pageDataResult.location_lng) {
         setIsLocationLocked(true);
         setIsLoading(false);
         return;
       }
 
-      // No security, proceed to fetch products
       fetchPageProducts(pageDataResult.id);
     } catch (error: any) {
       console.error(error);
@@ -153,12 +149,11 @@ const BusinessPage = () => {
     if (!pageData || !passwordInput.trim()) return;
 
     const inputHash = hashPassword(passwordInput.trim());
-    
+
     if (inputHash === pageData.password_hash) {
       setIsPasswordVerified(true);
       setPasswordError("");
-      
-      // Check if location lock is also needed
+
       if (pageData.location_locked && pageData.location_lat && pageData.location_lng) {
         setIsLocationLocked(true);
       } else {
@@ -180,10 +175,8 @@ const BusinessPage = () => {
 
   const fetchPageProducts = async (pageId: string) => {
     try {
-      // Record scan in database
       recordQRScan(pageId, true);
 
-      // Fetch products for this page
       const { data: pageProducts, error: productsError } = await supabase
         .from("qr_business_page_products")
         .select(`
@@ -205,14 +198,12 @@ const BusinessPage = () => {
 
       if (productsError) throw productsError;
 
-      // Filter active products and extract data
       const activeProducts = (pageProducts || [])
         .filter((pp: any) => pp.business_products.status === "active")
         .map((pp: any) => pp.business_products as Product);
 
       setProducts(activeProducts);
 
-      // Get unique category IDs
       const categoryIds = [...new Set(activeProducts.map((p) => p.category_id))];
 
       if (categoryIds.length > 0) {
@@ -232,8 +223,24 @@ const BusinessPage = () => {
     }
   };
 
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q))
+      );
+    }
+    if (activeCategory) {
+      result = result.filter((p) => p.category_id === activeCategory);
+    }
+    return result;
+  }, [products, searchQuery, activeCategory]);
+
   const getProductsByCategory = (categoryId: string) => {
-    return products.filter((p) => p.category_id === categoryId);
+    return filteredProducts.filter((p) => p.category_id === categoryId);
   };
 
   const getDiscountPercentage = (original: number, discount: number | null) => {
@@ -277,68 +284,50 @@ const BusinessPage = () => {
 
   const getTotalItems = () => {
     let total = 0;
-    cart.forEach((item) => {
-      total += item.quantity;
-    });
+    cart.forEach((item) => { total += item.quantity; });
     return total;
   };
 
   const getTotalPrice = () => {
     let total = 0;
-    cart.forEach((item) => {
-      total += getProductPrice(item.product) * item.quantity;
-    });
+    cart.forEach((item) => { total += getProductPrice(item.product) * item.quantity; });
     return total;
   };
 
   // Password verification screen
   if (isPasswordProtected && !isPasswordVerified) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-card rounded-2xl border shadow-lg p-6 space-y-6">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm bg-card rounded-2xl border shadow-xl p-6 space-y-6"
+        >
           <div className="text-center space-y-2">
             <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
               <Lock className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-xl font-bold">Password Protected</h1>
-            <p className="text-sm text-muted-foreground">
-              Enter the password to view this catalog
-            </p>
+            <p className="text-sm text-muted-foreground">Enter the password to view this catalog</p>
           </div>
-
           <div className="space-y-4">
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 value={passwordInput}
-                onChange={(e) => {
-                  setPasswordInput(e.target.value);
-                  setPasswordError("");
-                }}
+                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                 placeholder="Enter password"
                 className="pr-10"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handlePasswordSubmit();
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handlePasswordSubmit(); }}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={() => setShowPassword(!showPassword)}
-              >
+              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </Button>
             </div>
-            {passwordError && (
-              <p className="text-sm text-destructive">{passwordError}</p>
-            )}
-            <Button onClick={handlePasswordSubmit} className="w-full">
-              Submit
-            </Button>
+            {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+            <Button onClick={handlePasswordSubmit} className="w-full">Submit</Button>
           </div>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -357,289 +346,423 @@ const BusinessPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-3"
+        >
+          <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading catalog...</p>
+        </motion.div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <div className="text-center space-y-4">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-4"
+        >
           <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
             <X className="w-8 h-8 text-destructive" />
           </div>
           <h1 className="text-xl font-bold text-foreground">{error}</h1>
-          <p className="text-muted-foreground">
-            The page you're looking for doesn't exist or has been removed.
-          </p>
-        </div>
+          <p className="text-muted-foreground">The page you're looking for doesn't exist or has been removed.</p>
+        </motion.div>
       </div>
     );
   }
 
   const hasBusinessInfo = pageData?.business_name || pageData?.business_logo_url;
 
-  // Intro animation
+  // Polished Intro animation
   if (showIntro && hasBusinessInfo) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center overflow-hidden">
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="flex flex-col items-center gap-6 text-center px-8"
           onAnimationComplete={() => {
-            setTimeout(() => setShowIntro(false), 1500);
+            setTimeout(() => {
+              setIntroPhase("name");
+              setTimeout(() => {
+                setIntroPhase("line");
+                setTimeout(() => setShowIntro(false), 1200);
+              }, 800);
+            }, 600);
           }}
-          className="flex flex-col items-center gap-4 text-center px-6"
         >
           {pageData?.business_logo_url && (
-            <motion.img
-              src={pageData.business_logo_url}
-              alt={pageData.business_name || "Business Logo"}
-              className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl object-cover shadow-lg border"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-            />
+            <motion.div
+              className="relative"
+              initial={{ opacity: 0, scale: 0.3, rotate: -10 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-3xl overflow-hidden shadow-2xl border-2 border-primary/20">
+                <img
+                  src={pageData.business_logo_url}
+                  alt={pageData.business_name || "Business Logo"}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <motion.div
+                className="absolute -inset-2 rounded-3xl border-2 border-primary/30"
+                initial={{ opacity: 0, scale: 1.2 }}
+                animate={{ opacity: [0, 0.5, 0], scale: [1.2, 1.05, 1.1] }}
+                transition={{ duration: 1.2, delay: 0.3 }}
+              />
+            </motion.div>
           )}
           {pageData?.business_name && (
             <motion.h1
-              className="text-2xl sm:text-4xl font-bold text-foreground"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
+              className="text-3xl sm:text-5xl font-bold text-foreground tracking-tight"
+              initial={{ opacity: 0, y: 30, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ delay: 0.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             >
               {pageData.business_name}
             </motion.h1>
           )}
+          {pageData?.title && pageData.title !== pageData.business_name && (
+            <motion.p
+              className="text-lg text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.5 }}
+            >
+              {pageData.title}
+            </motion.p>
+          )}
           <motion.div
-            className="w-8 h-1 bg-primary rounded-full"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-          />
+            className="flex gap-1.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 0.5 }}
+          >
+            <motion.div className="w-2 h-2 rounded-full bg-primary" animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} />
+            <motion.div className="w-2 h-2 rounded-full bg-primary" animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.2 }} />
+            <motion.div className="w-2 h-2 rounded-full bg-primary" animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.4 }} />
+          </motion.div>
         </motion.div>
       </div>
     );
   }
 
   const hasSocialLinks = pageData?.business_website || pageData?.business_instagram || pageData?.business_facebook || pageData?.business_twitter || pageData?.business_whatsapp;
+  const hasContactInfo = pageData?.business_address || pageData?.business_phone || pageData?.business_email || pageData?.business_hours || hasSocialLinks;
+
+  const visibleCategories = categories.filter((c) => getProductsByCategory(c.id).length > 0);
 
   return (
-    <div className="min-h-screen bg-gradient-hero pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          {pageData?.business_logo_url ? (
-            <img src={pageData.business_logo_url} alt="" className="w-10 h-10 rounded-xl object-cover border flex-shrink-0" />
-          ) : (
-            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center flex-shrink-0">
-              <Store className="w-5 h-5 text-primary-foreground" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-lg text-foreground truncate">
-              {pageData?.business_name || pageTitle || "Product Catalog"}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              {products.length} product{products.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          {pageData?.show_expires_at && pageData?.expires_at && (
-            <ExpiryCountdown expiresAt={pageData.expires_at} />
-          )}
-          <LanguageToggle inline />
-        </div>
-      </header>
-
-      {/* Business Info Section */}
-      {(pageData?.business_address || pageData?.business_phone || pageData?.business_email || hasSocialLinks) && (
-        <div className="max-w-3xl mx-auto px-4 py-4 border-b border-border/50">
-          <div className="space-y-3">
-            {pageData?.business_address && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>{pageData.business_address}</span>
+    <div className="min-h-[100dvh] bg-background flex flex-col">
+      {/* Sticky Header */}
+      <motion.header
+        initial={{ y: -60 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border shadow-sm"
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            {pageData?.business_logo_url ? (
+              <img src={pageData.business_logo_url} alt="" className="w-10 h-10 rounded-xl object-cover border flex-shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+                <Store className="w-5 h-5 text-primary-foreground" />
               </div>
             )}
-            <div className="flex flex-wrap gap-3">
-              {pageData?.business_phone && (
-                <a href={`tel:${pageData.business_phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{pageData.business_phone}</span>
-                </a>
-              )}
-              {pageData?.business_email && (
-                <a href={`mailto:${pageData.business_email}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>{pageData.business_email}</span>
-                </a>
-              )}
+            <div className="flex-1 min-w-0">
+              <h1 className="font-bold text-base sm:text-lg text-foreground truncate">
+                {pageData?.business_name || pageTitle || "Product Catalog"}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {products.length} product{products.length !== 1 ? "s" : ""}
+              </p>
             </div>
-            {hasSocialLinks && (
-              <div className="flex items-center gap-3">
-                {pageData?.business_website && (
-                  <a href={pageData.business_website.startsWith("http") ? pageData.business_website : `https://${pageData.business_website}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                )}
-                {pageData?.business_instagram && (
-                  <a href={`https://instagram.com/${pageData.business_instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
-                    <Instagram className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                )}
-                {pageData?.business_facebook && (
-                  <a href={pageData.business_facebook.startsWith("http") ? pageData.business_facebook : `https://facebook.com/${pageData.business_facebook}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
-                    <Facebook className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                )}
-                {pageData?.business_twitter && (
-                  <a href={`https://x.com/${pageData.business_twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
-                    <Twitter className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                )}
-                {pageData?.business_whatsapp && (
-                  <a href={`https://wa.me/${pageData.business_whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-muted hover:bg-primary/10 transition-colors">
-                    <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                )}
-              </div>
+            {pageData?.show_expires_at && pageData?.expires_at && (
+              <ExpiryCountdown expiresAt={pageData.expires_at} />
             )}
+            <LanguageToggle inline />
           </div>
         </div>
-      )}
+      </motion.header>
 
-      {/* Products */}
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-        {categories.map((category) => {
-          const categoryProducts = getProductsByCategory(category.id);
-          if (categoryProducts.length === 0) return null;
+      {/* Search Bar */}
+      <div className="sticky top-[65px] z-30 bg-background/95 backdrop-blur-xl border-b border-border/50">
+        <div className="max-w-5xl mx-auto px-4 py-2.5">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              className="pl-9 h-10 bg-muted/50 border-0 focus:bg-background"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+          {/* Category Pills */}
+          {categories.length > 1 && (
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => setActiveCategory(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  activeCategory === null
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                All
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    activeCategory === cat.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
+      {/* Main Content */}
+      <main className="flex-1 pb-28">
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+          {searchQuery && filteredProducts.length === 0 && (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
+              <p className="text-muted-foreground">No products found for "{searchQuery}"</p>
+            </div>
+          )}
 
-          return (
-            <section key={category.id} className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">{category.name}</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {categoryProducts.map((product) => {
-                  const discountPercent = getDiscountPercentage(
-                    product.original_price,
-                    product.discount_price
-                  );
-                  const cartQty = getCartQuantity(product.id);
+          {visibleCategories.map((category, catIdx) => {
+            const categoryProducts = getProductsByCategory(category.id);
+            if (categoryProducts.length === 0) return null;
 
-                  return (
-                    <motion.div
-                      key={product.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-card rounded-xl border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <div
-                        className="cursor-pointer"
-                        onClick={() => {
-                          trackProductClick(product.id, product.name, publicId || '');
-                          setSelectedProduct(product);
-                        }}
+            return (
+              <motion.section
+                key={category.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: catIdx * 0.1 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground">{category.name}</h2>
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">{categoryProducts.length} items</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                  {categoryProducts.map((product, idx) => {
+                    const discountPercent = getDiscountPercentage(product.original_price, product.discount_price);
+                    const cartQty = getCartQuantity(product.id);
+
+                    return (
+                      <motion.div
+                        key={product.id}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="group bg-card rounded-xl border overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300"
                       >
-                        <div className="relative">
-                          <AspectRatio ratio={1}>
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </AspectRatio>
-                          {discountPercent && (
-                            <Badge className="absolute top-2 left-2 bg-destructive text-xs">
-                              -{discountPercent}%
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="p-3 space-y-2">
-                          <h3 className="font-medium text-sm line-clamp-2">{product.name}</h3>
-                          <div className="flex items-center gap-2">
-                            {product.discount_price ? (
-                              <>
-                                <span className="font-bold text-primary">
-                                  ₹{product.discount_price}
-                                </span>
-                                <span className="text-xs text-muted-foreground line-through">
-                                  ₹{product.original_price}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="font-bold">₹{product.original_price}</span>
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => {
+                            trackProductClick(product.id, product.name, publicId || '');
+                            setSelectedProduct(product);
+                          }}
+                        >
+                          <div className="relative overflow-hidden">
+                            <AspectRatio ratio={1}>
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                              />
+                            </AspectRatio>
+                            {discountPercent && (
+                              <Badge className="absolute top-2 left-2 bg-destructive text-destructive-foreground text-xs shadow-sm">
+                                -{discountPercent}%
+                              </Badge>
                             )}
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Add to cart controls */}
-                      <div className="px-3 pb-3">
-                        {cartQty === 0 ? (
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToCart(product);
-                            }}
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add
-                          </Button>
-                        ) : (
-                          <div className="flex items-center justify-center gap-2 bg-primary rounded-md py-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFromCart(product.id);
-                              }}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="font-bold text-primary-foreground min-w-[20px] text-center">
-                              {cartQty}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart(product);
-                              }}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
+                          <div className="p-3 space-y-1.5">
+                            <h3 className="font-medium text-sm line-clamp-2 leading-tight">{product.name}</h3>
+                            <div className="flex items-center gap-2">
+                              {product.discount_price ? (
+                                <>
+                                  <span className="font-bold text-primary text-sm">₹{product.discount_price}</span>
+                                  <span className="text-xs text-muted-foreground line-through">₹{product.original_price}</span>
+                                </>
+                              ) : (
+                                <span className="font-bold text-sm">₹{product.original_price}</span>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+                        </div>
+
+                        <div className="px-3 pb-3">
+                          {cartQty === 0 ? (
+                            <Button
+                              size="sm"
+                              className="w-full h-9"
+                              onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add
+                            </Button>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1 bg-primary rounded-md h-9">
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10" onClick={(e) => { e.stopPropagation(); removeFromCart(product.id); }}>
+                                <Minus className="w-4 h-4" />
+                              </Button>
+                              <span className="font-bold text-primary-foreground min-w-[24px] text-center text-sm">{cartQty}</span>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.section>
+            );
+          })}
+        </div>
       </main>
 
-      {/* Cart Summary Bar */}
+      {/* Footer with business info */}
+      {hasContactInfo && (
+        <footer className="bg-muted/50 border-t border-border">
+          <div className="max-w-5xl mx-auto px-4 py-8 sm:py-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Brand Column */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  {pageData?.business_logo_url ? (
+                    <img src={pageData.business_logo_url} alt="" className="w-10 h-10 rounded-xl object-cover border" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                      <Store className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                  )}
+                  <h3 className="font-bold text-foreground">
+                    {pageData?.business_name || pageTitle || "Our Store"}
+                  </h3>
+                </div>
+                {pageData?.business_address && (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{pageData.business_address}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Column */}
+              {(pageData?.business_phone || pageData?.business_email || pageData?.business_hours) && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-foreground uppercase tracking-wider">Contact</h4>
+                  {pageData?.business_phone && (
+                    <a href={`tel:${pageData.business_phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                      <Phone className="w-4 h-4 flex-shrink-0" />
+                      <span>{pageData.business_phone}</span>
+                    </a>
+                  )}
+                  {pageData?.business_email && (
+                    <a href={`mailto:${pageData.business_email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                      <Mail className="w-4 h-4 flex-shrink-0" />
+                      <span>{pageData.business_email}</span>
+                    </a>
+                  )}
+                  {pageData?.business_hours && (
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span className="whitespace-pre-line">{pageData.business_hours}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Social Column */}
+              {hasSocialLinks && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-foreground uppercase tracking-wider">Follow Us</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {pageData?.business_website && (
+                      <a href={pageData.business_website.startsWith("http") ? pageData.business_website : `https://${pageData.business_website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors text-sm text-muted-foreground hover:text-primary">
+                        <Globe className="w-4 h-4" />
+                        <span>Website</span>
+                      </a>
+                    )}
+                    {pageData?.business_instagram && (
+                      <a href={`https://instagram.com/${pageData.business_instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors text-sm text-muted-foreground hover:text-primary">
+                        <Instagram className="w-4 h-4" />
+                        <span>Instagram</span>
+                      </a>
+                    )}
+                    {pageData?.business_facebook && (
+                      <a href={pageData.business_facebook.startsWith("http") ? pageData.business_facebook : `https://facebook.com/${pageData.business_facebook}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors text-sm text-muted-foreground hover:text-primary">
+                        <Facebook className="w-4 h-4" />
+                        <span>Facebook</span>
+                      </a>
+                    )}
+                    {pageData?.business_twitter && (
+                      <a href={`https://x.com/${pageData.business_twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors text-sm text-muted-foreground hover:text-primary">
+                        <Twitter className="w-4 h-4" />
+                        <span>Twitter</span>
+                      </a>
+                    )}
+                    {pageData?.business_whatsapp && (
+                      <a href={`https://wa.me/${pageData.business_whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors text-sm text-muted-foreground hover:text-primary">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-8 pt-4 border-t border-border/50 text-center">
+              <p className="text-xs text-muted-foreground">
+                © {new Date().getFullYear()} {pageData?.business_name || "Store"}. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </footer>
+      )}
+
+      {/* Floating Cart Bar */}
       <AnimatePresence>
         {getTotalItems() > 0 && (
           <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-4 shadow-lg"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-primary text-primary-foreground shadow-2xl"
           >
-            <div className="max-w-3xl mx-auto flex items-center justify-between">
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <ShoppingCart className="w-6 h-6" />
@@ -648,17 +771,11 @@ const BusinessPage = () => {
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm opacity-90">
-                    {getTotalItems()} item{getTotalItems() !== 1 ? "s" : ""}
-                  </p>
+                  <p className="text-xs opacity-80">{getTotalItems()} item{getTotalItems() !== 1 ? "s" : ""}</p>
                   <p className="font-bold text-lg">₹{getTotalPrice().toFixed(2)}</p>
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => setIsCartOpen(true)}
-                className="font-semibold"
-              >
+              <Button variant="secondary" onClick={() => setIsCartOpen(true)} className="font-semibold shadow-lg">
                 View Cart
               </Button>
             </div>
@@ -672,11 +789,7 @@ const BusinessPage = () => {
           {selectedProduct && (
             <>
               <AspectRatio ratio={1} className="bg-muted rounded-lg overflow-hidden">
-                <img
-                  src={selectedProduct.image_url}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={selectedProduct.image_url} alt={selectedProduct.name} className="w-full h-full object-cover" />
               </AspectRatio>
               <DialogHeader>
                 <DialogTitle>{selectedProduct.name}</DialogTitle>
@@ -685,35 +798,20 @@ const BusinessPage = () => {
                 <div className="flex items-center gap-3">
                   {selectedProduct.discount_price ? (
                     <>
-                      <span className="text-2xl font-bold text-primary">
-                        ₹{selectedProduct.discount_price}
-                      </span>
-                      <span className="text-lg text-muted-foreground line-through">
-                        ₹{selectedProduct.original_price}
-                      </span>
-                      <Badge className="bg-destructive">
-                        -{getDiscountPercentage(
-                          selectedProduct.original_price,
-                          selectedProduct.discount_price
-                        )}%
+                      <span className="text-2xl font-bold text-primary">₹{selectedProduct.discount_price}</span>
+                      <span className="text-lg text-muted-foreground line-through">₹{selectedProduct.original_price}</span>
+                      <Badge className="bg-destructive text-destructive-foreground">
+                        -{getDiscountPercentage(selectedProduct.original_price, selectedProduct.discount_price)}%
                       </Badge>
                     </>
                   ) : (
-                    <span className="text-2xl font-bold">
-                      ₹{selectedProduct.original_price}
-                    </span>
+                    <span className="text-2xl font-bold">₹{selectedProduct.original_price}</span>
                   )}
                 </div>
                 {selectedProduct.description && (
-                  <p className="text-muted-foreground">{selectedProduct.description}</p>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{selectedProduct.description}</p>
                 )}
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    addToCart(selectedProduct);
-                    setSelectedProduct(null);
-                  }}
-                >
+                <Button className="w-full" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add to Cart
                 </Button>
@@ -738,33 +836,17 @@ const BusinessPage = () => {
             <div className="space-y-4">
               {Array.from(cart.values()).map(({ product, quantity }) => (
                 <div key={product.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-16 h-16 rounded object-cover"
-                  />
+                  <img src={product.image_url} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm truncate">{product.name}</h4>
-                    <p className="text-primary font-bold">
-                      ₹{getProductPrice(product)} × {quantity}
-                    </p>
+                    <p className="text-primary font-bold text-sm">₹{getProductPrice(product)} × {quantity}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() => removeFromCart(product.id)}
-                    >
+                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => removeFromCart(product.id)}>
                       <Minus className="w-4 h-4" />
                     </Button>
-                    <span className="w-8 text-center font-medium">{quantity}</span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() => addToCart(product)}
-                    >
+                    <span className="w-8 text-center font-medium text-sm">{quantity}</span>
+                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => addToCart(product)}>
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
