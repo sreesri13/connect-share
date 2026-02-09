@@ -14,6 +14,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { recordQRScan } from "@/hooks/useQRScans";
 import { hashPassword } from "@/lib/crypto";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
+import { BusinessInstallPrompt } from "@/components/business/BusinessInstallPrompt";
 
 interface Category {
   id: string;
@@ -353,7 +354,6 @@ const BusinessPage = () => {
           className="flex flex-col items-center gap-3"
         >
           <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading catalog...</p>
         </motion.div>
       </div>
     );
@@ -859,9 +859,17 @@ const BusinessPage = () => {
                 </div>
               </div>
             </div>
-          )}
+           )}
         </DialogContent>
       </Dialog>
+
+      {/* Install Prompt */}
+      {pageData && (
+        <BusinessInstallPrompt
+          businessName={pageData.business_name || pageTitle || "Store"}
+          logoUrl={pageData.business_logo_url}
+        />
+      )}
     </div>
   );
 };

@@ -18,6 +18,7 @@ import { defaultQRStyle, oceanPresetStyle, QRStyleConfig } from "@/lib/qr-styles
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { hashPassword } from "@/lib/crypto";
 import { addHours, addDays, format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -63,6 +64,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [generatedQR, setGeneratedQR] = useState<{ publicId: string; url: string; style: QRStyleConfig } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
+  const [activeTab, setActiveTab] = useState("products");
 
   // Location lock settings
   const [enableLocationLock, setEnableLocationLock] = useState(false);
@@ -86,7 +88,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     fetchData();
   }, [userId]);
 
-  // Apply Ocean preset when customization is enabled
   useEffect(() => {
     if (enableCustomization) {
       setQrStyle(oceanPresetStyle);
@@ -116,8 +117,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
       setCategories(categoriesRes.data || []);
       setProducts(productsRes.data || []);
-      
-      // Expand all categories by default
       setExpandedCategories(new Set((categoriesRes.data || []).map((c) => c.id)));
     } catch (error: any) {
       toast.error("Failed to load data");
@@ -134,11 +133,8 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
@@ -146,15 +142,11 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const toggleCategorySelection = (categoryId: string) => {
     const categoryProducts = getProductsByCategory(categoryId);
     const allSelected = categoryProducts.every((p) => selectedProducts.has(p.id));
-
     setSelectedProducts((prev) => {
       const next = new Set(prev);
       categoryProducts.forEach((p) => {
-        if (allSelected) {
-          next.delete(p.id);
-        } else {
-          next.add(p.id);
-        }
+        if (allSelected) next.delete(p.id);
+        else next.add(p.id);
       });
       return next;
     });
@@ -163,11 +155,8 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const toggleProductSelection = (productId: string) => {
     setSelectedProducts((prev) => {
       const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
       return next;
     });
   };
@@ -189,9 +178,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
   const calculateExpirationDate = (): string | null => {
     if (expiryOption === "none") return null;
-    
     const baseDate = new Date();
-    
     switch (expiryOption) {
       case "1h": return addHours(baseDate, 1).toISOString();
       case "24h": return addHours(baseDate, 24).toISOString();
@@ -207,17 +194,14 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
       toast.error("Please select at least one product");
       return;
     }
-
     if (enableLocationLock && !locationData) {
       toast.error("Please select a location for location-based access");
       return;
     }
-
     if (enablePassword && !password.trim()) {
       toast.error("Please enter a password");
       return;
     }
-
     if (expiryOption === "custom" && !customExpiryDate) {
       toast.error("Please select an expiry date");
       return;
@@ -230,7 +214,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
       const expiresAt = calculateExpirationDate();
       const passwordHash = enablePassword && password.trim() ? hashPassword(password.trim()) : null;
 
-      // Create QR business page
       const { data: pageData, error: pageError } = await supabase
         .from("qr_business_pages")
         .insert({
@@ -262,7 +245,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
       if (pageError) throw pageError;
 
-      // Add selected products to the page
       const productEntries = Array.from(selectedProducts).map((productId, index) => ({
         qr_page_id: pageData.id,
         product_id: productId,
@@ -275,7 +257,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
       if (productsError) throw productsError;
 
-      // Store the style used at generation time to lock it
       setGeneratedQR({ publicId, url: qrUrl, style: enableCustomization ? qrStyle : defaultQRStyle });
       toast.success("QR code generated successfully!");
     } catch (error: any) {
@@ -288,15 +269,9 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
   const handleDownload = async () => {
     if (!qrRef.current || !generatedQR) return;
-
     try {
       const canvas = qrRef.current.querySelector("canvas");
-      if (!canvas) {
-        toast.error("QR code not ready");
-        return;
-      }
-
-      // Create high-res version by default
+      if (!canvas) { toast.error("QR code not ready"); return; }
       const downloadCanvas = document.createElement("canvas");
       const scale = 4;
       downloadCanvas.width = canvas.width * scale;
@@ -307,7 +282,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         ctx.scale(scale, scale);
         ctx.drawImage(canvas, 0, 0);
       }
-
       const link = document.createElement("a");
       link.download = `business-qr-${generatedQR.publicId}.png`;
       link.href = downloadCanvas.toDataURL("image/png");
@@ -339,6 +313,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setCustomExpiryDate(undefined);
     setShowExpiryToVisitors(false);
     setBusinessInfo(defaultBusinessInfo);
+    setActiveTab("products");
   };
 
   const handleSaveStyle = async (name: string) => {
@@ -347,9 +322,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
   const handleLoadStyle = (styleId: string) => {
     const style = getStyleById(styleId);
-    if (style) {
-      setQrStyle({ ...defaultQRStyle, ...style.config });
-    }
+    if (style) setQrStyle({ ...defaultQRStyle, ...style.config });
   };
 
   if (isLoading) {
@@ -362,21 +335,17 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
 
   if (categories.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <p>Please create categories and add products first.</p>
-        </CardContent>
-      </Card>
+      <Card><CardContent className="py-12 text-center text-muted-foreground">
+        <p>Please create categories and add products first.</p>
+      </CardContent></Card>
     );
   }
 
   if (products.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <p>Please add products to your categories first.</p>
-        </CardContent>
-      </Card>
+      <Card><CardContent className="py-12 text-center text-muted-foreground">
+        <p>Please add products to your categories first.</p>
+      </CardContent></Card>
     );
   }
 
@@ -395,7 +364,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
                 style={generatedQR.style}
               />
             </div>
-
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg w-full">
               <Link className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <span className="text-xs sm:text-sm truncate flex-1">{generatedQR.url}</span>
@@ -403,22 +371,13 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
-
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
               <Button onClick={handleDownload} className="min-h-[44px]">
                 <Download className="w-4 h-4 mr-2" />
                 Download
               </Button>
-              <QRShareButton
-                qrCanvasId="business-qr-canvas"
-                title={qrTitle || "Business QR"}
-                url={generatedQR.url}
-              />
-              <Button
-                variant="secondary"
-                onClick={() => window.open(generatedQR.url, "_blank")}
-                className="min-h-[44px]"
-              >
+              <QRShareButton qrCanvasId="business-qr-canvas" title={qrTitle || "Business QR"} url={generatedQR.url} />
+              <Button variant="secondary" onClick={() => window.open(generatedQR.url, "_blank")} className="min-h-[44px]">
                 <Eye className="w-4 h-4 mr-2" />
                 Preview Page
               </Button>
@@ -432,280 +391,272 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     );
   }
 
+  // Determine if right panel should show
+  const showRightPanel = enableCustomization || enableLocationLock;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Product Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Select Products</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>QR Code Title (Optional)</Label>
-            <Input
-              value={qrTitle}
-              onChange={(e) => setQrTitle(e.target.value)}
-              placeholder="e.g., Summer Menu, New Collection"
-            />
-          </div>
+    <div className="space-y-6">
+      {/* Top Section: Products & Business Info in tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="products">Select Products</TabsTrigger>
+          <TabsTrigger value="business">Business Information</TabsTrigger>
+        </TabsList>
 
-          <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
-            {categories.map((category) => {
-              const categoryProducts = getProductsByCategory(category.id);
-              if (categoryProducts.length === 0) return null;
-
-              const isExpanded = expandedCategories.has(category.id);
-              const isSelected = isCategorySelected(category.id);
-              const isPartial = isCategoryPartiallySelected(category.id);
-
-              return (
-                <Collapsible
-                  key={category.id}
-                  open={isExpanded}
-                  onOpenChange={() => toggleCategory(category.id)}
-                >
-                  <div className="flex items-center gap-2 p-3 bg-muted/30">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleCategorySelection(category.id)}
-                      className={isPartial ? "data-[state=checked]:bg-primary/50" : ""}
-                    />
-                    <CollapsibleTrigger asChild>
-                      <button className="flex-1 flex items-center gap-2 text-left">
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                        <span className="font-medium">{category.name}</span>
-                        <span className="text-sm text-muted-foreground">
-                          ({categoryProducts.length})
-                        </span>
-                      </button>
-                    </CollapsibleTrigger>
-                  </div>
-                  <CollapsibleContent>
-                    <div className="divide-y">
-                      {categoryProducts.map((product) => (
-                        <label
-                          key={product.id}
-                          className="flex items-center gap-3 p-3 pl-10 hover:bg-muted/30 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={selectedProducts.has(product.id)}
-                            onCheckedChange={() => toggleProductSelection(product.id)}
-                          />
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-10 h-10 rounded object-cover"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {product.discount_price ? (
-                                <>
-                                  <span className="text-primary">₹{product.discount_price}</span>
-                                  <span className="line-through ml-1">₹{product.original_price}</span>
-                                </>
-                              ) : (
-                                <>₹{product.original_price}</>
-                              )}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {selectedProducts.size} product{selectedProducts.size !== 1 ? "s" : ""} selected
-            </span>
-            {selectedProducts.size > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedProducts(new Set())}>
-                Clear selection
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Business Info + QR Preview */}
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <BusinessInfoForm value={businessInfo} onChange={setBusinessInfo} userId={userId} />
-        </CardContent>
-      </Card>
-
-      {/* QR Code Preview & Settings */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">QR Code Preview</CardTitle>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="customize-toggle" className="text-sm">
-                Customize
-              </Label>
-              <Switch
-                id="customize-toggle"
-                checked={enableCustomization}
-                onCheckedChange={setEnableCustomization}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-            <div className="w-full max-w-[160px] sm:max-w-[200px]">
-              <CustomQRCode
-                id="business-qr-preview"
-                value={`${window.location.origin}/business/preview`}
-                style={enableCustomization ? qrStyle : defaultQRStyle}
-              />
-            </div>
-          </div>
-
-          {enableCustomization && (
-            <QRCustomizationPanel
-              value={qrStyle}
-              onChange={setQrStyle}
-              savedStyles={styles}
-              onSaveStyle={handleSaveStyle}
-              onLoadStyle={handleLoadStyle}
-            />
-          )}
-
-          {/* Password Protection */}
-          <div className="space-y-3 p-4 border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {enablePassword ? (
-                  <Lock className="w-4 h-4 text-primary" />
-                ) : (
-                  <LockOpen className="w-4 h-4 text-muted-foreground" />
-                )}
-                <Label>Password Protection</Label>
-              </div>
-              <Switch
-                checked={enablePassword}
-                onCheckedChange={setEnablePassword}
-              />
-            </div>
-            
-            {enablePassword && (
-              <div className="relative">
+        <TabsContent value="products" className="mt-4">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label>QR Code Title (Optional)</Label>
                 <Input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
+                  value={qrTitle}
+                  onChange={(e) => setQrTitle(e.target.value)}
+                  placeholder="e.g., Summer Menu, New Collection"
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
               </div>
-            )}
-          </div>
 
-          {/* Location Lock Option */}
-          <LocationPicker
-            enabled={enableLocationLock}
-            onEnabledChange={setEnableLocationLock}
-            location={locationData}
-            onLocationChange={setLocationData}
-          />
+              <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
+                {categories.map((category) => {
+                  const categoryProducts = getProductsByCategory(category.id);
+                  if (categoryProducts.length === 0) return null;
+                  const isExpanded = expandedCategories.has(category.id);
+                  const isSelected = isCategorySelected(category.id);
+                  const isPartial = isCategoryPartiallySelected(category.id);
 
-          {/* Expiry Settings */}
-          <div className="space-y-3 p-4 border rounded-lg">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <Label>QR Code Expiration</Label>
+                  return (
+                    <Collapsible key={category.id} open={isExpanded} onOpenChange={() => toggleCategory(category.id)}>
+                      <div className="flex items-center gap-2 p-3 bg-muted/30">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleCategorySelection(category.id)}
+                          className={isPartial ? "data-[state=checked]:bg-primary/50" : ""}
+                        />
+                        <CollapsibleTrigger asChild>
+                          <button className="flex-1 flex items-center gap-2 text-left">
+                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            <span className="font-medium">{category.name}</span>
+                            <span className="text-sm text-muted-foreground">({categoryProducts.length})</span>
+                          </button>
+                        </CollapsibleTrigger>
+                      </div>
+                      <CollapsibleContent>
+                        <div className="divide-y">
+                          {categoryProducts.map((product) => (
+                            <label key={product.id} className="flex items-center gap-3 p-3 pl-10 hover:bg-muted/30 cursor-pointer">
+                              <Checkbox checked={selectedProducts.has(product.id)} onCheckedChange={() => toggleProductSelection(product.id)} />
+                              <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{product.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {product.discount_price ? (
+                                    <>
+                                      <span className="text-primary">₹{product.discount_price}</span>
+                                      <span className="line-through ml-1">₹{product.original_price}</span>
+                                    </>
+                                  ) : (
+                                    <>₹{product.original_price}</>
+                                  )}
+                                </p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {selectedProducts.size} product{selectedProducts.size !== 1 ? "s" : ""} selected
+                </span>
+                {selectedProducts.size > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedProducts(new Set())}>
+                    Clear selection
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="business" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <BusinessInfoForm value={businessInfo} onChange={setBusinessInfo} userId={userId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Bottom Section: QR Preview (left) + Customization/Location (right) */}
+      <div className={`grid gap-6 ${showRightPanel ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
+        {/* QR Code Preview & Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">QR Code Preview</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
+              <div className="w-full max-w-[160px] sm:max-w-[200px]">
+                <CustomQRCode
+                  id="business-qr-preview"
+                  value={`${window.location.origin}/business/preview`}
+                  style={enableCustomization ? qrStyle : defaultQRStyle}
+                />
+              </div>
             </div>
 
-            <Select
-              value={expiryOption}
-              onValueChange={(value) => setExpiryOption(value as ExpiryOption)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Set expiration" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Never expires</SelectItem>
-                <SelectItem value="1h">Expire in 1 hour</SelectItem>
-                <SelectItem value="24h">Expire in 24 hours</SelectItem>
-                <SelectItem value="7d">Expire in 7 days</SelectItem>
-                <SelectItem value="30d">Expire in 30 days</SelectItem>
-                <SelectItem value="custom">Custom date</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Toggles */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <QrCode className="w-4 h-4 text-muted-foreground" />
+                  <Label>Customize QR</Label>
+                </div>
+                <Switch checked={enableCustomization} onCheckedChange={setEnableCustomization} />
+              </div>
 
-            {expiryOption === "custom" && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {customExpiryDate 
-                      ? format(customExpiryDate, "PPP") 
-                      : "Pick a date"
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customExpiryDate}
-                    onSelect={setCustomExpiryDate}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
+              {/* Password Protection */}
+              <div className="space-y-3 p-3 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {enablePassword ? <Lock className="w-4 h-4 text-primary" /> : <LockOpen className="w-4 h-4 text-muted-foreground" />}
+                    <Label>Password Protection</Label>
+                  </div>
+                  <Switch checked={enablePassword} onCheckedChange={setEnablePassword} />
+                </div>
+                {enablePassword && (
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => setShowPassword(!showPassword)}>
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Location Lock Toggle */}
+              <div className="p-3 border rounded-lg">
+                {!showRightPanel || !enableLocationLock ? (
+                  <LocationPicker
+                    enabled={enableLocationLock}
+                    onEnabledChange={setEnableLocationLock}
+                    location={locationData}
+                    onLocationChange={setLocationData}
                   />
-                </PopoverContent>
-              </Popover>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <Label>Location Lock</Label>
+                    </div>
+                    <Switch checked={enableLocationLock} onCheckedChange={setEnableLocationLock} />
+                  </div>
+                )}
+              </div>
+
+              {/* Expiry Settings */}
+              <div className="space-y-3 p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <Label>QR Code Expiration</Label>
+                </div>
+                <Select value={expiryOption} onValueChange={(value) => setExpiryOption(value as ExpiryOption)}>
+                  <SelectTrigger><SelectValue placeholder="Set expiration" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Never expires</SelectItem>
+                    <SelectItem value="1h">Expire in 1 hour</SelectItem>
+                    <SelectItem value="24h">Expire in 24 hours</SelectItem>
+                    <SelectItem value="7d">Expire in 7 days</SelectItem>
+                    <SelectItem value="30d">Expire in 30 days</SelectItem>
+                    <SelectItem value="custom">Custom date</SelectItem>
+                  </SelectContent>
+                </Select>
+                {expiryOption === "custom" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start">
+                        {customExpiryDate ? format(customExpiryDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent mode="single" selected={customExpiryDate} onSelect={setCustomExpiryDate} disabled={(date) => date < new Date()} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                )}
+                {expiryOption !== "none" && (
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="show-expiry" className="text-sm">Show countdown to visitors</Label>
+                    </div>
+                    <Switch id="show-expiry" checked={showExpiryToVisitors} onCheckedChange={setShowExpiryToVisitors} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Button onClick={handleGenerate} disabled={selectedProducts.size === 0 || isGenerating} className="w-full">
+              {isGenerating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Generate QR Code ({selectedProducts.size} products)
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Right Panel: Customization / Location Map */}
+        {showRightPanel && (
+          <div className="space-y-6">
+            {enableCustomization && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">QR Customization</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <QRCustomizationPanel
+                    value={qrStyle}
+                    onChange={setQrStyle}
+                    savedStyles={styles}
+                    onSaveStyle={handleSaveStyle}
+                    onLoadStyle={handleLoadStyle}
+                  />
+                </CardContent>
+              </Card>
             )}
 
-            {expiryOption !== "none" && (
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="show-expiry" className="text-sm">Show countdown to visitors</Label>
-                </div>
-                <Switch
-                  id="show-expiry"
-                  checked={showExpiryToVisitors}
-                  onCheckedChange={setShowExpiryToVisitors}
-                />
-              </div>
+            {enableLocationLock && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Location Lock</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <LocationPicker
+                    enabled={enableLocationLock}
+                    onEnabledChange={setEnableLocationLock}
+                    location={locationData}
+                    onLocationChange={setLocationData}
+                  />
+                </CardContent>
+              </Card>
             )}
           </div>
-
-          <Button
-            onClick={handleGenerate}
-            disabled={selectedProducts.size === 0 || isGenerating}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <QrCode className="w-4 h-4 mr-2" />
-                Generate QR Code
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 };
