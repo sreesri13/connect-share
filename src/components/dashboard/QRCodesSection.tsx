@@ -334,6 +334,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         updateData.location_name = null;
       }
 
+      // Handle starred item
+      updateData.starred_item_id = editStarredItemId || null;
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
