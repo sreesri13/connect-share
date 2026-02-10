@@ -56,6 +56,7 @@ interface QRPage {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  starred_item_id: string | null;
 }
 
 interface QRItem {
