@@ -674,7 +674,6 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     ) : (
                       <ul className="divide-y divide-border/50">
                         {category.items.map((item) => {
-                          const Icon = itemTypeIcons[item.type];
                           return (
                             <li
                               key={item.id}
@@ -689,9 +688,7 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                                 checked={selectedItems.has(item.id)}
                                 onCheckedChange={() => toggleItemSelection(item.id)}
                               />
-                              <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
-                                <Icon className="w-4 h-4 text-muted-foreground" />
-                              </div>
+                              <PlatformIcon type={item.type} content={item.content} size="md" />
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-foreground">{item.title}</p>
                                 <p className="text-sm text-muted-foreground truncate">{item.content}</p>
