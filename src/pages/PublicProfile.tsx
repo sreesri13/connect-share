@@ -474,7 +474,6 @@ const PublicProfile = () => {
               </h3>
               <div className="space-y-2">
                 {categoryItems.map((item, itemIndex) => {
-                  const Icon = typeIcons[item.type] || LinkIcon;
                   const isMedia = ["image", "video", "audio", "pdf"].includes(item.type);
                   return (
                     <motion.div
@@ -488,9 +487,7 @@ const PublicProfile = () => {
                         onClick={() => handleItemClick(item)}
                       >
                         <CardContent className="flex items-center gap-4 p-4">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                            <Icon className="w-5 h-5 text-primary" />
-                          </div>
+                          <PlatformIcon type={item.type} content={item.content} size="lg" className="group-hover:scale-110 transition-transform" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-foreground">{item.title}</p>
                             {item.type === "url" && (
