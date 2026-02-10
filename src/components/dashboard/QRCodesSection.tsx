@@ -134,6 +134,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           location_lng,
           location_name,
           is_deleted,
+          starred_item_id,
           qr_page_items (id)
         `)
         .eq("user_id", userId)
