@@ -848,7 +848,13 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
             {/* Items in QR Code */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Items in this QR Code ({qrItems.length})</Label>
+                <div>
+                  <Label>Items in this QR Code ({qrItems.length})</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <Star className="w-3 h-3 inline mr-1" />
+                    Star an item to directly open it on scan
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => { fetchProfileCategories(); setIsAddItemToQROpen(true); }}>
                     <Folder className="w-3 h-3 mr-1" />
@@ -864,13 +870,32 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                 {qrItems.map((item) => (
                   <div
                     key={item.qr_page_item_id}
-                    className={`flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30 ${dragQRItemId === item.qr_page_item_id ? "opacity-50" : ""}`}
+                    className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+                      editStarredItemId === item.id 
+                        ? "bg-amber-500/10 border-amber-500/30" 
+                        : "bg-secondary/30 border-border/30"
+                    } ${dragQRItemId === item.qr_page_item_id ? "opacity-50" : ""}`}
                     draggable
                     onDragStart={() => handleQRDragStart(item.qr_page_item_id)}
                     onDragOver={(e) => handleQRDragOver(e, item.qr_page_item_id)}
                     onDragEnd={handleQRDragEnd}
                   >
                     <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setEditStarredItemId(editStarredItemId === item.id ? null : item.id)}
+                      className="p-0.5 rounded hover:bg-secondary transition-colors flex-shrink-0"
+                      title={editStarredItemId === item.id ? "Remove star" : "Star (direct open on scan)"}
+                    >
+                      <Star 
+                        className={`w-4 h-4 transition-colors ${
+                          editStarredItemId === item.id 
+                            ? "text-amber-500 fill-amber-500" 
+                            : "text-muted-foreground"
+                        }`} 
+                      />
+                    </button>
+                    <PlatformIcon type={item.type} content={item.content} size="sm" />
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.content}</p>
