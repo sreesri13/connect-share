@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
   Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
-  Folder, LinkIcon, FileText, Image, Video, Music, File
+  Folder, LinkIcon, FileText, Image, Video, Music, File, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
