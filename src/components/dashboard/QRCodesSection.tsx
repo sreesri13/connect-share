@@ -276,6 +276,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     );
     setEditExpiryExtension("none");
     setEditCustomExpiryDate(undefined);
+    setEditStarredItemId(qrPage.starred_item_id || null);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
