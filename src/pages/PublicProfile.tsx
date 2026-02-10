@@ -54,6 +54,19 @@ const typeIcons: Record<string, React.ComponentType<any>> = {
   others: File,
 };
 
+// Helper to handle starred item redirect
+const handleStarredRedirect = (item: ProfileItem) => {
+  if (item.type === "url") {
+    let url = item.content;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    window.location.href = url;
+    return true;
+  }
+  return false;
+};
+
 const PublicProfile = () => {
   const { profileId } = useParams<{ profileId: string }>();
   const [isLoading, setIsLoading] = useState(true);
