@@ -1,0 +1,1 @@
+ALTER TABLE public.qr_pages ADD COLUMN starred_item_id UUID NULL REFERENCES public.items(id) ON DELETE SET NULL;

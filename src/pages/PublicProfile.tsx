@@ -15,6 +15,7 @@ import { LocationVerification } from "@/components/qr/LocationVerification";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { recordQRScan } from "@/hooks/useQRScans";
 import { FileViewer } from "@/components/FileViewer";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface ProfileItem {
   id: string;
@@ -40,6 +41,7 @@ interface QRPageData {
   location_name: string | null;
   expires_at: string | null;
   show_expires_at: boolean | null;
+  starred_item_id: string | null;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
@@ -50,6 +52,19 @@ const typeIcons: Record<string, React.ComponentType<any>> = {
   video: Video,
   audio: Music,
   others: File,
+};
+
+// Helper to handle starred item redirect
+const handleStarredRedirect = (item: ProfileItem) => {
+  if (item.type === "url") {
+    let url = item.content;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    window.location.href = url;
+    return true;
+  }
+  return false;
 };
 
 const PublicProfile = () => {
@@ -89,7 +104,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -211,6 +226,29 @@ const PublicProfile = () => {
         content: qpItem.items.content,
         category_name: qpItem.items.categories?.name || "Unknown",
       }));
+
+      // Check for starred item - redirect directly
+      if (qrPage.starred_item_id) {
+        const starredItem = formattedItems.find((item: ProfileItem) => item.id === qrPage.starred_item_id);
+        if (starredItem) {
+          if (starredItem.type === "url") {
+            let url = starredItem.content;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://' + url;
+            }
+            window.location.href = url;
+            return;
+          } else {
+            // For file types, show only that item
+            setItems([starredItem]);
+            setProfile(profileData);
+            setIsLoading(false);
+            // Auto-open the file viewer
+            setSelectedItem(starredItem);
+            return;
+          }
+        }
+      }
 
       setItems(formattedItems);
     } catch (err) {
@@ -436,7 +474,6 @@ const PublicProfile = () => {
               </h3>
               <div className="space-y-2">
                 {categoryItems.map((item, itemIndex) => {
-                  const Icon = typeIcons[item.type] || LinkIcon;
                   const isMedia = ["image", "video", "audio", "pdf"].includes(item.type);
                   return (
                     <motion.div
@@ -450,9 +487,7 @@ const PublicProfile = () => {
                         onClick={() => handleItemClick(item)}
                       >
                         <CardContent className="flex items-center gap-4 p-4">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                            <Icon className="w-5 h-5 text-primary" />
-                          </div>
+                          <PlatformIcon type={item.type} content={item.content} size="lg" className="group-hover:scale-110 transition-transform" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-foreground">{item.title}</p>
                             {item.type === "url" && (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, MapPin, Users } from "lucide-react";
+import { QrCode, Download, Copy, ArrowLeft, Check, ExternalLink, Share2, Lock, Eye, EyeOff, Clock, Calendar, Palette, MapPin, Users, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
 import { defaultQRStyle, oceanPresetStyle } from "@/lib/qr-styles";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface ItemWithCategory {
   id: string;
@@ -63,6 +64,9 @@ const QRGenerator = () => {
   // Location lock settings
   const [enableLocationLock, setEnableLocationLock] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
+
+  // Star item (direct redirect on scan)
+  const [starredItemId, setStarredItemId] = useState<string | null>(null);
 
   // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
@@ -187,6 +191,7 @@ const QRGenerator = () => {
           location_lat: locationData?.lat || null,
           location_lng: locationData?.lng || null,
           location_name: locationData?.name || null,
+          starred_item_id: starredItemId || null,
         })
         .select()
         .single();
@@ -621,6 +626,12 @@ const QRGenerator = () => {
                   <Share2 className="w-5 h-5 text-primary" />
                   Shared Content ({selectedItems.length} items)
                 </CardTitle>
+                {!qrPageId && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <Star className="w-3 h-3 inline mr-1" />
+                    Star an item to directly open it when QR is scanned
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-4 max-h-[500px] overflow-y-auto">
                 {Object.entries(groupedItems).map(([categoryName, items]) => (
@@ -630,16 +641,37 @@ const QRGenerator = () => {
                       {items.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30"
+                          className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                            starredItemId === item.id 
+                              ? "bg-amber-500/10 border-amber-500/30" 
+                              : "bg-secondary/30 border-border/30"
+                          }`}
                         >
-                          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
-                            <QrCode className="w-4 h-4 text-primary" />
-                          </div>
+                          <PlatformIcon type={item.type} content={item.content} size="sm" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm text-foreground">{item.title}</p>
                             <p className="text-xs text-muted-foreground truncate">{item.content}</p>
                           </div>
-                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary text-muted-foreground uppercase">
+                          {!qrPageId && (
+                            <button
+                              type="button"
+                              onClick={() => setStarredItemId(starredItemId === item.id ? null : item.id)}
+                              className="p-1 rounded hover:bg-secondary transition-colors flex-shrink-0"
+                              title={starredItemId === item.id ? "Remove star" : "Star this item (direct open on scan)"}
+                            >
+                              <Star 
+                                className={`w-4 h-4 transition-colors ${
+                                  starredItemId === item.id 
+                                    ? "text-amber-500 fill-amber-500" 
+                                    : "text-muted-foreground"
+                                }`} 
+                              />
+                            </button>
+                          )}
+                          {qrPageId && starredItemId === item.id && (
+                            <Star className="w-4 h-4 text-amber-500 fill-amber-500 flex-shrink-0" />
+                          )}
+                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary text-muted-foreground uppercase flex-shrink-0">
                             {item.type}
                           </span>
                         </li>

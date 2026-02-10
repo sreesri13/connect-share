@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
   Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
-  Folder, LinkIcon, FileText, Image, Video, Music, File
+  Folder, LinkIcon, FileText, Image, Video, Music, File, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours, addMonths } from "date-fns";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface QRPage {
   id: string;
@@ -55,6 +56,7 @@ interface QRPage {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  starred_item_id: string | null;
 }
 
 interface QRItem {
@@ -111,6 +113,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
+  // Star item state
+  const [editStarredItemId, setEditStarredItemId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchQRPages();
   }, [userId]);
@@ -132,6 +137,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           location_lng,
           location_name,
           is_deleted,
+          starred_item_id,
           qr_page_items (id)
         `)
         .eq("user_id", userId)
@@ -153,6 +159,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         location_lat: page.location_lat,
         location_lng: page.location_lng,
         location_name: page.location_name,
+        starred_item_id: page.starred_item_id || null,
       }));
 
       setQrPages(pages);
@@ -269,6 +276,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     );
     setEditExpiryExtension("none");
     setEditCustomExpiryDate(undefined);
+    setEditStarredItemId(qrPage.starred_item_id || null);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
@@ -326,6 +334,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         updateData.location_name = null;
       }
 
+      // Handle starred item
+      updateData.starred_item_id = editStarredItemId || null;
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
@@ -344,6 +355,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+              starred_item_id: editStarredItemId || null,
             }
           : p
       ));
@@ -628,6 +640,12 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                             Location
                           </Badge>
                         )}
+                        {page.starred_item_id && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Star className="w-3 h-3 mr-1 fill-amber-500 text-amber-500" />
+                            Starred
+                          </Badge>
+                        )}
                         {page.expires_at && (
                           <Badge 
                             variant={isExpired(page.expires_at) ? "destructive" : "secondary"} 
@@ -836,7 +854,13 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
             {/* Items in QR Code */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Items in this QR Code ({qrItems.length})</Label>
+                <div>
+                  <Label>Items in this QR Code ({qrItems.length})</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <Star className="w-3 h-3 inline mr-1" />
+                    Star an item to directly open it on scan
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => { fetchProfileCategories(); setIsAddItemToQROpen(true); }}>
                     <Folder className="w-3 h-3 mr-1" />
@@ -852,13 +876,32 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                 {qrItems.map((item) => (
                   <div
                     key={item.qr_page_item_id}
-                    className={`flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30 ${dragQRItemId === item.qr_page_item_id ? "opacity-50" : ""}`}
+                    className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+                      editStarredItemId === item.id 
+                        ? "bg-amber-500/10 border-amber-500/30" 
+                        : "bg-secondary/30 border-border/30"
+                    } ${dragQRItemId === item.qr_page_item_id ? "opacity-50" : ""}`}
                     draggable
                     onDragStart={() => handleQRDragStart(item.qr_page_item_id)}
                     onDragOver={(e) => handleQRDragOver(e, item.qr_page_item_id)}
                     onDragEnd={handleQRDragEnd}
                   >
                     <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setEditStarredItemId(editStarredItemId === item.id ? null : item.id)}
+                      className="p-0.5 rounded hover:bg-secondary transition-colors flex-shrink-0"
+                      title={editStarredItemId === item.id ? "Remove star" : "Star (direct open on scan)"}
+                    >
+                      <Star 
+                        className={`w-4 h-4 transition-colors ${
+                          editStarredItemId === item.id 
+                            ? "text-amber-500 fill-amber-500" 
+                            : "text-muted-foreground"
+                        }`} 
+                      />
+                    </button>
+                    <PlatformIcon type={item.type} content={item.content} size="sm" />
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.content}</p>
