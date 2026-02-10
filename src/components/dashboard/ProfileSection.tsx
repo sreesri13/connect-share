@@ -62,15 +62,7 @@ interface Category {
   display_order: number;
 }
 
-const itemTypeIcons: Record<Item["type"], any> = {
-  url: LinkIcon,
-  text: FileText,
-  pdf: File,
-  image: Image,
-  video: Video,
-  audio: Music,
-  others: File,
-};
+// Platform icons are now handled by PlatformIcon component
 
 interface ProfileSectionProps {
   userId: string;
