@@ -41,6 +41,7 @@ import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours, addMonths } from "date-fns";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface QRPage {
   id: string;
