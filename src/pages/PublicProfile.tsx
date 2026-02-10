@@ -227,6 +227,29 @@ const PublicProfile = () => {
         category_name: qpItem.items.categories?.name || "Unknown",
       }));
 
+      // Check for starred item - redirect directly
+      if (qrPage.starred_item_id) {
+        const starredItem = formattedItems.find((item: ProfileItem) => item.id === qrPage.starred_item_id);
+        if (starredItem) {
+          if (starredItem.type === "url") {
+            let url = starredItem.content;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://' + url;
+            }
+            window.location.href = url;
+            return;
+          } else {
+            // For file types, show only that item
+            setItems([starredItem]);
+            setProfile(profileData);
+            setIsLoading(false);
+            // Auto-open the file viewer
+            setSelectedItem(starredItem);
+            return;
+          }
+        }
+      }
+
       setItems(formattedItems);
     } catch (err) {
       console.error(err);
