@@ -191,6 +191,7 @@ const QRGenerator = () => {
           location_lat: locationData?.lat || null,
           location_lng: locationData?.lng || null,
           location_name: locationData?.name || null,
+          starred_item_id: starredItemId || null,
         })
         .select()
         .single();
