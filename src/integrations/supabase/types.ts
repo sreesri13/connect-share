@@ -382,6 +382,7 @@ export type Database = {
           password_hash: string | null
           public_id: string
           show_expires_at: boolean | null
+          starred_item_id: string | null
           style_config: Json | null
           style_id: string | null
           title: string | null
@@ -400,6 +401,7 @@ export type Database = {
           password_hash?: string | null
           public_id: string
           show_expires_at?: boolean | null
+          starred_item_id?: string | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
@@ -418,12 +420,20 @@ export type Database = {
           password_hash?: string | null
           public_id?: string
           show_expires_at?: boolean | null
+          starred_item_id?: string | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "qr_pages_starred_item_id_fkey"
+            columns: ["starred_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "qr_pages_style_id_fkey"
             columns: ["style_id"]
