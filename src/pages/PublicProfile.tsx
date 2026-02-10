@@ -41,6 +41,7 @@ interface QRPageData {
   location_name: string | null;
   expires_at: string | null;
   show_expires_at: boolean | null;
+  starred_item_id: string | null;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
