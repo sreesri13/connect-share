@@ -20,6 +20,7 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
 import { defaultQRStyle, oceanPresetStyle } from "@/lib/qr-styles";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface ItemWithCategory {
   id: string;
