@@ -640,6 +640,12 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                             Location
                           </Badge>
                         )}
+                        {page.starred_item_id && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Star className="w-3 h-3 mr-1 fill-amber-500 text-amber-500" />
+                            Starred
+                          </Badge>
+                        )}
                         {page.expires_at && (
                           <Badge 
                             variant={isExpired(page.expires_at) ? "destructive" : "secondary"} 
