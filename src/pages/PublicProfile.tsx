@@ -15,6 +15,7 @@ import { LocationVerification } from "@/components/qr/LocationVerification";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { recordQRScan } from "@/hooks/useQRScans";
 import { FileViewer } from "@/components/FileViewer";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface ProfileItem {
   id: string;
