@@ -65,6 +65,9 @@ const QRGenerator = () => {
   const [enableLocationLock, setEnableLocationLock] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
 
+  // Star item (direct redirect on scan)
+  const [starredItemId, setStarredItemId] = useState<string | null>(null);
+
   // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
     if (enableCustomization) {
