@@ -156,6 +156,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         location_lat: page.location_lat,
         location_lng: page.location_lng,
         location_name: page.location_name,
+        starred_item_id: page.starred_item_id || null,
       }));
 
       setQrPages(pages);
