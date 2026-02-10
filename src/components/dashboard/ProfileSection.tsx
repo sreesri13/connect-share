@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
 import { FileViewer } from "@/components/FileViewer";
 import { useNavigate } from "react-router-dom";
+import { PlatformIcon } from "@/lib/platform-icons";
 
 interface Item {
   id: string;
