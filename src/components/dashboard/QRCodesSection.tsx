@@ -113,6 +113,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
+  // Star item state
+  const [editStarredItemId, setEditStarredItemId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchQRPages();
   }, [userId]);
