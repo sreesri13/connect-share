@@ -355,6 +355,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+              starred_item_id: editStarredItemId || null,
             }
           : p
       ));
