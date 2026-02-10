@@ -3,12 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Folder,
-  Link as LinkIcon,
-  FileText,
-  Image,
-  Video,
-  Music,
-  File,
   MoreVertical,
   Edit2,
   Trash2,
