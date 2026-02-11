@@ -868,6 +868,7 @@ const BusinessPage = () => {
         <BusinessInstallPrompt
           businessName={pageData.business_name || pageTitle || "Store"}
           logoUrl={pageData.business_logo_url}
+          pageUrl={`/b/${publicId}`}
         />
       )}
     </div>
