@@ -16,12 +16,90 @@ interface BeforeInstallPromptEvent extends Event {
 interface BusinessInstallPromptProps {
   businessName: string;
   logoUrl?: string | null;
+  pageUrl?: string;
 }
 
-export const BusinessInstallPrompt = ({ businessName, logoUrl }: BusinessInstallPromptProps) => {
+// Dynamically inject a manifest for this specific business page
+const injectDynamicManifest = (businessName: string, logoUrl: string | null | undefined, pageUrl: string) => {
+  // Remove any existing manifest link
+  const existingManifest = document.querySelector('link[rel="manifest"]');
+  if (existingManifest) {
+    existingManifest.remove();
+  }
+
+  const icons: any[] = [];
+
+  if (logoUrl) {
+    // Use the business logo as the app icon
+    icons.push(
+      { src: logoUrl, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: logoUrl, sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "maskable" }
+    );
+  } else {
+    // Fallback to default icons
+    icons.push(
+      { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" }
+    );
+  }
+
+  const manifest = {
+    name: businessName,
+    short_name: businessName.length > 12 ? businessName.substring(0, 12) : businessName,
+    description: `Shop at ${businessName}`,
+    theme_color: "#7C3AED",
+    background_color: "#0F0F23",
+    display: "standalone",
+    orientation: "portrait-primary",
+    scope: pageUrl,
+    start_url: pageUrl,
+    icons,
+  };
+
+  const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+  const manifestUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement("link");
+  link.rel = "manifest";
+  link.href = manifestUrl;
+  document.head.appendChild(link);
+
+  // Also update page title and meta tags
+  document.title = businessName;
+
+  // Update apple-mobile-web-app-title
+  let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if (appleMeta) {
+    appleMeta.setAttribute("content", businessName);
+  }
+
+  // Update apple-touch-icon if logo available
+  if (logoUrl) {
+    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (appleIcon) {
+      appleIcon.setAttribute("href", logoUrl);
+    }
+  }
+
+  return () => {
+    URL.revokeObjectURL(manifestUrl);
+  };
+};
+
+export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: BusinessInstallPromptProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+
+  // Inject dynamic manifest on mount
+  useEffect(() => {
+    const currentUrl = pageUrl || window.location.pathname;
+    const fullUrl = `${window.location.origin}${currentUrl}`;
+    const cleanup = injectDynamicManifest(businessName, logoUrl, fullUrl);
+    return cleanup;
+  }, [businessName, logoUrl, pageUrl]);
 
   useEffect(() => {
     if (window.matchMedia("(display-mode: standalone)").matches) {

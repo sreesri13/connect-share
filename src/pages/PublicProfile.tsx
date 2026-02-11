@@ -75,6 +75,7 @@ const PublicProfile = () => {
   const [items, setItems] = useState<ProfileItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
   const [qrPageData, setQrPageData] = useState<QRPageData | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -232,11 +233,12 @@ const PublicProfile = () => {
         const starredItem = formattedItems.find((item: ProfileItem) => item.id === qrPage.starred_item_id);
         if (starredItem) {
           if (starredItem.type === "url") {
+            setIsRedirecting(true);
             let url = starredItem.content;
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'https://' + url;
             }
-            window.location.href = url;
+            window.location.replace(url);
             return;
           } else {
             // For file types, show only that item
@@ -375,6 +377,11 @@ const PublicProfile = () => {
         </motion.div>
       </div>
     );
+  }
+
+  // When redirecting to a starred URL, show nothing
+  if (isRedirecting) {
+    return null;
   }
 
   if (isLoading) {

@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
+        navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
             // Cache First for static assets (UI, fonts, icons)
