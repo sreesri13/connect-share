@@ -87,6 +87,36 @@ const BusinessPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+
+  // In standalone mode, lock all navigation to this business page only
+  useEffect(() => {
+    if (!isStandalone) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (!href) return;
+
+      // Allow same-page anchors
+      if (href.startsWith("#")) return;
+
+      // Block all navigation - this installed app should only show this business page
+      try {
+        const url = new URL(href, window.location.origin);
+        const currentPath = `/business/${publicId}`;
+        if (url.origin === window.location.origin && url.pathname === currentPath) return;
+      } catch {}
+
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [isStandalone, publicId]);
+
   useEffect(() => {
     initGA();
     if (publicId) {
