@@ -20,7 +20,7 @@ interface BusinessInstallPromptProps {
 }
 
 // Dynamically inject a manifest for this specific business page
-const injectDynamicManifest = (businessName: string, logoUrl: string | null | undefined, pageUrl: string) => {
+const injectDynamicManifest = (businessName: string, logoUrl: string | null | undefined, pagePath: string) => {
   // Remove any existing manifest link
   const existingManifest = document.querySelector('link[rel="manifest"]');
   if (existingManifest) {
@@ -30,7 +30,6 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
   const icons: any[] = [];
 
   if (logoUrl) {
-    // Use the business logo as the app icon
     icons.push(
       { src: logoUrl, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "any" },
@@ -38,13 +37,14 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
       { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "maskable" }
     );
   } else {
-    // Fallback to default icons
     icons.push(
       { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" }
     );
   }
 
+  // Use "/" as scope so the service worker can serve index.html for the SPA route
+  // but start_url points to the specific business page
   const manifest = {
     name: businessName,
     short_name: businessName.length > 12 ? businessName.substring(0, 12) : businessName,
@@ -53,8 +53,8 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
     background_color: "#0F0F23",
     display: "standalone",
     orientation: "portrait-primary",
-    scope: pageUrl,
-    start_url: pageUrl,
+    scope: "/",
+    start_url: pagePath,
     icons,
   };
 
@@ -95,9 +95,8 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
 
   // Inject dynamic manifest on mount
   useEffect(() => {
-    const currentUrl = pageUrl || window.location.pathname;
-    const fullUrl = `${window.location.origin}${currentUrl}`;
-    const cleanup = injectDynamicManifest(businessName, logoUrl, fullUrl);
+    const currentPath = pageUrl || window.location.pathname;
+    const cleanup = injectDynamicManifest(businessName, logoUrl, currentPath);
     return cleanup;
   }, [businessName, logoUrl, pageUrl]);
 
