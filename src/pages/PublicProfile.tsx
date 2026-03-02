@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play, Wifi, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ const typeIcons: Record<string, React.ComponentType<any>> = {
   video: Video,
   audio: Music,
   others: File,
+  wifi: Wifi,
 };
 
 // Helper to handle starred item redirect
@@ -261,6 +262,33 @@ const PublicProfile = () => {
     }
   };
 
+  // WiFi dialog state
+  const [wifiItem, setWifiItem] = useState<ProfileItem | null>(null);
+  const [wifiCopied, setWifiCopied] = useState("");
+
+  const parseWifi = (content: string) => {
+    const ssidMatch = content.match(/S:([^;]*)/);
+    const passMatch = content.match(/P:([^;]*)/);
+    const typeMatch = content.match(/T:([^;]*)/);
+    const hiddenMatch = content.match(/H:([^;]*)/);
+    return {
+      ssid: ssidMatch?.[1] || "",
+      password: passMatch?.[1] || "",
+      encryption: typeMatch?.[1] || "WPA",
+      hidden: hiddenMatch?.[1] === "true",
+    };
+  };
+
+  const handleCopyWifiField = async (value: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setWifiCopied(field);
+      setTimeout(() => setWifiCopied(""), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
   const handleItemClick = (item: ProfileItem) => {
     // Track link click for analytics
     trackLinkClick(
@@ -270,21 +298,23 @@ const PublicProfile = () => {
       profileId
     );
 
+    if (item.type === "wifi") {
+      setWifiItem(item);
+      return;
+    }
+
     if (item.type === "url") {
       // Ensure URL has protocol
       let url = item.content;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
-      // Open URL in a new browser window/tab - use window.open with popup approach for better compatibility
       const newWindow = window.open(url, "_blank", "noopener,noreferrer");
       if (!newWindow) {
-        // Fallback: copy URL and notify user
         navigator.clipboard.writeText(url);
         toast.info("Link copied! Open it in a new tab.");
       }
     } else {
-      // Open all file types in the FileViewer modal
       setSelectedItem(item);
     }
   };
@@ -503,6 +533,9 @@ const PublicProfile = () => {
                             {item.type === "text" && (
                               <p className="text-sm text-muted-foreground">Click to view</p>
                             )}
+                            {item.type === "wifi" && (
+                              <p className="text-sm text-muted-foreground">Tap to connect</p>
+                            )}
                             {isMedia && item.type !== "pdf" && (
                               <p className="text-sm text-muted-foreground">Click to view</p>
                             )}
@@ -512,6 +545,9 @@ const PublicProfile = () => {
                           </div>
                           {(item.type === "url" || item.type === "pdf") && (
                             <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          )}
+                          {item.type === "wifi" && (
+                            <Wifi className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                           )}
                           {["image", "video", "audio"].includes(item.type) && (
                             <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -543,6 +579,57 @@ const PublicProfile = () => {
         </motion.div>
       </motion.div>
 
+      {/* WiFi Credentials Dialog */}
+      <Dialog open={!!wifiItem} onOpenChange={(open) => !open && setWifiItem(null)}>
+        <DialogContent className="sm:max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wifi className="w-5 h-5 text-primary" />
+              {wifiItem?.title || "WiFi Network"}
+            </DialogTitle>
+            <DialogDescription>
+              Connect to this WiFi network
+            </DialogDescription>
+          </DialogHeader>
+          {wifiItem && (() => {
+            const wifi = parseWifi(wifiItem.content);
+            return (
+              <div className="space-y-4 mt-2">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Network Name</p>
+                      <p className="font-medium text-foreground">{wifi.ssid}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyWifiField(wifi.ssid, "ssid")}>
+                      {wifiCopied === "ssid" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  {wifi.encryption !== "nopass" && wifi.password && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Password</p>
+                        <p className="font-medium text-foreground font-mono">{wifi.password}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyWifiField(wifi.password, "password")}>
+                        {wifiCopied === "password" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Security</p>
+                    <p className="text-sm text-foreground">{wifi.encryption === "nopass" ? "Open (No Password)" : wifi.encryption}</p>
+                  </div>
+                  {wifi.hidden && (
+                    <p className="text-xs text-muted-foreground italic">This is a hidden network</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* File Viewer Modal - Supports all file types */}
       <FileViewer
         isOpen={!!selectedItem}
@@ -550,7 +637,7 @@ const PublicProfile = () => {
         file={selectedItem ? {
           title: selectedItem.title,
           content: selectedItem.content,
-          type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others"
+          type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi"
         } : null}
       />
     </div>

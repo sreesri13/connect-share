@@ -30,7 +30,7 @@ interface FileViewerProps {
   file: {
     title: string;
     content: string; // URL to the file
-    type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others";
+    type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
   } | null;
 }
 

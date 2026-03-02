@@ -15,6 +15,7 @@ import {
   Smartphone,
   Globe,
   Code,
+  Wifi,
 } from "lucide-react";
 
 interface PlatformInfo {
@@ -366,6 +367,10 @@ export function getItemIcon(
     others: {
       icon: <File className="w-full h-full" />,
       color: "#757575",
+    },
+    wifi: {
+      icon: <Wifi className="w-full h-full" />,
+      color: "#00ACC1",
     },
   };
 

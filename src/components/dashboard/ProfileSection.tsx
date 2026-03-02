@@ -44,16 +44,46 @@ import { FileUpload } from "@/components/FileUpload";
 import { FileViewer } from "@/components/FileViewer";
 import { useNavigate } from "react-router-dom";
 import { PlatformIcon } from "@/lib/platform-icons";
+import { WifiInput } from "@/components/dashboard/WifiInput";
 
 interface Item {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
   content: string;
   selected: boolean;
   category_id: string;
   display_order: number;
 }
+
+// Helper to auto-generate title from URL or filename
+const generateAutoTitle = (type: Item["type"], content: string): string => {
+  if (!content) return "";
+  if (type === "url") {
+    try {
+      const url = new URL(content.startsWith("http") ? content : `https://${content}`);
+      return url.hostname.replace(/^www\./, "");
+    } catch {
+      return content.substring(0, 50);
+    }
+  }
+  if (type === "wifi") {
+    // Parse SSID from wifi content
+    const ssidMatch = content.match(/S:([^;]*)/);
+    return ssidMatch ? ssidMatch[1] : "WiFi Network";
+  }
+  // For file uploads, extract filename from URL
+  try {
+    const url = new URL(content);
+    const path = url.pathname;
+    const filename = decodeURIComponent(path.split("/").pop() || "");
+    // Remove UUID prefix if present (supabase storage pattern)
+    const cleanName = filename.replace(/^[a-f0-9-]{36,}_?/, "");
+    return cleanName || filename;
+  } catch {
+    return content.substring(0, 50);
+  }
+};
 
 interface Category {
   id: string;
@@ -164,13 +194,23 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
   };
 
   const handleAddItem = async () => {
-    if (!selectedCategoryId || !newItem.title.trim() || !newItem.content.trim()) {
-      toast.error("Please fill in all fields");
+    if (!selectedCategoryId || !newItem.content.trim()) {
+      toast.error("Please fill in the content");
+      return;
+    }
+
+    // Auto-generate title if not provided
+    const itemTitle = newItem.title.trim() || generateAutoTitle(newItem.type, newItem.content.trim());
+    if (!itemTitle) {
+      toast.error("Please provide a title");
       return;
     }
 
     const category = categories.find((c) => c.id === selectedCategoryId);
     if (!category) return;
+
+    // Map the stored type - "other_files" UI option stores as "others"
+    const storedType = newItem.type;
 
     try {
       const { data, error } = await supabase
@@ -178,8 +218,8 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
         .insert({
           user_id: userId,
           category_id: selectedCategoryId,
-          title: newItem.title.trim(),
-          type: newItem.type,
+          title: itemTitle,
+          type: storedType,
           content: newItem.content.trim(),
           display_order: category.items.length,
         })
@@ -495,19 +535,25 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     <SelectItem value="url">URL</SelectItem>
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="pdf">PDF</SelectItem>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="audio">Audio (MP3)</SelectItem>
-                    <SelectItem value="others">Others (Any File)</SelectItem>
+                    <SelectItem value="wifi">WiFi</SelectItem>
+                    <SelectItem value="others">Other Files (Image, Video, Audio, etc.)</SelectItem>
                   </SelectContent>
                 </Select>
 
-                {["pdf", "image", "video", "audio", "others"].includes(newItem.type) ? (
+                {newItem.type === "wifi" ? (
+                  <WifiInput
+                    value={newItem.content}
+                    onChange={(val) => setNewItem({ ...newItem, content: val })}
+                  />
+                ) : ["pdf", "others"].includes(newItem.type) ? (
                   <FileUpload
-                    type={newItem.type as "pdf" | "image" | "video" | "audio" | "others"}
+                    type={newItem.type as "pdf" | "others"}
                     userId={userId}
                     value={newItem.content}
-                    onUploadComplete={(url) => setNewItem({ ...newItem, content: url })}
+                    onUploadComplete={(url) => {
+                      const autoTitle = newItem.title.trim() ? newItem.title : generateAutoTitle(newItem.type, url);
+                      setNewItem({ ...newItem, content: url, title: autoTitle });
+                    }}
                   />
                 ) : newItem.type === "text" ? (
                   <Textarea
@@ -520,7 +566,16 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   <Input
                     placeholder="https://..."
                     value={newItem.content}
-                    onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
+                    onChange={(e) => {
+                      const content = e.target.value;
+                      const autoTitle = newItem.title.trim() ? newItem.title : "";
+                      setNewItem({ ...newItem, content, title: autoTitle });
+                    }}
+                    onBlur={() => {
+                      if (!newItem.title.trim() && newItem.content.trim()) {
+                        setNewItem(prev => ({ ...prev, title: generateAutoTitle(prev.type, prev.content) }));
+                      }
+                    }}
                     className="min-h-[44px]"
                   />
                 )}
@@ -765,16 +820,19 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                   <SelectItem value="url">URL</SelectItem>
                   <SelectItem value="text">Text</SelectItem>
                   <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="image">Image</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="audio">Audio (MP3)</SelectItem>
-                  <SelectItem value="others">Others (Any File)</SelectItem>
+                  <SelectItem value="wifi">WiFi</SelectItem>
+                  <SelectItem value="others">Other Files (Image, Video, Audio, etc.)</SelectItem>
                 </SelectContent>
               </Select>
 
-              {["pdf", "image", "video", "audio", "others"].includes(editingItem.type) ? (
+              {editingItem.type === "wifi" ? (
+                <WifiInput
+                  value={editingItem.content}
+                  onChange={(val) => setEditingItem({ ...editingItem, content: val })}
+                />
+              ) : ["pdf", "others"].includes(editingItem.type) ? (
                 <FileUpload
-                  type={editingItem.type as "pdf" | "image" | "video" | "audio" | "others"}
+                  type={editingItem.type as "pdf" | "others"}
                   userId={userId}
                   value={editingItem.content}
                   onUploadComplete={(url) => setEditingItem({ ...editingItem, content: url })}

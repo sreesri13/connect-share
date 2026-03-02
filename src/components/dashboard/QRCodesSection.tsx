@@ -62,7 +62,7 @@ interface QRPage {
 interface QRItem {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
   content: string;
   qr_page_item_id: string;
 }
