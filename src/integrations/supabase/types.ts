@@ -596,7 +596,15 @@ export type Database = {
       }
     }
     Enums: {
-      item_type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others"
+      item_type:
+        | "url"
+        | "text"
+        | "pdf"
+        | "image"
+        | "video"
+        | "audio"
+        | "others"
+        | "wifi"
       product_status: "active" | "disabled"
     }
     CompositeTypes: {
@@ -725,7 +733,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      item_type: ["url", "text", "pdf", "image", "video", "audio", "others"],
+      item_type: [
+        "url",
+        "text",
+        "pdf",
+        "image",
+        "video",
+        "audio",
+        "others",
+        "wifi",
+      ],
       product_status: ["active", "disabled"],
     },
   },
