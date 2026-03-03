@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
   Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
-  Folder, LinkIcon, FileText, Image, Video, Music, File, Star
+  Folder, LinkIcon, FileText, Image, Video, Music, File, Star, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,6 +57,7 @@ interface QRPage {
   location_lng: number | null;
   location_name: string | null;
   starred_item_id: string | null;
+  scan_count: number;
 }
 
 interface QRItem {
@@ -146,6 +147,21 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
       if (error) throw error;
 
+      // Fetch scan counts for all pages
+      const pageIds = (data || []).map((p: any) => p.id);
+      const scanCounts: Record<string, number> = {};
+      
+      if (pageIds.length > 0) {
+        const { data: scansData } = await supabase
+          .from("qr_scans")
+          .select("qr_page_id")
+          .in("qr_page_id", pageIds);
+        
+        (scansData || []).forEach((scan: any) => {
+          scanCounts[scan.qr_page_id] = (scanCounts[scan.qr_page_id] || 0) + 1;
+        });
+      }
+
       const pages = (data || []).map((page: any) => ({
         id: page.id,
         public_id: page.public_id,
@@ -160,6 +176,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         location_lng: page.location_lng,
         location_name: page.location_name,
         starred_item_id: page.starred_item_id || null,
+        scan_count: scanCounts[page.id] || 0,
       }));
 
       setQrPages(pages);
@@ -662,6 +679,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                           {new Date(page.created_at).toLocaleDateString()}
                         </span>
                         <span>{page.item_count} items</span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {page.scan_count} scans
+                        </span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate mt-1 hidden sm:block">
                         {getPublicUrl(page.public_id)}

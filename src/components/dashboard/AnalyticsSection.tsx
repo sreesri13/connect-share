@@ -425,7 +425,7 @@ export const AnalyticsSection = () => {
           </div>
 
           {/* Additional Metrics Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             <MetricCard 
               title="Avg. Session" 
               value={overview.avgSessionDuration} 
@@ -441,13 +441,6 @@ export const AnalyticsSection = () => {
               bgColor="bg-emerald-500/10"
             />
             <MetricCard 
-              title="Profile Views" 
-              value={overview.profileViews.toLocaleString()} 
-              icon={Globe}
-              iconColor="text-indigo-500"
-              bgColor="bg-indigo-500/10"
-            />
-            <MetricCard 
               title="Sessions" 
               value={overview.sessions.toLocaleString()} 
               icon={MousePointerClick}
@@ -456,41 +449,6 @@ export const AnalyticsSection = () => {
             />
           </div>
         </>
-      )}
-
-      {/* QR vs URL Traffic */}
-      {!isLoading && qrTraffic && (
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Share2 className="h-5 w-5 text-primary" />
-              QR Code vs Shared URL Traffic
-            </CardTitle>
-            <CardDescription>How users are accessing your QR pages</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                <QrCode className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-                <p className="text-2xl font-bold">{qrTraffic.qrScans.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">QR Code Scans</p>
-                <p className="text-xs text-purple-500 mt-1">{qrTraffic.qrPercentage}% of traffic</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <Link2 className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-                <p className="text-2xl font-bold">{qrTraffic.urlOpens.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Shared URL Opens</p>
-                <p className="text-xs text-blue-500 mt-1">{100 - qrTraffic.qrPercentage}% of traffic</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-primary/10 border border-primary/20">
-                <Eye className="h-8 w-8 mx-auto text-primary mb-2" />
-                <p className="text-2xl font-bold">{qrTraffic.total.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Total Tagged Traffic</p>
-                <p className="text-xs text-primary mt-1">All tracked sources</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {/* Charts Row */}
@@ -766,31 +724,6 @@ export const AnalyticsSection = () => {
         </Card>
       </div>
 
-      {/* QR Page Engagement */}
-      {engagement && engagement.topPages.length > 0 && (
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              QR Page Engagement
-            </CardTitle>
-            <CardDescription>Time spent on QR-generated pages</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {engagement.topPages.slice(0, 6).map((page, i) => (
-                <div key={i} className="p-4 rounded-lg bg-muted/30 border border-border/50">
-                  <p className="text-sm font-medium truncate mb-2">{page.path}</p>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Avg. Time: <strong className="text-foreground">{page.avgTime}</strong></span>
-                    <span>Views: <strong className="text-foreground">{page.pageViews}</strong></span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
