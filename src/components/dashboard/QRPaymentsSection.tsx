@@ -143,7 +143,7 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
 
       if (error) throw error;
 
-      setUpiPayments([data, ...upiPayments]);
+      setUpiPayments([{ ...data, scan_count: 0 }, ...upiPayments]);
       setUpiId("");
       setDisplayName("QR Payments");
       setHasFixedAmount(false);
