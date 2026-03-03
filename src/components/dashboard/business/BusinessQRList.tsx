@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
-  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2 
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3 
 } from "lucide-react";
 import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,7 @@ interface BusinessQRPage {
   business_facebook: string | null;
   business_twitter: string | null;
   business_whatsapp: string | null;
+  scan_count: number;
 }
 
 interface BusinessQRListProps {
@@ -148,7 +149,21 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
 
       if (pagesError) throw pagesError;
 
-      // Get product counts for each page
+      // Get product counts and scan counts for each page
+      const pageIds = (pagesData || []).map((p) => p.id);
+      const scanCounts: Record<string, number> = {};
+      
+      if (pageIds.length > 0) {
+        const { data: scansData } = await supabase
+          .from("qr_scans")
+          .select("qr_business_page_id")
+          .in("qr_business_page_id", pageIds);
+        
+        (scansData || []).forEach((scan: any) => {
+          scanCounts[scan.qr_business_page_id] = (scanCounts[scan.qr_business_page_id] || 0) + 1;
+        });
+      }
+
       const pagesWithCounts = await Promise.all(
         (pagesData || []).map(async (page) => {
           const { count } = await supabase
@@ -160,6 +175,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             ...page,
             style_config: page.style_config as unknown as QRStyleConfig | null,
             product_count: count || 0,
+            scan_count: scanCounts[page.id] || 0,
             show_expires_at: page.show_expires_at || false,
             business_name: (page as any).business_name || null,
             business_logo_url: (page as any).business_logo_url || null,
@@ -719,9 +735,15 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Badge variant="secondary">
-                      {page.product_count} product{page.product_count !== 1 ? "s" : ""}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        {page.product_count} product{page.product_count !== 1 ? "s" : ""}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        <Eye className="w-3 h-3 mr-1" />
+                        {page.scan_count} scans
+                      </Badge>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
