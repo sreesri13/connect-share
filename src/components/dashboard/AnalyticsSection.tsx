@@ -14,6 +14,7 @@ import {
   CreditCard,
   FileText,
   TrendingUp,
+  ExternalLink,
 } from "lucide-react";
 import {
   BarChart,
@@ -29,32 +30,42 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
+type DateRange = 'today' | '7days' | '30days';
+
 interface UserAnalytics {
   totalQRCodes: number;
   totalBusinessQR: number;
   totalPayments: number;
   totalItems: number;
   totalScans: number;
-  recentScans: Array<{
-    date: string;
-    scans: number;
-  }>;
-  deviceBreakdown: Array<{
-    device: string;
-    count: number;
-    color: string;
-  }>;
+  recentScans: Array<{ date: string; scans: number }>;
+  deviceBreakdown: Array<{ device: string; count: number; color: string }>;
   topQRCodes: Array<{
     title: string;
     scans: number;
     type: 'profile' | 'business';
+    publicId: string;
   }>;
 }
+
+const DEVICE_COLORS: Record<string, string> = {
+  'Mobile': 'hsl(340, 82%, 52%)',
+  'Desktop': 'hsl(210, 96%, 45%)',
+  'Tablet': 'hsl(45, 93%, 47%)',
+  'Unknown': 'hsl(0, 0%, 55%)',
+};
+
+const RANGE_LABELS: Record<DateRange, string> = {
+  today: 'Today',
+  '7days': '7 Days',
+  '30days': '30 Days',
+};
 
 export const AnalyticsSection = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [analytics, setAnalytics] = useState<UserAnalytics | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>('7days');
 
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
@@ -62,7 +73,6 @@ export const AnalyticsSection = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch all data in parallel
       const [
         { count: qrCount },
         { count: bizCount },
@@ -76,56 +86,70 @@ export const AnalyticsSection = () => {
         supabase.from('qr_business_pages').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_deleted', false),
         supabase.from('upi_payments').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('items').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('qr_pages').select('id, title').eq('user_id', user.id).eq('is_deleted', false),
-        supabase.from('qr_business_pages').select('id, title, business_name').eq('user_id', user.id).eq('is_deleted', false),
+        supabase.from('qr_pages').select('id, title, public_id').eq('user_id', user.id).eq('is_deleted', false),
+        supabase.from('qr_business_pages').select('id, title, business_name, public_id').eq('user_id', user.id).eq('is_deleted', false),
         supabase.from('qr_scans').select('scanned_at, device_type, qr_page_id, qr_business_page_id'),
       ]);
 
       const qrPageIds = (qrPages || []).map(p => p.id);
       const bizPageIds = (bizPages || []).map(p => p.id);
 
-      // Filter scans belonging to this user
       const userScans = (allScans || []).filter(s => 
         (s.qr_page_id && qrPageIds.includes(s.qr_page_id)) ||
         (s.qr_business_page_id && bizPageIds.includes(s.qr_business_page_id))
       );
 
-      // Recent scans (last 7 days)
+      // Date range filtering
       const now = new Date();
-      const recentScans: Record<string, number> = {};
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        recentScans[key] = 0;
-      }
-      userScans.forEach(s => {
-        const d = new Date(s.scanned_at);
-        const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (key in recentScans) recentScans[key]++;
-      });
+      const daysCount = dateRange === 'today' ? 1 : dateRange === '7days' ? 7 : 30;
+      const rangeStart = new Date(now);
+      rangeStart.setDate(rangeStart.getDate() - (daysCount - 1));
+      rangeStart.setHours(0, 0, 0, 0);
 
-      // Device breakdown
+      const filteredScans = userScans.filter(s => new Date(s.scanned_at) >= rangeStart);
+
+      // Build chart data
+      const recentScans: Record<string, number> = {};
+      if (dateRange === 'today') {
+        // Hourly breakdown for today
+        for (let h = 0; h < 24; h++) {
+          const label = `${h.toString().padStart(2, '0')}:00`;
+          recentScans[label] = 0;
+        }
+        filteredScans.forEach(s => {
+          const d = new Date(s.scanned_at);
+          const label = `${d.getHours().toString().padStart(2, '0')}:00`;
+          if (label in recentScans) recentScans[label]++;
+        });
+      } else {
+        for (let i = daysCount - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          recentScans[key] = 0;
+        }
+        filteredScans.forEach(s => {
+          const d = new Date(s.scanned_at);
+          const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (key in recentScans) recentScans[key]++;
+        });
+      }
+
+      // Device breakdown from filtered scans
       const deviceMap: Record<string, number> = {};
-      userScans.forEach(s => {
+      filteredScans.forEach(s => {
         const device = s.device_type || 'Unknown';
         deviceMap[device] = (deviceMap[device] || 0) + 1;
       });
-      const deviceColors: Record<string, string> = {
-        'Mobile': 'hsl(142, 76%, 36%)',
-        'Desktop': 'hsl(221, 83%, 53%)',
-        'Tablet': 'hsl(262, 83%, 58%)',
-        'Unknown': 'hsl(var(--muted-foreground))',
-      };
       const deviceBreakdown = Object.entries(deviceMap).map(([device, count]) => ({
         device,
         count,
-        color: deviceColors[device] || 'hsl(var(--muted-foreground))',
+        color: DEVICE_COLORS[device] || DEVICE_COLORS['Unknown'],
       }));
 
-      // Top QR codes by scans
+      // Top QR codes from filtered scans
       const scanCountMap: Record<string, number> = {};
-      userScans.forEach(s => {
+      filteredScans.forEach(s => {
         const id = s.qr_page_id || s.qr_business_page_id || '';
         if (id) scanCountMap[id] = (scanCountMap[id] || 0) + 1;
       });
@@ -140,6 +164,7 @@ export const AnalyticsSection = () => {
             title: qr?.title || biz?.business_name || biz?.title || 'Untitled',
             scans,
             type: (biz ? 'business' : 'profile') as 'profile' | 'business',
+            publicId: qr?.public_id || biz?.public_id || '',
           };
         });
 
@@ -148,7 +173,7 @@ export const AnalyticsSection = () => {
         totalBusinessQR: bizCount || 0,
         totalPayments: payCount || 0,
         totalItems: itemCount || 0,
-        totalScans: userScans.length,
+        totalScans: filteredScans.length,
         recentScans: Object.entries(recentScans).map(([date, scans]) => ({ date, scans })),
         deviceBreakdown,
         topQRCodes,
@@ -159,11 +184,17 @@ export const AnalyticsSection = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dateRange]);
 
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
+
+  const handleOpenQR = (publicId: string, type: 'profile' | 'business') => {
+    if (!publicId) return;
+    const path = type === 'business' ? `/b/${publicId}` : `/q/${publicId}`;
+    window.open(path, '_blank');
+  };
 
   const MetricCard = ({ title, value, icon: Icon, iconColor = "text-primary", bgColor = "bg-primary/10" }: { 
     title: string; value: string | number; icon: React.ElementType; iconColor?: string; bgColor?: string;
@@ -183,6 +214,8 @@ export const AnalyticsSection = () => {
     </Card>
   );
 
+  const chartTitle = dateRange === 'today' ? 'Scans Today (Hourly)' : `Scans (Last ${RANGE_LABELS[dateRange]})`;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -197,8 +230,24 @@ export const AnalyticsSection = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-xs text-muted-foreground">
-            Updated: {lastUpdated.toLocaleTimeString()}
+          {/* Date Range Toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(['today', '7days', '30days'] as DateRange[]).map((range) => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  dateRange === range
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {RANGE_LABELS[range]}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            {lastUpdated.toLocaleTimeString()}
           </p>
           <Button variant="outline" size="sm" onClick={fetchAnalytics} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -224,19 +273,19 @@ export const AnalyticsSection = () => {
       {/* Charts */}
       {!isLoading && analytics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Scans Last 7 Days */}
+          {/* Scans Chart */}
           <Card className="bg-card/50 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
-                Scans (Last 7 Days)
+                {chartTitle}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={analytics.recentScans}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} interval={dateRange === 'today' ? 3 : dateRange === '30days' ? 4 : 0} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
                   <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                   <Bar dataKey="scans" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
@@ -306,7 +355,13 @@ export const AnalyticsSection = () => {
           <CardContent>
             <div className="space-y-3">
               {analytics.topQRCodes.map((qr, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <div
+                  key={i}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                  onClick={() => handleOpenQR(qr.publicId, qr.type)}
+                  role="button"
+                  tabIndex={0}
+                >
                   <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                     qr.type === 'business' ? 'bg-blue-500/20 text-blue-500' : 'bg-purple-500/20 text-purple-500'
                   }`}>
@@ -317,6 +372,7 @@ export const AnalyticsSection = () => {
                     <p className="text-xs text-muted-foreground capitalize">{qr.type}</p>
                   </div>
                   <p className="text-sm font-medium">{qr.scans} scans</p>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               ))}
             </div>
