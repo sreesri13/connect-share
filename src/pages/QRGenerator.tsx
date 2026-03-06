@@ -17,6 +17,7 @@ import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
 import { QRShareButton } from "@/components/qr/QRShareButton";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
+import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
 import { defaultQRStyle, oceanPresetStyle } from "@/lib/qr-styles";
@@ -67,6 +68,11 @@ const QRGenerator = () => {
 
   // Star item (direct redirect on scan)
   const [starredItemId, setStarredItemId] = useState<string | null>(null);
+
+  // Scan limit settings
+  const [scanLimitType, setScanLimitType] = useState<ScanLimitType>('unlimited');
+  const [maxScans, setMaxScans] = useState(100);
+  const [dailyLimit, setDailyLimit] = useState(50);
 
   // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
@@ -192,7 +198,10 @@ const QRGenerator = () => {
           location_lng: locationData?.lng || null,
           location_name: locationData?.name || null,
           starred_item_id: starredItemId || null,
-        })
+          scan_limit_type: scanLimitType,
+          max_scans: scanLimitType === 'total' ? maxScans : null,
+          daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
+        } as any)
         .select()
         .single();
 
@@ -518,6 +527,17 @@ const QRGenerator = () => {
                       onEnabledChange={setEnableLocationLock}
                       location={locationData}
                       onLocationChange={setLocationData}
+                    />
+
+                    {/* Scan Limit */}
+                    <ScanLimitInput
+                      scanLimitType={scanLimitType}
+                      onScanLimitTypeChange={setScanLimitType}
+                      maxScans={maxScans}
+                      onMaxScansChange={setMaxScans}
+                      dailyLimit={dailyLimit}
+                      onDailyLimitChange={setDailyLimit}
+                      compact
                     />
                     
                     <Button onClick={handleSaveQR} className="w-full h-11 sm:min-h-[48px] text-sm" disabled={isSaving}>

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
   Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
-  Folder, LinkIcon, FileText, Image, Video, Music, File, Star, BarChart3
+  Folder, LinkIcon, FileText, Image, Video, Music, File, Star, BarChart3, ScanLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +42,8 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours, addMonths } from "date-fns";
 import { PlatformIcon } from "@/lib/platform-icons";
+import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
+import { Progress } from "@/components/ui/progress";
 
 interface QRPage {
   id: string;
@@ -58,6 +60,9 @@ interface QRPage {
   location_name: string | null;
   starred_item_id: string | null;
   scan_count: number;
+  scan_limit_type: string;
+  max_scans: number | null;
+  daily_limit: number | null;
 }
 
 interface QRItem {
@@ -117,6 +122,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   // Star item state
   const [editStarredItemId, setEditStarredItemId] = useState<string | null>(null);
 
+  // Scan limit edit state
+  const [editScanLimitType, setEditScanLimitType] = useState<ScanLimitType>('unlimited');
+  const [editMaxScans, setEditMaxScans] = useState(100);
+  const [editDailyLimit, setEditDailyLimit] = useState(50);
+
   useEffect(() => {
     fetchQRPages();
   }, [userId]);
@@ -139,6 +149,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           location_name,
           is_deleted,
           starred_item_id,
+          scan_limit_type,
+          max_scans,
+          daily_limit,
           qr_page_items (id)
         `)
         .eq("user_id", userId)
@@ -177,6 +190,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         location_name: page.location_name,
         starred_item_id: page.starred_item_id || null,
         scan_count: scanCounts[page.id] || 0,
+        scan_limit_type: page.scan_limit_type || 'unlimited',
+        max_scans: page.max_scans,
+        daily_limit: page.daily_limit,
       }));
 
       setQrPages(pages);
@@ -294,6 +310,9 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setEditExpiryExtension("none");
     setEditCustomExpiryDate(undefined);
     setEditStarredItemId(qrPage.starred_item_id || null);
+    setEditScanLimitType((qrPage.scan_limit_type || 'unlimited') as ScanLimitType);
+    setEditMaxScans(qrPage.max_scans || 100);
+    setEditDailyLimit(qrPage.daily_limit || 50);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
@@ -328,6 +347,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       }
 
       const updateData: any = { title: editQRTitle };
+
+      // Handle scan limit
+      updateData.scan_limit_type = editScanLimitType;
+      updateData.max_scans = editScanLimitType === 'total' ? editMaxScans : null;
+      updateData.daily_limit = editScanLimitType === 'daily' ? editDailyLimit : null;
       
       if (passwordHash !== undefined) {
         updateData.password_hash = passwordHash;
@@ -682,8 +706,27 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                         <span className="flex items-center gap-1">
                           <Eye className="w-3 h-3" />
                           {page.scan_count} scans
+                          {page.scan_limit_type !== 'unlimited' && (
+                            <span className="text-primary">
+                              / {page.scan_limit_type === 'total' ? page.max_scans : `${page.daily_limit}/day`}
+                            </span>
+                          )}
                         </span>
                       </div>
+                      {page.scan_limit_type !== 'unlimited' && page.scan_count > 0 && (
+                        <div className="mt-1.5">
+                          <Progress 
+                            value={Math.min(100, (page.scan_count / (page.scan_limit_type === 'total' ? (page.max_scans || 1) : (page.daily_limit || 1))) * 100)} 
+                            className="h-1.5" 
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {page.scan_limit_type === 'total' 
+                              ? `${Math.max(0, (page.max_scans || 0) - page.scan_count)} remaining`
+                              : `Daily: ${page.daily_limit} max`
+                            }
+                          </p>
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground truncate mt-1 hidden sm:block">
                         {getPublicUrl(page.public_id)}
                       </p>
@@ -871,6 +914,16 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                 </Popover>
               )}
             </div>
+
+            {/* Scan Limit */}
+            <ScanLimitInput
+              scanLimitType={editScanLimitType}
+              onScanLimitTypeChange={setEditScanLimitType}
+              maxScans={editMaxScans}
+              onMaxScansChange={setEditMaxScans}
+              dailyLimit={editDailyLimit}
+              onDailyLimitChange={setEditDailyLimit}
+            />
 
             {/* Items in QR Code */}
             <div className="space-y-3">

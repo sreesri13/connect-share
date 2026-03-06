@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
-  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3 
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine
 } from "lucide-react";
 import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { hashPassword } from "@/lib/crypto";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours } from "date-fns";
+import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +83,9 @@ interface BusinessQRPage {
   business_twitter: string | null;
   business_whatsapp: string | null;
   scan_count: number;
+  scan_limit_type: string;
+  max_scans: number | null;
+  daily_limit: number | null;
 }
 
 interface BusinessQRListProps {
@@ -132,6 +137,11 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [editShowExpiryToVisitors, setEditShowExpiryToVisitors] = useState(false);
   const [editBusinessInfo, setEditBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
   
+  // Scan limit edit state
+  const [editScanLimitType, setEditScanLimitType] = useState<ScanLimitType>('unlimited');
+  const [editMaxScans, setEditMaxScans] = useState(100);
+  const [editDailyLimit, setEditDailyLimit] = useState(50);
+  
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -177,6 +187,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             product_count: count || 0,
             scan_count: scanCounts[page.id] || 0,
             show_expires_at: page.show_expires_at || false,
+            scan_limit_type: (page as any).scan_limit_type || 'unlimited',
+            max_scans: (page as any).max_scans || null,
+            daily_limit: (page as any).daily_limit || null,
             business_name: (page as any).business_name || null,
             business_logo_url: (page as any).business_logo_url || null,
             business_address: (page as any).business_address || null,
@@ -247,6 +260,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       business_whatsapp: page.business_whatsapp || "",
       business_hours: (page as any).business_hours || "",
     });
+    setEditScanLimitType((page.scan_limit_type || 'unlimited') as ScanLimitType);
+    setEditMaxScans(page.max_scans || 100);
+    setEditDailyLimit(page.daily_limit || 50);
     setIsEditOpen(true);
   };
 
@@ -384,6 +400,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
 
       const updateData: any = { 
         title: editTitle,
+        scan_limit_type: editScanLimitType,
+        max_scans: editScanLimitType === 'total' ? editMaxScans : null,
+        daily_limit: editScanLimitType === 'daily' ? editDailyLimit : null,
         business_name: editBusinessInfo.business_name || null,
         business_logo_url: editBusinessInfo.business_logo_url || null,
         business_address: editBusinessInfo.business_address || null,
@@ -742,6 +761,11 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                       <Badge variant="outline" className="text-xs">
                         <Eye className="w-3 h-3 mr-1" />
                         {page.scan_count} scans
+                        {page.scan_limit_type !== 'unlimited' && (
+                          <span className="text-primary ml-1">
+                            / {page.scan_limit_type === 'total' ? page.max_scans : `${page.daily_limit}/day`}
+                          </span>
+                        )}
                       </Badge>
                     </div>
                     <Button
@@ -940,6 +964,16 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                   />
                 </div>
               </div>
+
+              {/* Scan Limit */}
+              <ScanLimitInput
+                scanLimitType={editScanLimitType}
+                onScanLimitTypeChange={setEditScanLimitType}
+                maxScans={editMaxScans}
+                onMaxScansChange={setEditMaxScans}
+                dailyLimit={editDailyLimit}
+                onDailyLimitChange={setEditDailyLimit}
+              />
 
               {/* Business Information */}
               <BusinessInfoForm value={editBusinessInfo} onChange={setEditBusinessInfo} userId={userId} />
