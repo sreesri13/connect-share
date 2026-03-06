@@ -11,7 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { initGA, trackQRScan, trackProductClick } from "@/lib/analytics";
 import { LocationVerification } from "@/components/qr/LocationVerification";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { recordQRScan } from "@/hooks/useQRScans";
+import { recordQRScan, checkScanLimit } from "@/hooks/useQRScans";
+import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { hashPassword } from "@/lib/crypto";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { BusinessInstallPrompt } from "@/components/business/BusinessInstallPrompt";
@@ -58,6 +59,9 @@ interface BusinessPageData {
   business_twitter: string | null;
   business_whatsapp: string | null;
   business_hours: string | null;
+  scan_limit_type: string | null;
+  max_scans: number | null;
+  daily_limit: number | null;
 }
 
 const BusinessPage = () => {
@@ -86,6 +90,8 @@ const BusinessPage = () => {
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [scanLimitReached, setScanLimitReached] = useState(false);
+  const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
@@ -155,6 +161,20 @@ const BusinessPage = () => {
 
       setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
+
+      // Check scan limit before security checks
+      const limitType = (pageDataResult as any).scan_limit_type;
+      if (limitType && limitType !== 'unlimited') {
+        const limitCheck = await checkScanLimit(
+          pageDataResult.id, limitType, (pageDataResult as any).max_scans, (pageDataResult as any).daily_limit, true
+        );
+        if (!limitCheck.allowed) {
+          setScanLimitReached(true);
+          setScanLimitReachedType(limitType === 'daily' ? 'daily' : 'total');
+          setIsLoading(false);
+          return;
+        }
+      }
 
       if (pageDataResult.password_hash) {
         setIsPasswordProtected(true);
@@ -324,6 +344,11 @@ const BusinessPage = () => {
     cart.forEach((item) => { total += getProductPrice(item.product) * item.quantity; });
     return total;
   };
+
+  // Scan limit reached
+  if (scanLimitReached) {
+    return <ScanLimitReached type={scanLimitReachedType} />;
+  }
 
   // Password verification screen
   if (isPasswordProtected && !isPasswordVerified) {

@@ -13,8 +13,9 @@ import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } fr
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { LocationVerification } from "@/components/qr/LocationVerification";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
-import { recordQRScan } from "@/hooks/useQRScans";
+import { recordQRScan, checkScanLimit } from "@/hooks/useQRScans";
 import { FileViewer } from "@/components/FileViewer";
+import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { PlatformIcon } from "@/lib/platform-icons";
 
 interface ProfileItem {
@@ -42,6 +43,9 @@ interface QRPageData {
   expires_at: string | null;
   show_expires_at: boolean | null;
   starred_item_id: string | null;
+  scan_limit_type: string | null;
+  max_scans: number | null;
+  daily_limit: number | null;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
@@ -77,6 +81,8 @@ const PublicProfile = () => {
   const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
   const [qrPageData, setQrPageData] = useState<QRPageData | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [scanLimitReached, setScanLimitReached] = useState(false);
+  const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -106,7 +112,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -119,6 +125,19 @@ const PublicProfile = () => {
       }
 
       setQrPageData(qrPage);
+
+      // Check scan limit before anything else
+      if (qrPage.scan_limit_type && qrPage.scan_limit_type !== 'unlimited') {
+        const limitCheck = await checkScanLimit(
+          qrPage.id, qrPage.scan_limit_type, qrPage.max_scans, qrPage.daily_limit, false
+        );
+        if (!limitCheck.allowed) {
+          setScanLimitReached(true);
+          setScanLimitReachedType(qrPage.scan_limit_type === 'daily' ? 'daily' : 'total');
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Check for location lock first
       if (qrPage.location_locked && qrPage.location_lat && qrPage.location_lng) {
@@ -327,6 +346,11 @@ const PublicProfile = () => {
     acc[item.category_name].push(item);
     return acc;
   }, {} as Record<string, ProfileItem[]>);
+
+  // Scan limit reached screen
+  if (scanLimitReached) {
+    return <ScanLimitReached type={scanLimitReachedType} />;
+  }
 
   // Location verification screen
   if (isLocationLocked && !isLocationVerified && qrPageData) {
