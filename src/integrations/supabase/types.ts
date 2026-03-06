@@ -245,6 +245,7 @@ export type Database = {
           business_website: string | null
           business_whatsapp: string | null
           created_at: string
+          daily_limit: number | null
           deleted_at: string | null
           expires_at: string | null
           id: string
@@ -253,8 +254,10 @@ export type Database = {
           location_lng: number | null
           location_locked: boolean | null
           location_name: string | null
+          max_scans: number | null
           password_hash: string | null
           public_id: string
+          scan_limit_type: string
           show_expires_at: boolean | null
           style_config: Json | null
           style_id: string | null
@@ -275,6 +278,7 @@ export type Database = {
           business_website?: string | null
           business_whatsapp?: string | null
           created_at?: string
+          daily_limit?: number | null
           deleted_at?: string | null
           expires_at?: string | null
           id?: string
@@ -283,8 +287,10 @@ export type Database = {
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          max_scans?: number | null
           password_hash?: string | null
           public_id: string
+          scan_limit_type?: string
           show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
@@ -305,6 +311,7 @@ export type Database = {
           business_website?: string | null
           business_whatsapp?: string | null
           created_at?: string
+          daily_limit?: number | null
           deleted_at?: string | null
           expires_at?: string | null
           id?: string
@@ -313,8 +320,10 @@ export type Database = {
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          max_scans?: number | null
           password_hash?: string | null
           public_id?: string
+          scan_limit_type?: string
           show_expires_at?: boolean | null
           style_config?: Json | null
           style_id?: string | null
@@ -371,6 +380,7 @@ export type Database = {
       qr_pages: {
         Row: {
           created_at: string
+          daily_limit: number | null
           deleted_at: string | null
           expires_at: string | null
           id: string
@@ -379,8 +389,10 @@ export type Database = {
           location_lng: number | null
           location_locked: boolean | null
           location_name: string | null
+          max_scans: number | null
           password_hash: string | null
           public_id: string
+          scan_limit_type: string
           show_expires_at: boolean | null
           starred_item_id: string | null
           style_config: Json | null
@@ -390,6 +402,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          daily_limit?: number | null
           deleted_at?: string | null
           expires_at?: string | null
           id?: string
@@ -398,8 +411,10 @@ export type Database = {
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          max_scans?: number | null
           password_hash?: string | null
           public_id: string
+          scan_limit_type?: string
           show_expires_at?: boolean | null
           starred_item_id?: string | null
           style_config?: Json | null
@@ -409,6 +424,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          daily_limit?: number | null
           deleted_at?: string | null
           expires_at?: string | null
           id?: string
@@ -417,8 +433,10 @@ export type Database = {
           location_lng?: number | null
           location_locked?: boolean | null
           location_name?: string | null
+          max_scans?: number | null
           password_hash?: string | null
           public_id?: string
+          scan_limit_type?: string
           show_expires_at?: boolean | null
           starred_item_id?: string | null
           style_config?: Json | null
