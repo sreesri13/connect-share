@@ -965,6 +965,16 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                 </div>
               </div>
 
+              {/* Scan Limit */}
+              <ScanLimitInput
+                scanLimitType={editScanLimitType}
+                onScanLimitTypeChange={setEditScanLimitType}
+                maxScans={editMaxScans}
+                onMaxScansChange={setEditMaxScans}
+                dailyLimit={editDailyLimit}
+                onDailyLimitChange={setEditDailyLimit}
+              />
+
               {/* Business Information */}
               <BusinessInfoForm value={editBusinessInfo} onChange={setEditBusinessInfo} userId={userId} />
 
