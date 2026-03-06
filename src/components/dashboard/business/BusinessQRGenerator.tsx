@@ -16,6 +16,7 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import { defaultQRStyle, oceanPresetStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { hashPassword } from "@/lib/crypto";
 import { addHours, addDays, format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,6 +81,11 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
   const [expiryOption, setExpiryOption] = useState<ExpiryOption>("none");
   const [customExpiryDate, setCustomExpiryDate] = useState<Date | undefined>(undefined);
   const [showExpiryToVisitors, setShowExpiryToVisitors] = useState(false);
+
+  // Scan limit settings
+  const [scanLimitType, setScanLimitType] = useState<ScanLimitType>('unlimited');
+  const [maxScans, setMaxScans] = useState(100);
+  const [dailyLimit, setDailyLimit] = useState(50);
 
   const qrRef = useRef<HTMLDivElement>(null);
   const { styles, saveStyle, getStyleById } = useQRStyles();
@@ -239,6 +245,9 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           business_twitter: businessInfo.business_twitter || null,
           business_whatsapp: businessInfo.business_whatsapp || null,
           business_hours: businessInfo.business_hours || null,
+          scan_limit_type: scanLimitType,
+          max_scans: scanLimitType === 'total' ? maxScans : null,
+          daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
         } as any)
         .select("id")
         .single();
@@ -314,6 +323,9 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setShowExpiryToVisitors(false);
     setBusinessInfo(defaultBusinessInfo);
     setActiveTab("products");
+    setScanLimitType('unlimited');
+    setMaxScans(100);
+    setDailyLimit(50);
   };
 
   const handleSaveStyle = async (name: string) => {
@@ -601,6 +613,16 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
                   </div>
                 )}
               </div>
+
+              {/* Scan Limit */}
+              <ScanLimitInput
+                scanLimitType={scanLimitType}
+                onScanLimitTypeChange={setScanLimitType}
+                maxScans={maxScans}
+                onMaxScansChange={setMaxScans}
+                dailyLimit={dailyLimit}
+                onDailyLimitChange={setDailyLimit}
+              />
             </div>
 
             <Button onClick={handleGenerate} disabled={selectedProducts.size === 0 || isGenerating} className="w-full">

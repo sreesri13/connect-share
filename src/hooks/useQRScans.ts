@@ -62,7 +62,6 @@ export async function recordQRScan(
   isBusinessPage: boolean = false
 ): Promise<void> {
   try {
-    // Get basic device info
     const userAgent = navigator.userAgent;
     const deviceType = /mobile/i.test(userAgent) ? 'mobile' : /tablet/i.test(userAgent) ? 'tablet' : 'desktop';
 
@@ -86,4 +85,46 @@ export async function recordQRScan(
   } catch (error) {
     console.error('Failed to record scan:', error);
   }
+}
+
+// Check if a QR code has reached its scan limit
+export async function checkScanLimit(
+  pageId: string,
+  scanLimitType: string,
+  maxScans: number | null,
+  dailyLimit: number | null,
+  isBusinessPage: boolean = false
+): Promise<{ allowed: boolean; currentScans: number; limit: number }> {
+  if (!scanLimitType || scanLimitType === 'unlimited') {
+    return { allowed: true, currentScans: 0, limit: 0 };
+  }
+
+  const column = isBusinessPage ? 'qr_business_page_id' : 'qr_page_id';
+
+  try {
+    if (scanLimitType === 'total' && maxScans) {
+      const { count } = await supabase
+        .from('qr_scans')
+        .select('*', { count: 'exact', head: true })
+        .eq(column, pageId);
+      const current = count || 0;
+      return { allowed: current < maxScans, currentScans: current, limit: maxScans };
+    }
+
+    if (scanLimitType === 'daily' && dailyLimit) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from('qr_scans')
+        .select('*', { count: 'exact', head: true })
+        .eq(column, pageId)
+        .gte('scanned_at', today.toISOString());
+      const current = count || 0;
+      return { allowed: current < dailyLimit, currentScans: current, limit: dailyLimit };
+    }
+  } catch (error) {
+    console.error('Failed to check scan limit:', error);
+  }
+
+  return { allowed: true, currentScans: 0, limit: 0 };
 }
