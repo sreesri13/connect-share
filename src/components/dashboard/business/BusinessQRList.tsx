@@ -896,8 +896,6 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
 
               {/* Expiry Settings */}
               <div className="space-y-3 p-4 border rounded-lg">
-
-              {/* after expiry section, add scan limit - I need to find the right closing */}
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-muted-foreground" />
                   <Label>QR Code Expiration</Label>
