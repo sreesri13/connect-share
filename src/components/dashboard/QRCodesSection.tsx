@@ -726,7 +726,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                             }
                           </p>
                         </div>
-                      )
+                      )}
                       <p className="text-xs text-muted-foreground truncate mt-1 hidden sm:block">
                         {getPublicUrl(page.public_id)}
                       </p>
