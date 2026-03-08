@@ -746,6 +746,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                           <Download className="w-4 h-4 mr-2" />
                           Download QR
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleInstallStore(page)}>
+                          <Smartphone className="w-4 h-4 mr-2" />
+                          Install Store App
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeleteId(page.id)}
                           className="text-destructive focus:text-destructive"
