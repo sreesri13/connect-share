@@ -86,6 +86,7 @@ interface BusinessQRPage {
   scan_limit_type: string;
   max_scans: number | null;
   daily_limit: number | null;
+  store_slug: string | null;
 }
 
 interface BusinessQRListProps {
