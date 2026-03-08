@@ -555,7 +555,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   };
 
   const handleCopyUrl = (page: BusinessQRPage) => {
-    const url = `${window.location.origin}/business/${page.public_id}`;
+    const url = page.store_slug 
+      ? `${window.location.origin}/store/${page.store_slug}`
+      : `${window.location.origin}/business/${page.public_id}`;
     navigator.clipboard.writeText(url);
     toast.success("URL copied to clipboard");
   };
