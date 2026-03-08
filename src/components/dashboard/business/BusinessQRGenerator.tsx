@@ -182,6 +182,16 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     return `biz_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
   };
 
+  const generateStoreSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 50) + '-' + Math.random().toString(36).substring(2, 6);
+  };
+
   const calculateExpirationDate = (): string | null => {
     if (expiryOption === "none") return null;
     const baseDate = new Date();
@@ -216,7 +226,12 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setIsGenerating(true);
     try {
       const publicId = generatePublicId();
-      const qrUrl = `${window.location.origin}/business/${publicId}`;
+      const storeSlug = businessInfo.business_name 
+        ? generateStoreSlug(businessInfo.business_name)
+        : null;
+      const qrUrl = storeSlug 
+        ? `${window.location.origin}/store/${storeSlug}`
+        : `${window.location.origin}/business/${publicId}`;
       const expiresAt = calculateExpirationDate();
       const passwordHash = enablePassword && password.trim() ? hashPassword(password.trim()) : null;
 
@@ -248,6 +263,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           scan_limit_type: scanLimitType,
           max_scans: scanLimitType === 'total' ? maxScans : null,
           daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
+          store_slug: storeSlug,
         } as any)
         .select("id")
         .single();

@@ -124,6 +124,18 @@ export default defineConfig(({ mode }) => ({
             }
           },
           {
+            // Stale While Revalidate for store pages
+            urlPattern: /\/store\/.*/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "store-pages-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+              }
+            }
+          },
+          {
             // Network First for OpenStreetMap tiles
             urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/,
             handler: "CacheFirst",

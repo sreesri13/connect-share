@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
-  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine, Smartphone, Store
 } from "lucide-react";
 import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,7 @@ interface BusinessQRPage {
   scan_limit_type: string;
   max_scans: number | null;
   daily_limit: number | null;
+  store_slug: string | null;
 }
 
 interface BusinessQRListProps {
@@ -200,6 +201,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             business_facebook: (page as any).business_facebook || null,
             business_twitter: (page as any).business_twitter || null,
             business_whatsapp: (page as any).business_whatsapp || null,
+            store_slug: (page as any).store_slug || null,
           };
         })
       );
@@ -553,13 +555,17 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   };
 
   const handleCopyUrl = (page: BusinessQRPage) => {
-    const url = `${window.location.origin}/business/${page.public_id}`;
+    const url = page.store_slug 
+      ? `${window.location.origin}/store/${page.store_slug}`
+      : `${window.location.origin}/business/${page.public_id}`;
     navigator.clipboard.writeText(url);
     toast.success("URL copied to clipboard");
   };
 
   const handleShare = async (page: BusinessQRPage) => {
-    const url = `${window.location.origin}/business/${page.public_id}`;
+    const url = page.store_slug
+      ? `${window.location.origin}/store/${page.store_slug}`
+      : `${window.location.origin}/business/${page.public_id}`;
     const shareText = `📱 Check out this catalog: ${page.title || 'Business Products'}\n\n🔗 ${url}`;
     
     if (navigator.share) {
@@ -583,7 +589,18 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   };
 
   const handleOpenPage = (page: BusinessQRPage) => {
-    window.open(`/business/${page.public_id}`, "_blank");
+    const url = page.store_slug
+      ? `/store/${page.store_slug}`
+      : `/business/${page.public_id}`;
+    window.open(url, "_blank");
+  };
+
+  const handleInstallStore = (page: BusinessQRPage) => {
+    const url = page.store_slug
+      ? `/store/${page.store_slug}`
+      : `/business/${page.public_id}`;
+    window.open(url, "_blank");
+    toast.info("Visit the store page to install it as an app");
   };
 
   const isExpired = (expiresAt: string | null) => {
@@ -651,7 +668,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pages.map((page) => {
-              const url = `${window.location.origin}/business/${page.public_id}`;
+              const url = page.store_slug
+                ? `${window.location.origin}/store/${page.store_slug}`
+                : `${window.location.origin}/business/${page.public_id}`;
               const styleConfig = page.style_config || defaultQRStyle;
               const expired = isExpired(page.expires_at);
 
@@ -726,6 +745,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                         <DropdownMenuItem onClick={() => handleDownload(page)}>
                           <Download className="w-4 h-4 mr-2" />
                           Download QR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleInstallStore(page)}>
+                          <Smartphone className="w-4 h-4 mr-2" />
+                          Install Store App
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeleteId(page.id)}
@@ -808,7 +831,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                 >
                   <CustomQRCode
                     id={`edit-biz-qr-${editingQR.id}`}
-                    value={`${window.location.origin}/business/${editingQR.public_id}`}
+                    value={editingQR.store_slug 
+                      ? `${window.location.origin}/store/${editingQR.store_slug}`
+                      : `${window.location.origin}/business/${editingQR.public_id}`}
                     style={{ ...(editingQR.style_config || defaultQRStyle), size: 160 }}
                   />
                 </div>
@@ -817,8 +842,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     <Download className="w-4 h-4 mr-2" />
                     Download High-Quality PNG
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    URL: {window.location.origin}/business/{editingQR.public_id}
+                  <p className="text-xs text-muted-foreground break-all">
+                    URL: {editingQR.store_slug 
+                      ? `${window.location.origin}/store/${editingQR.store_slug}`
+                      : `${window.location.origin}/business/${editingQR.public_id}`}
                   </p>
                 </div>
               </div>
