@@ -201,6 +201,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             business_facebook: (page as any).business_facebook || null,
             business_twitter: (page as any).business_twitter || null,
             business_whatsapp: (page as any).business_whatsapp || null,
+            store_slug: (page as any).store_slug || null,
           };
         })
       );
