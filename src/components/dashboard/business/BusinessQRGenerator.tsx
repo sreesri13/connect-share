@@ -182,6 +182,16 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     return `biz_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
   };
 
+  const generateStoreSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 50) + '-' + Math.random().toString(36).substring(2, 6);
+  };
+
   const calculateExpirationDate = (): string | null => {
     if (expiryOption === "none") return null;
     const baseDate = new Date();
