@@ -831,7 +831,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                 >
                   <CustomQRCode
                     id={`edit-biz-qr-${editingQR.id}`}
-                    value={`${window.location.origin}/business/${editingQR.public_id}`}
+                    value={editingQR.store_slug 
+                      ? `${window.location.origin}/store/${editingQR.store_slug}`
+                      : `${window.location.origin}/business/${editingQR.public_id}`}
                     style={{ ...(editingQR.style_config || defaultQRStyle), size: 160 }}
                   />
                 </div>
@@ -840,8 +842,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                     <Download className="w-4 h-4 mr-2" />
                     Download High-Quality PNG
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    URL: {window.location.origin}/business/{editingQR.public_id}
+                  <p className="text-xs text-muted-foreground break-all">
+                    URL: {editingQR.store_slug 
+                      ? `${window.location.origin}/store/${editingQR.store_slug}`
+                      : `${window.location.origin}/business/${editingQR.public_id}`}
                   </p>
                 </div>
               </div>
