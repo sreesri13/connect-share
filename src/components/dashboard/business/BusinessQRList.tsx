@@ -563,7 +563,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   };
 
   const handleShare = async (page: BusinessQRPage) => {
-    const url = `${window.location.origin}/business/${page.public_id}`;
+    const url = page.store_slug
+      ? `${window.location.origin}/store/${page.store_slug}`
+      : `${window.location.origin}/business/${page.public_id}`;
     const shareText = `📱 Check out this catalog: ${page.title || 'Business Products'}\n\n🔗 ${url}`;
     
     if (navigator.share) {
@@ -587,7 +589,18 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   };
 
   const handleOpenPage = (page: BusinessQRPage) => {
-    window.open(`/business/${page.public_id}`, "_blank");
+    const url = page.store_slug
+      ? `/store/${page.store_slug}`
+      : `/business/${page.public_id}`;
+    window.open(url, "_blank");
+  };
+
+  const handleInstallStore = (page: BusinessQRPage) => {
+    const url = page.store_slug
+      ? `/store/${page.store_slug}`
+      : `/business/${page.public_id}`;
+    window.open(url, "_blank");
+    toast.info("Visit the store page to install it as an app");
   };
 
   const isExpired = (expiresAt: string | null) => {
