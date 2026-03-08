@@ -259,6 +259,7 @@ export type Database = {
           public_id: string
           scan_limit_type: string
           show_expires_at: boolean | null
+          store_slug: string | null
           style_config: Json | null
           style_id: string | null
           title: string | null
@@ -292,6 +293,7 @@ export type Database = {
           public_id: string
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          store_slug?: string | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
@@ -325,6 +327,7 @@ export type Database = {
           public_id?: string
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          store_slug?: string | null
           style_config?: Json | null
           style_id?: string | null
           title?: string | null
