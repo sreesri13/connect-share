@@ -668,7 +668,9 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pages.map((page) => {
-              const url = `${window.location.origin}/business/${page.public_id}`;
+              const url = page.store_slug
+                ? `${window.location.origin}/store/${page.store_slug}`
+                : `${window.location.origin}/business/${page.public_id}`;
               const styleConfig = page.style_config || defaultQRStyle;
               const expired = isExpired(page.expires_at);
 
