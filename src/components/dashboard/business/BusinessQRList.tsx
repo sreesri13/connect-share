@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
-  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine, Smartphone, Store
 } from "lucide-react";
 import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
