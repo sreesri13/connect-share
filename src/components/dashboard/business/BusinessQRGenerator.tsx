@@ -263,6 +263,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           scan_limit_type: scanLimitType,
           max_scans: scanLimitType === 'total' ? maxScans : null,
           daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
+          store_slug: storeSlug,
         } as any)
         .select("id")
         .single();
