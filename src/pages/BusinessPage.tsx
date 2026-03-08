@@ -146,10 +146,10 @@ const BusinessPage = () => {
 
       // Look up by store_slug or public_id
       if (storeSlug) {
-        const res = await supabase
+        const res = await (supabase
           .from("qr_business_pages")
-          .select("*")
-          .eq("store_slug" as any, storeSlug)
+          .select("*") as any)
+          .eq("store_slug", storeSlug)
           .maybeSingle();
         pageDataResult = res.data;
         pageError = res.error;
