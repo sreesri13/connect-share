@@ -141,22 +141,31 @@ const BusinessPage = () => {
 
   const checkSecurityRequirements = async () => {
     try {
-      let query = supabase
-        .from("qr_business_pages")
-        .select("*");
+      let pageDataResult: any = null;
+      let pageError: any = null;
 
       // Look up by store_slug or public_id
       if (storeSlug) {
-        query = query.eq("store_slug" as any, storeSlug);
+        const res = await supabase
+          .from("qr_business_pages")
+          .select("*")
+          .eq("store_slug" as any, storeSlug)
+          .maybeSingle();
+        pageDataResult = res.data;
+        pageError = res.error;
       } else if (publicId) {
-        query = query.eq("public_id", publicId);
+        const res = await supabase
+          .from("qr_business_pages")
+          .select("*")
+          .eq("public_id", publicId)
+          .maybeSingle();
+        pageDataResult = res.data;
+        pageError = res.error;
       } else {
         setError("Page not found");
         setIsLoading(false);
         return;
       }
-
-      const { data: pageDataResult, error: pageError } = await query.maybeSingle();
 
       if (pageError) throw pageError;
 
