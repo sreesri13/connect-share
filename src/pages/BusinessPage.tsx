@@ -39,6 +39,7 @@ interface CartItem {
 
 interface BusinessPageData {
   id: string;
+  public_id: string;
   title: string | null;
   is_deleted: boolean;
   location_locked: boolean | null;
@@ -62,10 +63,11 @@ interface BusinessPageData {
   scan_limit_type: string | null;
   max_scans: number | null;
   daily_limit: number | null;
+  store_slug: string | null;
 }
 
 const BusinessPage = () => {
-  const { publicId } = useParams<{ publicId: string }>();
+  const { publicId, storeSlug } = useParams<{ publicId?: string; storeSlug?: string }>();
   const [pageData, setPageData] = useState<BusinessPageData | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -95,9 +97,16 @@ const BusinessPage = () => {
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
+  // Determine the current store path for navigation locking
+  const currentStorePath = storeSlug 
+    ? `/store/${storeSlug}` 
+    : publicId 
+      ? `/business/${publicId}` 
+      : null;
+
   // In standalone mode, lock all navigation to this business page only
   useEffect(() => {
-    if (!isStandalone) return;
+    if (!isStandalone || !currentStorePath) return;
 
     const handleClick = (e: MouseEvent) => {
       const anchor = (e.target as HTMLElement).closest("a");
@@ -111,8 +120,7 @@ const BusinessPage = () => {
       // Block all navigation - this installed app should only show this business page
       try {
         const url = new URL(href, window.location.origin);
-        const currentPath = `/business/${publicId}`;
-        if (url.origin === window.location.origin && url.pathname === currentPath) return;
+        if (url.origin === window.location.origin && url.pathname === currentStorePath) return;
       } catch {}
 
       e.preventDefault();
@@ -121,23 +129,34 @@ const BusinessPage = () => {
 
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
-  }, [isStandalone, publicId]);
+  }, [isStandalone, currentStorePath]);
 
   useEffect(() => {
     initGA();
-    if (publicId) {
-      trackQRScan(publicId, undefined, 'business');
+    if (publicId || storeSlug) {
+      trackQRScan(publicId || storeSlug || '', undefined, 'business');
       checkSecurityRequirements();
     }
-  }, [publicId]);
+  }, [publicId, storeSlug]);
 
   const checkSecurityRequirements = async () => {
     try {
-      const { data: pageDataResult, error: pageError } = await supabase
+      let query = supabase
         .from("qr_business_pages")
-        .select("*")
-        .eq("public_id", publicId)
-        .maybeSingle();
+        .select("*");
+
+      // Look up by store_slug or public_id
+      if (storeSlug) {
+        query = query.eq("store_slug" as any, storeSlug);
+      } else if (publicId) {
+        query = query.eq("public_id", publicId);
+      } else {
+        setError("Page not found");
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: pageDataResult, error: pageError } = await query.maybeSingle();
 
       if (pageError) throw pageError;
 
@@ -512,6 +531,9 @@ const BusinessPage = () => {
 
   const visibleCategories = categories.filter((c) => getProductsByCategory(c.id).length > 0);
 
+  // Determine the identifier used for tracking
+  const trackingId = storeSlug || publicId || '';
+
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Sticky Header */}
@@ -642,7 +664,7 @@ const BusinessPage = () => {
                         <div
                           className="cursor-pointer"
                           onClick={() => {
-                            trackProductClick(product.id, product.name, publicId || '');
+                            trackProductClick(product.id, product.name, trackingId);
                             setSelectedProduct(product);
                           }}
                         >
@@ -923,7 +945,8 @@ const BusinessPage = () => {
         <BusinessInstallPrompt
           businessName={pageData.business_name || pageTitle || "Store"}
           logoUrl={pageData.business_logo_url}
-          pageUrl={`/b/${publicId}`}
+          pageUrl={currentStorePath || `/business/${pageData.public_id}`}
+          storeSlug={pageData.store_slug}
         />
       )}
     </div>

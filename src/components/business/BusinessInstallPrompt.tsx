@@ -17,10 +17,16 @@ interface BusinessInstallPromptProps {
   businessName: string;
   logoUrl?: string | null;
   pageUrl?: string;
+  storeSlug?: string | null;
 }
 
 // Dynamically inject a manifest for this specific business page
-const injectDynamicManifest = (businessName: string, logoUrl: string | null | undefined, pagePath: string) => {
+const injectDynamicManifest = (
+  businessName: string,
+  logoUrl: string | null | undefined,
+  pagePath: string,
+  storeSlug?: string | null
+) => {
   // Remove any existing manifest link
   const existingManifest = document.querySelector('link[rel="manifest"]');
   if (existingManifest) {
@@ -43,8 +49,10 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
     );
   }
 
-  // Use "/" as scope so the service worker can serve index.html for the SPA route
-  // but start_url points to the specific business page
+  // Use store slug path for scope if available, otherwise use "/" for SPA routing
+  const storePath = storeSlug ? `/store/${storeSlug}` : pagePath;
+  const startUrl = storeSlug ? `/store/${storeSlug}` : pagePath;
+
   const manifest = {
     name: businessName,
     short_name: businessName.length > 12 ? businessName.substring(0, 12) : businessName,
@@ -54,7 +62,7 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
     display: "standalone",
     orientation: "portrait-primary",
     scope: "/",
-    start_url: pagePath,
+    start_url: startUrl,
     icons,
   };
 
@@ -88,7 +96,7 @@ const injectDynamicManifest = (businessName: string, logoUrl: string | null | un
   };
 };
 
-export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: BusinessInstallPromptProps) => {
+export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl, storeSlug }: BusinessInstallPromptProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -96,9 +104,9 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
   // Inject dynamic manifest on mount
   useEffect(() => {
     const currentPath = pageUrl || window.location.pathname;
-    const cleanup = injectDynamicManifest(businessName, logoUrl, currentPath);
+    const cleanup = injectDynamicManifest(businessName, logoUrl, currentPath, storeSlug);
     return cleanup;
-  }, [businessName, logoUrl, pageUrl]);
+  }, [businessName, logoUrl, pageUrl, storeSlug]);
 
   useEffect(() => {
     if (window.matchMedia("(display-mode: standalone)").matches) {
@@ -106,7 +114,11 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
       return;
     }
 
-    const dismissed = localStorage.getItem("business-install-dismissed");
+    // Use store-specific dismissal key
+    const dismissKey = storeSlug 
+      ? `store-install-dismissed-${storeSlug}` 
+      : "business-install-dismissed";
+    const dismissed = localStorage.getItem(dismissKey);
     if (dismissed) {
       const dismissedDate = new Date(dismissed);
       const daysSinceDismissed = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -140,7 +152,7 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
       window.removeEventListener("appinstalled", handleAppInstalled);
       clearTimeout(timer);
     };
-  }, []);
+  }, [storeSlug]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -163,7 +175,10 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
 
   const handleDismiss = () => {
     setShowBanner(false);
-    localStorage.setItem("business-install-dismissed", new Date().toISOString());
+    const dismissKey = storeSlug 
+      ? `store-install-dismissed-${storeSlug}` 
+      : "business-install-dismissed";
+    localStorage.setItem(dismissKey, new Date().toISOString());
   };
 
   if (isInstalled || !showBanner) return null;
@@ -194,7 +209,7 @@ export const BusinessInstallPrompt = ({ businessName, logoUrl, pageUrl }: Busine
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleInstallClick} className="flex-1">
                     <Download className="w-4 h-4 mr-1" />
-                    Install
+                    Install App
                   </Button>
                   <Button size="sm" variant="ghost" onClick={handleDismiss}>
                     <X className="w-4 h-4" />
