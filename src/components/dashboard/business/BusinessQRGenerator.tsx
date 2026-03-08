@@ -226,7 +226,12 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
     setIsGenerating(true);
     try {
       const publicId = generatePublicId();
-      const qrUrl = `${window.location.origin}/business/${publicId}`;
+      const storeSlug = businessInfo.business_name 
+        ? generateStoreSlug(businessInfo.business_name)
+        : null;
+      const qrUrl = storeSlug 
+        ? `${window.location.origin}/store/${storeSlug}`
+        : `${window.location.origin}/business/${publicId}`;
       const expiresAt = calculateExpirationDate();
       const passwordHash = enablePassword && password.trim() ? hashPassword(password.trim()) : null;
 
