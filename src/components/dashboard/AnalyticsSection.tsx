@@ -86,10 +86,27 @@ export const AnalyticsSection = () => {
         supabase.from('qr_business_pages').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_deleted', false),
         supabase.from('upi_payments').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('items').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('qr_pages').select('id, title, public_id').eq('user_id', user.id).eq('is_deleted', false),
-        supabase.from('qr_business_pages').select('id, title, business_name, public_id').eq('user_id', user.id).eq('is_deleted', false),
+        supabase.from('qr_pages').select('id, title, public_id, starred_item_id').eq('user_id', user.id).eq('is_deleted', false),
+        supabase.from('qr_business_pages').select('id, title, business_name, public_id, store_slug').eq('user_id', user.id).eq('is_deleted', false),
         supabase.from('qr_scans').select('scanned_at, device_type, qr_page_id, qr_business_page_id'),
       ]);
+
+      // Fetch starred item URLs for QR pages that have starred items
+      const starredItemIds = (qrPages || []).filter(p => p.starred_item_id).map(p => p.starred_item_id!);
+      let starredItemsMap: Record<string, string> = {};
+      if (starredItemIds.length > 0) {
+        const { data: starredItems } = await supabase
+          .from('items')
+          .select('id, content, type')
+          .in('id', starredItemIds);
+        if (starredItems) {
+          starredItems.forEach(item => {
+            if (item.type === 'url') {
+              starredItemsMap[item.id] = item.content;
+            }
+          });
+        }
+      }
 
       const qrPageIds = (qrPages || []).map(p => p.id);
       const bizPageIds = (bizPages || []).map(p => p.id);
