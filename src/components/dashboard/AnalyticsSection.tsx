@@ -212,10 +212,20 @@ export const AnalyticsSection = () => {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const handleOpenQR = (publicId: string, type: 'profile' | 'business') => {
-    if (!publicId) return;
-    const path = type === 'business' ? `/b/${publicId}` : `/q/${publicId}`;
-    window.open(path, '_blank');
+  const handleOpenQR = (qr: UserAnalytics['topQRCodes'][0]) => {
+    if (!qr.publicId) return;
+    // If starred URL exists, open that directly
+    if (qr.starredUrl) {
+      window.open(qr.starredUrl, '_blank');
+      return;
+    }
+    // Business pages: use store slug or /business/ route
+    if (qr.type === 'business') {
+      const path = qr.storeSlug ? `/store/${qr.storeSlug}` : `/business/${qr.publicId}`;
+      window.open(path, '_blank');
+    } else {
+      window.open(`/p/${qr.publicId}`, '_blank');
+    }
   };
 
   const MetricCard = ({ title, value, icon: Icon, iconColor = "text-primary", bgColor = "bg-primary/10" }: { 
