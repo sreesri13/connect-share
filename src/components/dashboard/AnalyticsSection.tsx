@@ -179,11 +179,14 @@ export const AnalyticsSection = () => {
         .map(([id, scans]) => {
           const qr = (qrPages || []).find(p => p.id === id);
           const biz = (bizPages || []).find(p => p.id === id);
+          const starredUrl = qr?.starred_item_id ? starredItemsMap[qr.starred_item_id] : undefined;
           return {
             title: qr?.title || biz?.business_name || biz?.title || 'Untitled',
             scans,
             type: (biz ? 'business' : 'profile') as 'profile' | 'business',
             publicId: qr?.public_id || biz?.public_id || '',
+            starredUrl,
+            storeSlug: biz?.store_slug || undefined,
           };
         });
 
