@@ -390,7 +390,7 @@ export const AnalyticsSection = () => {
                 <div
                   key={i}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                  onClick={() => handleOpenQR(qr.publicId, qr.type)}
+                  onClick={() => handleOpenQR(qr)}
                   role="button"
                   tabIndex={0}
                 >
