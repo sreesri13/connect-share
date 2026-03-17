@@ -45,6 +45,8 @@ interface UserAnalytics {
     scans: number;
     type: 'profile' | 'business';
     publicId: string;
+    starredUrl?: string;
+    storeSlug?: string;
   }>;
 }
 
