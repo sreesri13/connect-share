@@ -53,7 +53,10 @@ const injectDynamicManifest = (
   const storePath = storeSlug ? `/store/${storeSlug}` : pagePath;
   const startUrl = storeSlug ? `/store/${storeSlug}` : pagePath;
 
+  const storeScope = storeSlug ? `/store/${storeSlug}/` : "/";
+
   const manifest = {
+    id: storeSlug ? `/store/${storeSlug}` : pagePath,
     name: businessName,
     short_name: businessName.length > 12 ? businessName.substring(0, 12) : businessName,
     description: `Shop at ${businessName}`,
@@ -61,7 +64,7 @@ const injectDynamicManifest = (
     background_color: "#0F0F23",
     display: "standalone",
     orientation: "portrait-primary",
-    scope: "/",
+    scope: storeScope,
     start_url: startUrl,
     icons,
   };
