@@ -104,7 +104,7 @@ const BusinessPage = () => {
       ? `/business/${publicId}` 
       : null;
 
-  // In standalone mode, lock all navigation to this business page only
+  // In standalone mode, intercept navigation to other stores and open in browser
   useEffect(() => {
     if (!isStandalone || !currentStorePath) return;
 
@@ -117,14 +117,19 @@ const BusinessPage = () => {
       // Allow same-page anchors
       if (href.startsWith("#")) return;
 
-      // Block all navigation - this installed app should only show this business page
       try {
         const url = new URL(href, window.location.origin);
-        if (url.origin === window.location.origin && url.pathname === currentStorePath) return;
-      } catch {}
-
-      e.preventDefault();
-      e.stopPropagation();
+        // Allow navigation within the current store
+        if (url.origin === window.location.origin && url.pathname.startsWith(currentStorePath)) return;
+        
+        // For any other link (other stores, external, dashboard), open in browser
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(url.href, "_blank");
+      } catch {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     };
 
     document.addEventListener("click", handleClick, true);
