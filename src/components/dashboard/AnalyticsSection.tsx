@@ -337,9 +337,9 @@ export const AnalyticsSection = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
                   <ResponsiveContainer width={160} height={160}>
                     <PieChart>
-                      <Pie data={analytics.deviceBreakdown} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="count" paddingAngle={2}>
+                      <Pie data={analytics.deviceBreakdown} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="count" paddingAngle={4} strokeWidth={2} stroke="hsl(var(--card))">
                         {analytics.deviceBreakdown.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
+                          <Cell key={i} fill={entry.color} fillOpacity={1} />
                         ))}
                       </Pie>
                     </PieChart>
