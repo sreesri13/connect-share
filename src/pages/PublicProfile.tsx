@@ -76,6 +76,7 @@ const handleStarredRedirect = (item: ProfileItem) => {
 
 const PublicProfile = () => {
   const { profileId } = useParams<{ profileId: string }>();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -85,6 +86,11 @@ const PublicProfile = () => {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [scanLimitReached, setScanLimitReached] = useState(false);
   const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
+
+  // Access control states
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [allowRequests, setAllowRequests] = useState(false);
+  const [qrIdForAccess, setQrIdForAccess] = useState("");
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
