@@ -20,6 +20,7 @@ import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours } from "date-fns";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { Progress } from "@/components/ui/progress";
+import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
 import {
   Dialog,
   DialogContent,
