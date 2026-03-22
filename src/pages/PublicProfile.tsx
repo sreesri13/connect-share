@@ -388,6 +388,11 @@ const PublicProfile = () => {
     return acc;
   }, {} as Record<string, ProfileItem[]>);
 
+  // Access denied screen
+  if (accessDenied) {
+    return <AccessDenied qrId={qrIdForAccess} qrType="profile" allowRequests={allowRequests} />;
+  }
+
   // Scan limit reached screen
   if (scanLimitReached) {
     return <ScanLimitReached type={scanLimitReachedType} />;
