@@ -176,7 +176,6 @@ export const ManageAccessDialog = ({
         role: req.requested_role,
         status: "active",
         granted_by: userId,
-        user_id: req.user_id || null,
       };
       await supabase.from("qr_permissions").insert(insertData);
 
