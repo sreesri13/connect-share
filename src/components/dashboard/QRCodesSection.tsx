@@ -741,6 +741,15 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}
+                      className="min-h-[40px] min-w-[40px]"
+                      title="Manage Access"
+                    >
+                      <Shield className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleEditQR(page)}
                       className="min-h-[40px] min-w-[40px]"
                     >
