@@ -143,6 +143,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [editScanLimitType, setEditScanLimitType] = useState<ScanLimitType>('unlimited');
   const [editMaxScans, setEditMaxScans] = useState(100);
   const [editDailyLimit, setEditDailyLimit] = useState(50);
+
+  // Manage Access state
+  const [manageAccessQR, setManageAccessQR] = useState<BusinessQRPage | null>(null);
+  const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
