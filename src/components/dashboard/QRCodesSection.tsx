@@ -1218,6 +1218,18 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Access Dialog */}
+      {manageAccessQR && (
+        <ManageAccessDialog
+          open={isManageAccessOpen}
+          onOpenChange={(open) => { setIsManageAccessOpen(open); if (!open) setManageAccessQR(null); }}
+          qrId={manageAccessQR.id}
+          qrType="profile"
+          qrTitle={manageAccessQR.title || "Untitled QR"}
+          userId={userId}
+        />
+      )}
     </div>
   );
 };
