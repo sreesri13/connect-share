@@ -195,6 +195,54 @@ export type Database = {
         }
         Relationships: []
       }
+      qr_access_requests: {
+        Row: {
+          created_at: string
+          id: string
+          qr_business_page_id: string | null
+          qr_page_id: string | null
+          requested_role: string
+          status: string
+          user_email: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          requested_role?: string
+          status?: string
+          user_email: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          requested_role?: string
+          status?: string
+          user_email?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_access_requests_qr_business_page_id_fkey"
+            columns: ["qr_business_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_business_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_access_requests_qr_page_id_fkey"
+            columns: ["qr_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qr_business_page_products: {
         Row: {
           display_order: number
@@ -233,6 +281,7 @@ export type Database = {
       }
       qr_business_pages: {
         Row: {
+          allow_requests: boolean
           business_address: string | null
           business_email: string | null
           business_facebook: string | null
@@ -257,6 +306,7 @@ export type Database = {
           max_scans: number | null
           password_hash: string | null
           public_id: string
+          public_view: boolean
           scan_limit_type: string
           show_expires_at: boolean | null
           store_slug: string | null
@@ -267,6 +317,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allow_requests?: boolean
           business_address?: string | null
           business_email?: string | null
           business_facebook?: string | null
@@ -291,6 +342,7 @@ export type Database = {
           max_scans?: number | null
           password_hash?: string | null
           public_id: string
+          public_view?: boolean
           scan_limit_type?: string
           show_expires_at?: boolean | null
           store_slug?: string | null
@@ -301,6 +353,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allow_requests?: boolean
           business_address?: string | null
           business_email?: string | null
           business_facebook?: string | null
@@ -325,6 +378,7 @@ export type Database = {
           max_scans?: number | null
           password_hash?: string | null
           public_id?: string
+          public_view?: boolean
           scan_limit_type?: string
           show_expires_at?: boolean | null
           store_slug?: string | null
@@ -382,6 +436,7 @@ export type Database = {
       }
       qr_pages: {
         Row: {
+          allow_requests: boolean
           created_at: string
           daily_limit: number | null
           deleted_at: string | null
@@ -395,6 +450,7 @@ export type Database = {
           max_scans: number | null
           password_hash: string | null
           public_id: string
+          public_view: boolean
           scan_limit_type: string
           show_expires_at: boolean | null
           starred_item_id: string | null
@@ -404,6 +460,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allow_requests?: boolean
           created_at?: string
           daily_limit?: number | null
           deleted_at?: string | null
@@ -417,6 +474,7 @@ export type Database = {
           max_scans?: number | null
           password_hash?: string | null
           public_id: string
+          public_view?: boolean
           scan_limit_type?: string
           show_expires_at?: boolean | null
           starred_item_id?: string | null
@@ -426,6 +484,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allow_requests?: boolean
           created_at?: string
           daily_limit?: number | null
           deleted_at?: string | null
@@ -439,6 +498,7 @@ export type Database = {
           max_scans?: number | null
           password_hash?: string | null
           public_id?: string
+          public_view?: boolean
           scan_limit_type?: string
           show_expires_at?: boolean | null
           starred_item_id?: string | null
@@ -460,6 +520,57 @@ export type Database = {
             columns: ["style_id"]
             isOneToOne: false
             referencedRelation: "qr_styles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          qr_business_page_id: string | null
+          qr_page_id: string | null
+          role: string
+          status: string
+          user_email: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          role?: string
+          status?: string
+          user_email: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          qr_business_page_id?: string | null
+          qr_page_id?: string | null
+          role?: string
+          status?: string
+          user_email?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_permissions_qr_business_page_id_fkey"
+            columns: ["qr_business_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_business_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_permissions_qr_page_id_fkey"
+            columns: ["qr_page_id"]
+            isOneToOne: false
+            referencedRelation: "qr_pages"
             referencedColumns: ["id"]
           },
         ]

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   Trash2, Download, Copy, ExternalLink, Eye, MoreVertical, Share2, 
-  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine, Smartphone, Store
+  Edit2, Lock, LockOpen, MapPin, Clock, X, Check, AlertCircle, Loader2, BarChart3, ScanLine, Smartphone, Store, Shield
 } from "lucide-react";
 import { BusinessInfoForm, BusinessInfo, defaultBusinessInfo } from "@/components/business/BusinessInfoForm";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours } from "date-fns";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { Progress } from "@/components/ui/progress";
+import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   const [editScanLimitType, setEditScanLimitType] = useState<ScanLimitType>('unlimited');
   const [editMaxScans, setEditMaxScans] = useState(100);
   const [editDailyLimit, setEditDailyLimit] = useState(50);
+
+  // Manage Access state
+  const [manageAccessQR, setManageAccessQR] = useState<BusinessQRPage | null>(null);
+  const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -750,6 +755,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                           <Smartphone className="w-4 h-4 mr-2" />
                           Install Store App
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}>
+                          <Shield className="w-4 h-4 mr-2" />
+                          Manage Access
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeleteId(page.id)}
                           className="text-destructive focus:text-destructive"
@@ -1208,6 +1217,18 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Access Dialog */}
+      {manageAccessQR && (
+        <ManageAccessDialog
+          open={isManageAccessOpen}
+          onOpenChange={(open) => { setIsManageAccessOpen(open); if (!open) setManageAccessQR(null); }}
+          qrId={manageAccessQR.id}
+          qrType="business"
+          qrTitle={manageAccessQR.title || manageAccessQR.business_name || "Untitled QR"}
+          userId={userId}
+        />
+      )}
     </>
   );
 };

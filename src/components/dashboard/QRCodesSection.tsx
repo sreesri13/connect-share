@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   QrCode, ExternalLink, Trash2, Calendar, Loader2, Edit2, Lock, LockOpen, 
   Eye, EyeOff, X, Check, Download, MapPin, Clock, AlertCircle, Plus, GripVertical,
-  Folder, LinkIcon, FileText, Image, Video, Music, File, Star, BarChart3, ScanLine
+  Folder, LinkIcon, FileText, Image, Video, Music, File, Star, BarChart3, ScanLine, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import { format, isPast, addDays, addHours, addMonths } from "date-fns";
 import { PlatformIcon } from "@/lib/platform-icons";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { Progress } from "@/components/ui/progress";
+import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
 
 interface QRPage {
   id: string;
@@ -126,6 +127,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [editScanLimitType, setEditScanLimitType] = useState<ScanLimitType>('unlimited');
   const [editMaxScans, setEditMaxScans] = useState(100);
   const [editDailyLimit, setEditDailyLimit] = useState(50);
+
+  // Manage Access state
+  const [manageAccessQR, setManageAccessQR] = useState<QRPage | null>(null);
+  const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
 
   useEffect(() => {
     fetchQRPages();
@@ -736,6 +741,15 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}
+                      className="min-h-[40px] min-w-[40px]"
+                      title="Manage Access"
+                    >
+                      <Shield className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleEditQR(page)}
                       className="min-h-[40px] min-w-[40px]"
                     >
@@ -1204,6 +1218,18 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Access Dialog */}
+      {manageAccessQR && (
+        <ManageAccessDialog
+          open={isManageAccessOpen}
+          onOpenChange={(open) => { setIsManageAccessOpen(open); if (!open) setManageAccessQR(null); }}
+          qrId={manageAccessQR.id}
+          qrType="profile"
+          qrTitle={manageAccessQR.title || "Untitled QR"}
+          userId={userId}
+        />
+      )}
     </div>
   );
 };

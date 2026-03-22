@@ -16,6 +16,8 @@ import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { hashPassword } from "@/lib/crypto";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { BusinessInstallPrompt } from "@/components/business/BusinessInstallPrompt";
+import { AccessDenied } from "@/components/qr/AccessDenied";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Category {
   id: string;
@@ -68,6 +70,7 @@ interface BusinessPageData {
 
 const BusinessPage = () => {
   const { publicId, storeSlug } = useParams<{ publicId?: string; storeSlug?: string }>();
+  const { user } = useAuth();
   const [pageData, setPageData] = useState<BusinessPageData | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -94,6 +97,11 @@ const BusinessPage = () => {
   const [passwordError, setPasswordError] = useState("");
   const [scanLimitReached, setScanLimitReached] = useState(false);
   const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
+
+  // Access control states
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [allowRequests, setAllowRequests] = useState(false);
+  const [qrIdForAccess, setQrIdForAccess] = useState("");
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
@@ -194,6 +202,37 @@ const BusinessPage = () => {
 
       setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
+      setQrIdForAccess(pageDataResult.id);
+
+      // Check access control
+      const isPublic = pageDataResult.public_view ?? true;
+      const reqsAllowed = pageDataResult.allow_requests ?? false;
+      setAllowRequests(reqsAllowed);
+
+      if (!isPublic) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const isOwner = session?.user?.id === pageDataResult.user_id;
+        
+        if (!isOwner) {
+          let hasPermission = false;
+          if (session?.user?.email) {
+            const { data: perm } = await supabase
+              .from("qr_permissions")
+              .select("role")
+              .eq("qr_business_page_id", pageDataResult.id)
+              .eq("user_email", session.user.email.toLowerCase())
+              .eq("status", "active")
+              .maybeSingle();
+            hasPermission = !!perm;
+          }
+          
+          if (!hasPermission) {
+            setAccessDenied(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
 
       // Check scan limit before security checks
       const limitType = (pageDataResult as any).scan_limit_type;
@@ -377,6 +416,11 @@ const BusinessPage = () => {
     cart.forEach((item) => { total += getProductPrice(item.product) * item.quantity; });
     return total;
   };
+
+  // Access denied
+  if (accessDenied) {
+    return <AccessDenied qrId={qrIdForAccess} qrType="business" allowRequests={allowRequests} />;
+  }
 
   // Scan limit reached
   if (scanLimitReached) {
