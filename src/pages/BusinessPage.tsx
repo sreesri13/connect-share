@@ -16,6 +16,8 @@ import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { hashPassword } from "@/lib/crypto";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { BusinessInstallPrompt } from "@/components/business/BusinessInstallPrompt";
+import { AccessDenied } from "@/components/qr/AccessDenied";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Category {
   id: string;
