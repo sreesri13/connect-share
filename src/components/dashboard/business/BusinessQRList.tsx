@@ -1217,6 +1217,18 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Access Dialog */}
+      {manageAccessQR && (
+        <ManageAccessDialog
+          open={isManageAccessOpen}
+          onOpenChange={(open) => { setIsManageAccessOpen(open); if (!open) setManageAccessQR(null); }}
+          qrId={manageAccessQR.id}
+          qrType="business"
+          qrTitle={manageAccessQR.title || manageAccessQR.business_name || "Untitled QR"}
+          userId={userId}
+        />
+      )}
     </>
   );
 };
