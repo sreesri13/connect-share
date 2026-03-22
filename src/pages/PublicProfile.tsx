@@ -17,6 +17,8 @@ import { recordQRScan, checkScanLimit } from "@/hooks/useQRScans";
 import { FileViewer } from "@/components/FileViewer";
 import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { PlatformIcon } from "@/lib/platform-icons";
+import { AccessDenied } from "@/components/qr/AccessDenied";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfileItem {
   id: string;
