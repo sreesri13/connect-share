@@ -128,6 +128,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [editMaxScans, setEditMaxScans] = useState(100);
   const [editDailyLimit, setEditDailyLimit] = useState(50);
 
+  // Manage Access state
+  const [manageAccessQR, setManageAccessQR] = useState<QRPage | null>(null);
+  const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
+
   useEffect(() => {
     fetchQRPages();
   }, [userId]);
