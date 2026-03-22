@@ -70,6 +70,7 @@ interface BusinessPageData {
 
 const BusinessPage = () => {
   const { publicId, storeSlug } = useParams<{ publicId?: string; storeSlug?: string }>();
+  const { user } = useAuth();
   const [pageData, setPageData] = useState<BusinessPageData | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,6 +97,11 @@ const BusinessPage = () => {
   const [passwordError, setPasswordError] = useState("");
   const [scanLimitReached, setScanLimitReached] = useState(false);
   const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
+
+  // Access control states
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [allowRequests, setAllowRequests] = useState(false);
+  const [qrIdForAccess, setQrIdForAccess] = useState("");
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
