@@ -202,6 +202,37 @@ const BusinessPage = () => {
 
       setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
+      setQrIdForAccess(pageDataResult.id);
+
+      // Check access control
+      const isPublic = pageDataResult.public_view ?? true;
+      const reqsAllowed = pageDataResult.allow_requests ?? false;
+      setAllowRequests(reqsAllowed);
+
+      if (!isPublic) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const isOwner = session?.user?.id === pageDataResult.user_id;
+        
+        if (!isOwner) {
+          let hasPermission = false;
+          if (session?.user?.email) {
+            const { data: perm } = await supabase
+              .from("qr_permissions")
+              .select("role")
+              .eq("qr_business_page_id", pageDataResult.id)
+              .eq("user_email", session.user.email.toLowerCase())
+              .eq("status", "active")
+              .maybeSingle();
+            hasPermission = !!perm;
+          }
+          
+          if (!hasPermission) {
+            setAccessDenied(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
 
       // Check scan limit before security checks
       const limitType = (pageDataResult as any).scan_limit_type;
