@@ -755,6 +755,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                           <Smartphone className="w-4 h-4 mr-2" />
                           Install Store App
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}>
+                          <Shield className="w-4 h-4 mr-2" />
+                          Manage Access
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeleteId(page.id)}
                           className="text-destructive focus:text-destructive"
