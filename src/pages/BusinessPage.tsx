@@ -417,6 +417,11 @@ const BusinessPage = () => {
     return total;
   };
 
+  // Access denied
+  if (accessDenied) {
+    return <AccessDenied qrId={qrIdForAccess} qrType="business" allowRequests={allowRequests} />;
+  }
+
   // Scan limit reached
   if (scanLimitReached) {
     return <ScanLimitReached type={scanLimitReachedType} />;
