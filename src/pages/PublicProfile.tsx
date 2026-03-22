@@ -120,7 +120,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -133,6 +133,39 @@ const PublicProfile = () => {
       }
 
       setQrPageData(qrPage);
+      setQrIdForAccess(qrPage.id);
+
+      // Check access control
+      const isPublic = (qrPage as any).public_view ?? true;
+      const reqsAllowed = (qrPage as any).allow_requests ?? false;
+      setAllowRequests(reqsAllowed);
+
+      if (!isPublic) {
+        // Check if user is owner
+        const { data: { session } } = await supabase.auth.getSession();
+        const isOwner = session?.user?.id === qrPage.user_id;
+        
+        if (!isOwner) {
+          // Check if user has permission
+          let hasPermission = false;
+          if (session?.user?.email) {
+            const { data: perm } = await supabase
+              .from("qr_permissions")
+              .select("role")
+              .eq("qr_page_id", qrPage.id)
+              .eq("user_email", session.user.email.toLowerCase())
+              .eq("status", "active")
+              .maybeSingle();
+            hasPermission = !!perm;
+          }
+          
+          if (!hasPermission) {
+            setAccessDenied(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
 
       // Check scan limit before anything else
       if (qrPage.scan_limit_type && qrPage.scan_limit_type !== 'unlimited') {
