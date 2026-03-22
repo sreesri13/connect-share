@@ -44,6 +44,7 @@ import { format, isPast, addDays, addHours, addMonths } from "date-fns";
 import { PlatformIcon } from "@/lib/platform-icons";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { Progress } from "@/components/ui/progress";
+import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
 
 interface QRPage {
   id: string;
