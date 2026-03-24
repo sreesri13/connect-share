@@ -613,6 +613,10 @@ const BusinessPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
+      {/* View-only banner for logged-in users without edit access */}
+      {user && userRole !== "owner" && userRole !== "editor" && (
+        <AccessDenied qrId={qrIdForAccess} qrType="business" allowRequests={allowRequests} viewOnly />
+      )}
       {/* Sticky Header */}
       <motion.header
         initial={{ y: -60 }}
