@@ -28,13 +28,14 @@ export const checkQRPermission = async (
     return { role: "owner", publicView, allowRequests };
   }
 
-  // Check email-based permission
-  if (userEmail) {
+  // Check email-based permission using session email or provided email
+  const emailToCheck = session?.user?.email || userEmail;
+  if (emailToCheck) {
     const { data: perm } = await supabase
       .from("qr_permissions")
       .select("role")
       .eq(fkColumn, qrId)
-      .eq("user_email", userEmail.toLowerCase())
+      .eq("user_email", emailToCheck.toLowerCase())
       .eq("status", "active")
       .maybeSingle();
 
