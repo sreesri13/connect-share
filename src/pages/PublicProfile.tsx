@@ -91,6 +91,7 @@ const PublicProfile = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [allowRequests, setAllowRequests] = useState(false);
   const [qrIdForAccess, setQrIdForAccess] = useState("");
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -145,9 +146,11 @@ const PublicProfile = () => {
         const { data: { session } } = await supabase.auth.getSession();
         const isOwner = session?.user?.id === qrPage.user_id;
         
-        if (!isOwner) {
+        if (isOwner) {
+          setUserRole("owner");
+        } else {
           // Check if user has permission
-          let hasPermission = false;
+          let permRole: string | null = null;
           if (session?.user?.email) {
             const { data: perm } = await supabase
               .from("qr_permissions")
@@ -156,14 +159,30 @@ const PublicProfile = () => {
               .eq("user_email", session.user.email.toLowerCase())
               .eq("status", "active")
               .maybeSingle();
-            hasPermission = !!perm;
+            permRole = perm?.role || null;
           }
           
-          if (!hasPermission) {
+          if (!permRole) {
             setAccessDenied(true);
             setIsLoading(false);
             return;
           }
+          setUserRole(permRole);
+        }
+      } else {
+        // Public page - still check role for banner display
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id === qrPage.user_id) {
+          setUserRole("owner");
+        } else if (session?.user?.email) {
+          const { data: perm } = await supabase
+            .from("qr_permissions")
+            .select("role")
+            .eq("qr_page_id", qrPage.id)
+            .eq("user_email", session.user.email.toLowerCase())
+            .eq("status", "active")
+            .maybeSingle();
+          setUserRole(perm?.role || null);
         }
       }
 
