@@ -169,15 +169,31 @@ export const ManageAccessDialog = ({
       // Update request status
       await supabase.from("qr_access_requests").update({ status: "approved" }).eq("id", req.id);
 
-      // Add permission
-      const insertData: any = {
-        [fkColumn]: qrId,
-        user_email: req.user_email,
-        role: req.requested_role,
-        status: "active",
-        granted_by: userId,
-      };
-      await supabase.from("qr_permissions").insert(insertData);
+      // Check if permission already exists
+      const { data: existingPerm } = await supabase
+        .from("qr_permissions")
+        .select("id")
+        .eq(fkColumn, qrId)
+        .eq("user_email", req.user_email)
+        .maybeSingle();
+
+      if (existingPerm) {
+        // Update existing permission role
+        await supabase.from("qr_permissions").update({ 
+          role: req.requested_role, 
+          status: "active" 
+        }).eq("id", existingPerm.id);
+      } else {
+        // Add new permission
+        const insertData: any = {
+          [fkColumn]: qrId,
+          user_email: req.user_email,
+          role: req.requested_role,
+          status: "active",
+          granted_by: userId,
+        };
+        await supabase.from("qr_permissions").insert(insertData);
+      }
 
       toast.success(`Approved ${req.user_email} as ${req.requested_role}`);
       fetchData();
