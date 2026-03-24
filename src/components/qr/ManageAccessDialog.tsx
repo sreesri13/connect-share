@@ -123,20 +123,12 @@ export const ManageAccessDialog = ({
 
     setIsSaving(true);
     try {
-      // Check if user exists
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .ilike("display_name", emailLower)
-        .maybeSingle();
-
       const insertData: any = {
         [fkColumn]: qrId,
         user_email: emailLower,
         role: newRole,
-        status: profile ? "active" : "pending",
+        status: "active",
         granted_by: userId,
-        user_id: profile?.user_id || null,
       };
 
       const { error } = await supabase.from("qr_permissions").insert(insertData);
