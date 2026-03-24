@@ -102,6 +102,7 @@ const BusinessPage = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [allowRequests, setAllowRequests] = useState(false);
   const [qrIdForAccess, setQrIdForAccess] = useState("");
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
@@ -213,8 +214,10 @@ const BusinessPage = () => {
         const { data: { session } } = await supabase.auth.getSession();
         const isOwner = session?.user?.id === pageDataResult.user_id;
         
-        if (!isOwner) {
-          let hasPermission = false;
+        if (isOwner) {
+          setUserRole("owner");
+        } else {
+          let permRole: string | null = null;
           if (session?.user?.email) {
             const { data: perm } = await supabase
               .from("qr_permissions")
@@ -223,14 +226,30 @@ const BusinessPage = () => {
               .eq("user_email", session.user.email.toLowerCase())
               .eq("status", "active")
               .maybeSingle();
-            hasPermission = !!perm;
+            permRole = perm?.role || null;
           }
           
-          if (!hasPermission) {
+          if (!permRole) {
             setAccessDenied(true);
             setIsLoading(false);
             return;
           }
+          setUserRole(permRole);
+        }
+      } else {
+        // Public page - still check role for banner
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id === pageDataResult.user_id) {
+          setUserRole("owner");
+        } else if (session?.user?.email) {
+          const { data: perm } = await supabase
+            .from("qr_permissions")
+            .select("role")
+            .eq("qr_business_page_id", pageDataResult.id)
+            .eq("user_email", session.user.email.toLowerCase())
+            .eq("status", "active")
+            .maybeSingle();
+          setUserRole(perm?.role || null);
         }
       }
 
