@@ -586,6 +586,11 @@ const PublicProfile = () => {
           )}
         </div>
 
+        {/* View-only banner for logged-in users without edit access */}
+        {user && userRole !== "owner" && userRole !== "editor" && (
+          <AccessDenied qrId={qrIdForAccess} qrType="profile" allowRequests={allowRequests} viewOnly />
+        )}
+
         {/* Categories & Items */}
         <div className="space-y-6">
           {Object.entries(groupedItems).map(([categoryName, categoryItems], catIndex) => (
