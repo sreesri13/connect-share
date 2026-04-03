@@ -49,7 +49,7 @@ import { WifiInput } from "@/components/dashboard/WifiInput";
 interface Item {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile";
   content: string;
   selected: boolean;
   category_id: string;
