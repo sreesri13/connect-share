@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Square, Eye, Settings2, ChevronDown, ChevronUp, Sparkles, Save, Wand2 } from 'lucide-react';
+import { Palette, Square, Eye, Settings2, ChevronDown, ChevronUp, Sparkles, Save, Wand2, Image as ImageIcon, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -384,6 +384,65 @@ export function QRCustomizationPanel({
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Logo Upload Section */}
+        <div className="pt-4 border-t border-border space-y-3">
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-primary" />
+            Logo in Center
+          </Label>
+          <p className="text-xs text-muted-foreground">Add your logo to the center of the QR code. Use error correction level H for best results.</p>
+          
+          {value.logoUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
+              <img src={value.logoUrl} alt="QR Logo" className="w-12 h-12 rounded-lg object-cover border" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">Logo added</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Label className="text-xs text-muted-foreground">Size:</Label>
+                  <select
+                    value={value.logoSize || 'medium'}
+                    onChange={(e) => updateStyle({ logoSize: e.target.value as 'small' | 'medium' | 'large' })}
+                    className="text-xs border rounded px-1.5 py-0.5 bg-background"
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => updateStyle({ logoUrl: undefined, logoSize: undefined })}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) {
+                    alert("Logo must be under 2MB");
+                    return;
+                  }
+                  // Convert to data URL for preview
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    updateStyle({ logoUrl: reader.result as string, logoSize: 'medium', errorCorrectionLevel: 'H' });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <div className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer">
+                <Upload className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Upload Logo (PNG/JPG, max 2MB)</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Save Style */}
         {onSaveStyle && (

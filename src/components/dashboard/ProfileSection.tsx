@@ -49,7 +49,7 @@ import { WifiInput } from "@/components/dashboard/WifiInput";
 interface Item {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile";
   content: string;
   selected: boolean;
   category_id: string;
@@ -537,6 +537,7 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     <SelectItem value="pdf">PDF</SelectItem>
                     <SelectItem value="wifi">WiFi</SelectItem>
                     <SelectItem value="others">Other Files (Image, Video, Audio, etc.)</SelectItem>
+                    <SelectItem value="largefile">Large Files (up to 100MB)</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -545,9 +546,9 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     value={newItem.content}
                     onChange={(val) => setNewItem({ ...newItem, content: val })}
                   />
-                ) : ["pdf", "others"].includes(newItem.type) ? (
+                ) : ["pdf", "others", "largefile"].includes(newItem.type) ? (
                   <FileUpload
-                    type={newItem.type as "pdf" | "others"}
+                    type={newItem.type as "pdf" | "others" | "largefile"}
                     userId={userId}
                     value={newItem.content}
                     onUploadComplete={(url) => {
