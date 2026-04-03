@@ -42,6 +42,12 @@ const typeConfig = {
     label: "File",
     maxSize: 50 * 1024 * 1024, // 50MB
   },
+  largefile: {
+    accept: "*/*",
+    icon: FileText,
+    label: "Large File",
+    maxSize: 100 * 1024 * 1024, // 100MB
+  },
 };
 
 export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUploadProps) => {
