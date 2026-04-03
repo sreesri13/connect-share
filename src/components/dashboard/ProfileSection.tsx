@@ -546,7 +546,7 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     value={newItem.content}
                     onChange={(val) => setNewItem({ ...newItem, content: val })}
                   />
-                ) : ["pdf", "others"].includes(newItem.type) ? (
+                ) : ["pdf", "others", "largefile"].includes(newItem.type) ? (
                   <FileUpload
                     type={newItem.type as "pdf" | "others"}
                     userId={userId}
