@@ -16,6 +16,8 @@ export interface QRStyleConfig {
   size: number;
   margin: number;
   errorCorrectionLevel: ErrorCorrectionLevel;
+  logoUrl?: string;
+  logoSize?: 'small' | 'medium' | 'large';
 }
 
 export const defaultQRStyle: QRStyleConfig = {

@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
-import { Upload, X, FileText, Image, Video, Music, Loader2 } from "lucide-react";
+import { Upload, X, FileText, Image, Video, Music, Loader2, HardDrive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 interface FileUploadProps {
   type: "pdf" | "image" | "video" | "audio" | "others" | "largefile";
@@ -16,43 +17,44 @@ const typeConfig = {
     accept: ".pdf",
     icon: FileText,
     label: "PDF Document",
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
   },
   image: {
     accept: "image/*",
     icon: Image,
     label: "Image",
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 5 * 1024 * 1024,
   },
   video: {
     accept: "video/*",
     icon: Video,
     label: "Video",
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 50 * 1024 * 1024,
   },
   audio: {
     accept: "audio/*",
     icon: Music,
     label: "Audio",
-    maxSize: 20 * 1024 * 1024, // 20MB
+    maxSize: 20 * 1024 * 1024,
   },
   others: {
     accept: "*/*",
     icon: FileText,
     label: "File",
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 50 * 1024 * 1024,
   },
   largefile: {
     accept: "*/*",
-    icon: FileText,
+    icon: HardDrive,
     label: "Large File",
-    maxSize: 100 * 1024 * 1024, // 100MB
+    maxSize: 100 * 1024 * 1024,
   },
 };
 
 export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; url: string } | null>(
     value ? { name: "Uploaded file", url: value } : null
   );
@@ -77,19 +79,48 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("uploads")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
+      // Use XMLHttpRequest for progress tracking
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in to upload files");
+        setIsUploading(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const uploadUrl = `${supabaseUrl}/storage/v1/object/uploads/${fileName}`;
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percent);
+          }
         });
 
-      if (uploadError) throw uploadError;
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+
+        xhr.open("POST", uploadUrl);
+        xhr.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
+        xhr.setRequestHeader("x-upsert", "false");
+        xhr.send(file);
+      });
 
       const { data: { publicUrl } } = supabase.storage
         .from("uploads")
@@ -103,6 +134,7 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
       toast.error("Failed to upload file");
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -132,7 +164,6 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
   };
 
   if (uploadedFile) {
-    // Extract just the filename from the URL for display
     const displayName = uploadedFile.name !== "Uploaded file" 
       ? uploadedFile.name 
       : uploadedFile.url.split('/').pop()?.split('?')[0] || "Uploaded file";
@@ -179,10 +210,14 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
       
       <div className="flex flex-col items-center justify-center text-center">
         {isUploading ? (
-          <>
-            <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-            <p className="text-sm font-medium">Uploading...</p>
-          </>
+          <div className="w-full space-y-3">
+            <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+            <p className="text-sm font-medium">Uploading... {uploadProgress}%</p>
+            <Progress value={uploadProgress} className="w-full h-2" />
+            <p className="text-xs text-muted-foreground">
+              {uploadProgress < 100 ? "Please wait..." : "Finalizing..."}
+            </p>
+          </div>
         ) : (
           <>
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
