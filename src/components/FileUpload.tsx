@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface FileUploadProps {
-  type: "pdf" | "image" | "video" | "audio" | "others";
+  type: "pdf" | "image" | "video" | "audio" | "others" | "largefile";
   userId: string;
   onUploadComplete: (url: string) => void;
   value?: string;
