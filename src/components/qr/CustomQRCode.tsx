@@ -297,6 +297,8 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
           };
           logoImg.src = mergedStyle.logoUrl;
         }
+
+      } catch (error) {
         console.error('Failed to generate QR code:', error);
       }
     };
