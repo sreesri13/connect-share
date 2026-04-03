@@ -537,6 +537,7 @@ export const ProfileSection = ({ userId }: ProfileSectionProps) => {
                     <SelectItem value="pdf">PDF</SelectItem>
                     <SelectItem value="wifi">WiFi</SelectItem>
                     <SelectItem value="others">Other Files (Image, Video, Audio, etc.)</SelectItem>
+                    <SelectItem value="largefile">Large Files (up to 100MB)</SelectItem>
                   </SelectContent>
                 </Select>
 
