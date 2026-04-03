@@ -307,8 +307,11 @@ export type Database = {
           password_hash: string | null
           public_id: string
           public_view: boolean
+          qr_logo_url: string | null
           scan_limit_type: string
           show_expires_at: boolean | null
+          show_footer_branding: boolean
+          show_install_popup: boolean
           store_slug: string | null
           style_config: Json | null
           style_id: string | null
@@ -343,8 +346,11 @@ export type Database = {
           password_hash?: string | null
           public_id: string
           public_view?: boolean
+          qr_logo_url?: string | null
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          show_footer_branding?: boolean
+          show_install_popup?: boolean
           store_slug?: string | null
           style_config?: Json | null
           style_id?: string | null
@@ -379,8 +385,11 @@ export type Database = {
           password_hash?: string | null
           public_id?: string
           public_view?: boolean
+          qr_logo_url?: string | null
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          show_footer_branding?: boolean
+          show_install_popup?: boolean
           store_slug?: string | null
           style_config?: Json | null
           style_id?: string | null
@@ -451,8 +460,11 @@ export type Database = {
           password_hash: string | null
           public_id: string
           public_view: boolean
+          qr_logo_url: string | null
           scan_limit_type: string
           show_expires_at: boolean | null
+          show_footer_branding: boolean
+          show_install_popup: boolean
           starred_item_id: string | null
           style_config: Json | null
           style_id: string | null
@@ -475,8 +487,11 @@ export type Database = {
           password_hash?: string | null
           public_id: string
           public_view?: boolean
+          qr_logo_url?: string | null
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          show_footer_branding?: boolean
+          show_install_popup?: boolean
           starred_item_id?: string | null
           style_config?: Json | null
           style_id?: string | null
@@ -499,8 +514,11 @@ export type Database = {
           password_hash?: string | null
           public_id?: string
           public_view?: boolean
+          qr_logo_url?: string | null
           scan_limit_type?: string
           show_expires_at?: boolean | null
+          show_footer_branding?: boolean
+          show_install_popup?: boolean
           starred_item_id?: string | null
           style_config?: Json | null
           style_id?: string | null
@@ -737,6 +755,7 @@ export type Database = {
         | "audio"
         | "others"
         | "wifi"
+        | "largefile"
       product_status: "active" | "disabled"
     }
     CompositeTypes: {
@@ -874,6 +893,7 @@ export const Constants = {
         "audio",
         "others",
         "wifi",
+        "largefile",
       ],
       product_status: ["active", "disabled"],
     },
