@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Square, Eye, Settings2, ChevronDown, ChevronUp, Sparkles, Save, Wand2 } from 'lucide-react';
+import { Palette, Square, Eye, Settings2, ChevronDown, ChevronUp, Sparkles, Save, Wand2, Image as ImageIcon, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
