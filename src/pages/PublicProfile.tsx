@@ -731,7 +731,7 @@ const PublicProfile = () => {
         file={selectedItem ? {
           title: selectedItem.title,
           content: selectedItem.content,
-          type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi"
+          type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile"
         } : null}
       />
     </div>

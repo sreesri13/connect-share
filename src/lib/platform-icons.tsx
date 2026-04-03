@@ -368,6 +368,10 @@ export function getItemIcon(
       icon: <File className="w-full h-full" />,
       color: "#757575",
     },
+    largefile: {
+      icon: <File className="w-full h-full" />,
+      color: "#6D4C41",
+    },
     wifi: {
       icon: <Wifi className="w-full h-full" />,
       color: "#00ACC1",
