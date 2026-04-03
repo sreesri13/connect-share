@@ -261,7 +261,42 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
           renderEyeBall(ctx, ballX, ballY, moduleSize, mergedStyle.eyeBallShape, mergedStyle.eyeBallColor);
         });
 
-      } catch (error) {
+        // Draw logo in center if provided
+        if (mergedStyle.logoUrl) {
+          const logoImg = new window.Image();
+          logoImg.crossOrigin = "anonymous";
+          logoImg.onload = () => {
+            const logoSizeRatio = mergedStyle.logoSize === 'large' ? 0.3 : mergedStyle.logoSize === 'small' ? 0.15 : 0.22;
+            const logoSize = canvasSize * logoSizeRatio;
+            const logoX = (canvasSize - logoSize) / 2;
+            const logoY = (canvasSize - logoSize) / 2;
+            const padding = logoSize * 0.12;
+
+            // White background behind logo
+            ctx.fillStyle = '#ffffff';
+            const radius = padding * 1.5;
+            const rx = logoX - padding;
+            const ry = logoY - padding;
+            const rw = logoSize + padding * 2;
+            const rh = logoSize + padding * 2;
+            ctx.beginPath();
+            ctx.moveTo(rx + radius, ry);
+            ctx.lineTo(rx + rw - radius, ry);
+            ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius);
+            ctx.lineTo(rx + rw, ry + rh - radius);
+            ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh);
+            ctx.lineTo(rx + radius, ry + rh);
+            ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius);
+            ctx.lineTo(rx, ry + radius);
+            ctx.quadraticCurveTo(rx, ry, rx + radius, ry);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw logo
+            ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+          };
+          logoImg.src = mergedStyle.logoUrl;
+        }
         console.error('Failed to generate QR code:', error);
       }
     };
