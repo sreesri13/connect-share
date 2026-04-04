@@ -74,6 +74,10 @@ const QRGenerator = () => {
   const [maxScans, setMaxScans] = useState(100);
   const [dailyLimit, setDailyLimit] = useState(50);
 
+  // Branding toggles
+  const [showInstallPopup, setShowInstallPopup] = useState(true);
+  const [showFooterBranding, setShowFooterBranding] = useState(true);
+
   // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
     if (enableCustomization) {
