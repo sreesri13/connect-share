@@ -87,6 +87,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
       if (data) {
         setDisplayName(data.display_name || "");
         setBio(data.bio || "");
+        setAvatarUrl(data.avatar_url || "");
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
