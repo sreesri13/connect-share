@@ -220,6 +220,9 @@ const QRCodesList = () => {
       lng: qrPage.location_lng,
       name: qrPage.location_name || undefined,
     } : null);
+    // Set branding toggles
+    setEditShowInstallPopup(qrPage.show_install_popup);
+    setEditShowFooterBranding(qrPage.show_footer_branding);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
