@@ -48,6 +48,8 @@ interface QRPageData {
   scan_limit_type: string | null;
   max_scans: number | null;
   daily_limit: number | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
