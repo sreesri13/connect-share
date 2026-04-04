@@ -66,6 +66,8 @@ interface BusinessPageData {
   max_scans: number | null;
   daily_limit: number | null;
   store_slug: string | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 const BusinessPage = () => {
