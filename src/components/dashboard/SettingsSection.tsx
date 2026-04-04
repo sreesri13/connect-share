@@ -54,6 +54,8 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
