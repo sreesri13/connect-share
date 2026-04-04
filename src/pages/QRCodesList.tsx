@@ -140,6 +140,8 @@ const QRCodesList = () => {
         location_lat: page.location_lat,
         location_lng: page.location_lng,
         location_name: page.location_name,
+        show_install_popup: page.show_install_popup ?? true,
+        show_footer_branding: page.show_footer_branding ?? true,
       }));
 
       setQrPages(pages);
