@@ -123,7 +123,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests, show_install_popup, show_footer_branding")
         .eq("public_id", profileId)
         .maybeSingle();
 
