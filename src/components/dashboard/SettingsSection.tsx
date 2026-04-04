@@ -78,7 +78,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, bio")
+        .select("display_name, bio, avatar_url")
         .eq("user_id", userId)
         .maybeSingle();
 
