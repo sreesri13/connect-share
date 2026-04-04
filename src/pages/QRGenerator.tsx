@@ -545,6 +545,32 @@ const QRGenerator = () => {
                       onDailyLimitChange={setDailyLimit}
                       compact
                     />
+
+                    {/* Branding Controls */}
+                    <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="showInstallPopup" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <span>Show Install App Popup</span>
+                        </Label>
+                        <Switch
+                          id="showInstallPopup"
+                          checked={showInstallPopup}
+                          onCheckedChange={setShowInstallPopup}
+                          className="scale-75 sm:scale-90"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="showFooterBranding" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <span>Show Footer Branding</span>
+                        </Label>
+                        <Switch
+                          id="showFooterBranding"
+                          checked={showFooterBranding}
+                          onCheckedChange={setShowFooterBranding}
+                          className="scale-75 sm:scale-90"
+                        />
+                      </div>
+                    </div>
                     
                     <Button onClick={handleSaveQR} className="w-full h-11 sm:min-h-[48px] text-sm" disabled={isSaving}>
                       {isSaving ? (
