@@ -104,6 +104,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
         .update({
           display_name: displayName.trim() || null,
           bio: bio.trim() || null,
+          avatar_url: avatarUrl || null,
         })
         .eq("user_id", userId);
 
