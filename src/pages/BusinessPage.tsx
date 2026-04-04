@@ -1023,8 +1023,8 @@ const BusinessPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Install Prompt */}
-      {pageData && (
+      {/* Install Prompt - only if show_install_popup is enabled */}
+      {pageData && (pageData.show_install_popup !== false) && (
         <BusinessInstallPrompt
           businessName={pageData.business_name || pageTitle || "Store"}
           logoUrl={pageData.business_logo_url}
