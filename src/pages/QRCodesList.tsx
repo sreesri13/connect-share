@@ -282,6 +282,10 @@ const QRCodesList = () => {
         updateData.location_name = null;
       }
 
+      // Handle branding toggles
+      updateData.show_install_popup = editShowInstallPopup;
+      updateData.show_footer_branding = editShowFooterBranding;
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
