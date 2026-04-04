@@ -764,6 +764,27 @@ const QRCodesList = () => {
               )}
             </div>
 
+            {/* Branding Controls */}
+            <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+              <Label className="font-medium">Branding Controls</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="editShowInstallPopup" className="text-sm cursor-pointer">Show Install App Popup</Label>
+                <Switch
+                  id="editShowInstallPopup"
+                  checked={editShowInstallPopup}
+                  onCheckedChange={setEditShowInstallPopup}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="editShowFooterBranding" className="text-sm cursor-pointer">Show Footer Branding</Label>
+                <Switch
+                  id="editShowFooterBranding"
+                  checked={editShowFooterBranding}
+                  onCheckedChange={setEditShowFooterBranding}
+                />
+              </div>
+            </div>
+
             {/* Items List */}
             <div className="space-y-3">
               <Label>Items in this QR Code ({qrItems.length})</Label>
