@@ -97,6 +97,7 @@ const SettingsPage = () => {
         .update({
           display_name: displayName.trim() || null,
           bio: bio.trim() || null,
+          avatar_url: avatarUrl || null,
         })
         .eq("user_id", user.id);
 
