@@ -117,6 +117,8 @@ const QRCodesList = () => {
           location_lat,
           location_lng,
           location_name,
+          show_install_popup,
+          show_footer_branding,
           qr_page_items (id)
         `)
         .eq("user_id", user!.id)
