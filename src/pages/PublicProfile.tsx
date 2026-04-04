@@ -554,9 +554,13 @@ const PublicProfile = () => {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center shadow-glow"
+            className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center shadow-glow overflow-hidden"
           >
-            <User className="w-12 h-12 text-primary-foreground" />
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.display_name || "User"} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-12 h-12 text-primary-foreground" />
+            )}
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
