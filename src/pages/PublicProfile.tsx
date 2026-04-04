@@ -31,6 +31,7 @@ interface ProfileItem {
 interface ProfileData {
   display_name: string | null;
   bio: string | null;
+  avatar_url: string | null;
 }
 
 interface QRPageData {
