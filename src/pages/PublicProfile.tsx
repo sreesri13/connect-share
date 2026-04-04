@@ -658,21 +658,23 @@ const PublicProfile = () => {
           ))}
         </div>
 
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="mt-12 text-center"
-        >
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <QrCode className="w-4 h-4" />
-            <span className="text-sm">Powered by ConnectHUB</span>
-          </div>
-          <Button variant="link" className="mt-2 text-primary" asChild>
-            <a href="/">Create your own profile</a>
-          </Button>
-        </motion.div>
+        {/* Footer - conditional on show_footer_branding */}
+        {(qrPageData?.show_footer_branding !== false) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-12 text-center"
+          >
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <QrCode className="w-4 h-4" />
+              <span className="text-sm">Powered by ConnectHUB</span>
+            </div>
+            <Button variant="link" className="mt-2 text-primary" asChild>
+              <a href="/">Create your own profile</a>
+            </Button>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* WiFi Credentials Dialog */}
