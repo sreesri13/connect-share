@@ -908,6 +908,11 @@ const BusinessPage = () => {
               <p className="text-xs text-muted-foreground">
                 © {new Date().getFullYear()} {pageData?.business_name || "Store"}. All rights reserved.
               </p>
+              {(pageData?.show_footer_branding !== false) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Powered by <a href="/" className="text-primary hover:underline">ConnectHUB</a>
+                </p>
+              )}
             </div>
           </div>
         </footer>
