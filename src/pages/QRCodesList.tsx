@@ -46,12 +46,14 @@ interface QRPage {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 interface QRItem {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile";
   content: string;
   qr_page_item_id: string;
 }
