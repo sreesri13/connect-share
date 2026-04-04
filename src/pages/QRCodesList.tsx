@@ -304,6 +304,8 @@ const QRCodesList = () => {
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+              show_install_popup: editShowInstallPopup,
+              show_footer_branding: editShowFooterBranding,
             }
           : p
       ));
