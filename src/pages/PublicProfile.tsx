@@ -31,6 +31,7 @@ interface ProfileItem {
 interface ProfileData {
   display_name: string | null;
   bio: string | null;
+  avatar_url: string | null;
 }
 
 interface QRPageData {
@@ -48,6 +49,8 @@ interface QRPageData {
   scan_limit_type: string | null;
   max_scans: number | null;
   daily_limit: number | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 const typeIcons: Record<string, React.ComponentType<any>> = {
@@ -121,7 +124,7 @@ const PublicProfile = () => {
     try {
       const { data: qrPage, error: qrError } = await supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests")
+        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests, show_install_popup, show_footer_branding")
         .eq("public_id", profileId)
         .maybeSingle();
 
@@ -276,7 +279,7 @@ const PublicProfile = () => {
       // Fetch profile of the owner
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("display_name, bio")
+        .select("display_name, bio, avatar_url")
         .eq("user_id", qrPage.user_id)
         .maybeSingle();
 
@@ -551,9 +554,13 @@ const PublicProfile = () => {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center shadow-glow"
+            className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center shadow-glow overflow-hidden"
           >
-            <User className="w-12 h-12 text-primary-foreground" />
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.display_name || "User"} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-12 h-12 text-primary-foreground" />
+            )}
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
@@ -656,21 +663,23 @@ const PublicProfile = () => {
           ))}
         </div>
 
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="mt-12 text-center"
-        >
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <QrCode className="w-4 h-4" />
-            <span className="text-sm">Powered by ConnectHUB</span>
-          </div>
-          <Button variant="link" className="mt-2 text-primary" asChild>
-            <a href="/">Create your own profile</a>
-          </Button>
-        </motion.div>
+        {/* Footer - conditional on show_footer_branding */}
+        {(qrPageData?.show_footer_branding !== false) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-12 text-center"
+          >
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <QrCode className="w-4 h-4" />
+              <span className="text-sm">Powered by ConnectHUB</span>
+            </div>
+            <Button variant="link" className="mt-2 text-primary" asChild>
+              <a href="/">Create your own profile</a>
+            </Button>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* WiFi Credentials Dialog */}

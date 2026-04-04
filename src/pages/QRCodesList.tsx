@@ -46,12 +46,14 @@ interface QRPage {
   location_lat: number | null;
   location_lng: number | null;
   location_name: string | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 interface QRItem {
   id: string;
   title: string;
-  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi";
+  type: "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile";
   content: string;
   qr_page_item_id: string;
 }
@@ -83,6 +85,10 @@ const QRCodesList = () => {
   const [editEnableLocationLock, setEditEnableLocationLock] = useState(false);
   const [editLocationData, setEditLocationData] = useState<LocationData | null>(null);
 
+  // Branding toggle states
+  const [editShowInstallPopup, setEditShowInstallPopup] = useState(true);
+  const [editShowFooterBranding, setEditShowFooterBranding] = useState(true);
+
   useEffect(() => {
     if (!user && !authLoading) {
       navigate("/auth");
@@ -111,6 +117,8 @@ const QRCodesList = () => {
           location_lat,
           location_lng,
           location_name,
+          show_install_popup,
+          show_footer_branding,
           qr_page_items (id)
         `)
         .eq("user_id", user!.id)
@@ -132,6 +140,8 @@ const QRCodesList = () => {
         location_lat: page.location_lat,
         location_lng: page.location_lng,
         location_name: page.location_name,
+        show_install_popup: page.show_install_popup ?? true,
+        show_footer_branding: page.show_footer_branding ?? true,
       }));
 
       setQrPages(pages);
@@ -210,6 +220,9 @@ const QRCodesList = () => {
       lng: qrPage.location_lng,
       name: qrPage.location_name || undefined,
     } : null);
+    // Set branding toggles
+    setEditShowInstallPopup(qrPage.show_install_popup);
+    setEditShowFooterBranding(qrPage.show_footer_branding);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
@@ -269,6 +282,10 @@ const QRCodesList = () => {
         updateData.location_name = null;
       }
 
+      // Handle branding toggles
+      updateData.show_install_popup = editShowInstallPopup;
+      updateData.show_footer_branding = editShowFooterBranding;
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
@@ -287,6 +304,8 @@ const QRCodesList = () => {
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
+              show_install_popup: editShowInstallPopup,
+              show_footer_branding: editShowFooterBranding,
             }
           : p
       ));
@@ -743,6 +762,27 @@ const QRCodesList = () => {
                   Location lock will be disabled when you save changes.
                 </p>
               )}
+            </div>
+
+            {/* Branding Controls */}
+            <div className="space-y-3 p-4 rounded-lg bg-secondary/30 border border-border/50">
+              <Label className="font-medium">Branding Controls</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="editShowInstallPopup" className="text-sm cursor-pointer">Show Install App Popup</Label>
+                <Switch
+                  id="editShowInstallPopup"
+                  checked={editShowInstallPopup}
+                  onCheckedChange={setEditShowInstallPopup}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="editShowFooterBranding" className="text-sm cursor-pointer">Show Footer Branding</Label>
+                <Switch
+                  id="editShowFooterBranding"
+                  checked={editShowFooterBranding}
+                  onCheckedChange={setEditShowFooterBranding}
+                />
+              </div>
             </div>
 
             {/* Items List */}

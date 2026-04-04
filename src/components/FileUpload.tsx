@@ -47,7 +47,7 @@ const typeConfig = {
     accept: "*/*",
     icon: HardDrive,
     label: "Large File",
-    maxSize: 100 * 1024 * 1024,
+    maxSize: 1024 * 1024 * 1024,
   },
 };
 

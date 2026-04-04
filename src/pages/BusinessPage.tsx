@@ -66,6 +66,8 @@ interface BusinessPageData {
   max_scans: number | null;
   daily_limit: number | null;
   store_slug: string | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 const BusinessPage = () => {
@@ -906,6 +908,11 @@ const BusinessPage = () => {
               <p className="text-xs text-muted-foreground">
                 © {new Date().getFullYear()} {pageData?.business_name || "Store"}. All rights reserved.
               </p>
+              {(pageData?.show_footer_branding !== false) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Powered by <a href="/" className="text-primary hover:underline">ConnectHUB</a>
+                </p>
+              )}
             </div>
           </div>
         </footer>
@@ -1021,8 +1028,8 @@ const BusinessPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Install Prompt */}
-      {pageData && (
+      {/* Install Prompt - only if show_install_popup is enabled */}
+      {pageData && (pageData.show_install_popup !== false) && (
         <BusinessInstallPrompt
           businessName={pageData.business_name || pageTitle || "Store"}
           logoUrl={pageData.business_logo_url}

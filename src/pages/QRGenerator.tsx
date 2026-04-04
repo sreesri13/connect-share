@@ -74,6 +74,10 @@ const QRGenerator = () => {
   const [maxScans, setMaxScans] = useState(100);
   const [dailyLimit, setDailyLimit] = useState(50);
 
+  // Branding toggles
+  const [showInstallPopup, setShowInstallPopup] = useState(true);
+  const [showFooterBranding, setShowFooterBranding] = useState(true);
+
   // Load Ocean preset when customization is enabled (default style takes priority)
   useEffect(() => {
     if (enableCustomization) {
@@ -201,6 +205,8 @@ const QRGenerator = () => {
           scan_limit_type: scanLimitType,
           max_scans: scanLimitType === 'total' ? maxScans : null,
           daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
+          show_install_popup: showInstallPopup,
+          show_footer_branding: showFooterBranding,
         } as any)
         .select()
         .single();
@@ -539,6 +545,32 @@ const QRGenerator = () => {
                       onDailyLimitChange={setDailyLimit}
                       compact
                     />
+
+                    {/* Branding Controls */}
+                    <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-secondary/30 border border-border/50">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="showInstallPopup" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <span>Show Install App Popup</span>
+                        </Label>
+                        <Switch
+                          id="showInstallPopup"
+                          checked={showInstallPopup}
+                          onCheckedChange={setShowInstallPopup}
+                          className="scale-75 sm:scale-90"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="showFooterBranding" className="flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm">
+                          <span>Show Footer Branding</span>
+                        </Label>
+                        <Switch
+                          id="showFooterBranding"
+                          checked={showFooterBranding}
+                          onCheckedChange={setShowFooterBranding}
+                          className="scale-75 sm:scale-90"
+                        />
+                      </div>
+                    </div>
                     
                     <Button onClick={handleSaveQR} className="w-full h-11 sm:min-h-[48px] text-sm" disabled={isSaving}>
                       {isSaving ? (

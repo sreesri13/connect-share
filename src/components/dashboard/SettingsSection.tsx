@@ -12,6 +12,8 @@ import {
   EyeOff,
   Globe,
   Palette,
+  Camera,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +54,8 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +78,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, bio")
+        .select("display_name, bio, avatar_url")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -83,6 +87,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
       if (data) {
         setDisplayName(data.display_name || "");
         setBio(data.bio || "");
+        setAvatarUrl(data.avatar_url || "");
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -99,6 +104,7 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
         .update({
           display_name: displayName.trim() || null,
           bio: bio.trim() || null,
+          avatar_url: avatarUrl || null,
         })
         .eq("user_id", userId);
 
@@ -252,16 +258,76 @@ export const SettingsSection = ({ userId, userEmail }: SettingsSectionProps) => 
                   Update your display name and bio that appears on your public profile.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="displayName">Display Name</Label>
-                  <Input
-                    id="displayName"
-                    placeholder="Your name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                  />
-                </div>
+               <CardContent className="space-y-4">
+                  {/* Profile Picture */}
+                  <div className="space-y-2">
+                    <Label>Profile Picture</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-border" />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border">
+                            <User className="w-10 h-10 text-primary" />
+                          </div>
+                        )}
+                        {avatarUrl && (
+                          <button type="button" onClick={() => setAvatarUrl("")} className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80">
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                      <div>
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isUploadingAvatar}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast.error("Image too large. Max 5MB.");
+                                return;
+                              }
+                              setIsUploadingAvatar(true);
+                              try {
+                                const ext = file.name.split(".").pop();
+                                const fileName = `${userId}/avatar-${Date.now()}.${ext}`;
+                                const { error: uploadError } = await supabase.storage.from("uploads").upload(fileName, file, { upsert: true });
+                                if (uploadError) throw uploadError;
+                                const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(fileName);
+                                setAvatarUrl(publicUrl);
+                                toast.success("Photo uploaded!");
+                              } catch (err) {
+                                console.error(err);
+                                toast.error("Upload failed");
+                              } finally {
+                                setIsUploadingAvatar(false);
+                              }
+                            }}
+                          />
+                          <Button variant="outline" size="sm" asChild disabled={isUploadingAvatar}>
+                            <span>
+                              {isUploadingAvatar ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                              {isUploadingAvatar ? "Uploading..." : "Upload Photo"}
+                            </span>
+                          </Button>
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">Shown on all your QR pages</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName">Display Name</Label>
+                    <Input
+                      id="displayName"
+                      placeholder="Your name"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                    />
+                  </div>
                 <div className="space-y-2">
                   <Label htmlFor="bio">Bio</Label>
                   <Textarea
