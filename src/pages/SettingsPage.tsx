@@ -44,6 +44,8 @@ const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
