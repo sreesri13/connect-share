@@ -279,7 +279,7 @@ const PublicProfile = () => {
       // Fetch profile of the owner
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("display_name, bio")
+        .select("display_name, bio, avatar_url")
         .eq("user_id", qrPage.user_id)
         .maybeSingle();
 
