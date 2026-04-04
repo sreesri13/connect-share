@@ -85,6 +85,10 @@ const QRCodesList = () => {
   const [editEnableLocationLock, setEditEnableLocationLock] = useState(false);
   const [editLocationData, setEditLocationData] = useState<LocationData | null>(null);
 
+  // Branding toggle states
+  const [editShowInstallPopup, setEditShowInstallPopup] = useState(true);
+  const [editShowFooterBranding, setEditShowFooterBranding] = useState(true);
+
   useEffect(() => {
     if (!user && !authLoading) {
       navigate("/auth");
