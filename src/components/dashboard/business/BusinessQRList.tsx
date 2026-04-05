@@ -1027,6 +1027,33 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                 onDailyLimitChange={setEditDailyLimit}
               />
 
+              {/* Branding Controls */}
+              <div className="space-y-4 p-4 rounded-lg border bg-secondary/20">
+                <Label className="text-sm font-semibold">Branding Controls</Label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="edit-biz-install-popup" className="text-sm">Show Install App Popup</Label>
+                    <p className="text-xs text-muted-foreground">Show PWA install prompt to visitors</p>
+                  </div>
+                  <Switch
+                    id="edit-biz-install-popup"
+                    checked={editShowInstallPopup}
+                    onCheckedChange={setEditShowInstallPopup}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="edit-biz-footer-branding" className="text-sm">Show Footer Branding</Label>
+                    <p className="text-xs text-muted-foreground">"Powered by ConnectHUB" footer</p>
+                  </div>
+                  <Switch
+                    id="edit-biz-footer-branding"
+                    checked={editShowFooterBranding}
+                    onCheckedChange={setEditShowFooterBranding}
+                  />
+                </div>
+              </div>
+
               {/* Business Information */}
               <BusinessInfoForm value={editBusinessInfo} onChange={setEditBusinessInfo} userId={userId} />
 
