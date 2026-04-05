@@ -64,6 +64,8 @@ interface QRPage {
   scan_limit_type: string;
   max_scans: number | null;
   daily_limit: number | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 interface QRItem {
@@ -128,6 +130,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [editMaxScans, setEditMaxScans] = useState(100);
   const [editDailyLimit, setEditDailyLimit] = useState(50);
 
+  // Branding toggles state
+  const [editShowInstallPopup, setEditShowInstallPopup] = useState(true);
+  const [editShowFooterBranding, setEditShowFooterBranding] = useState(true);
+
   // Manage Access state
   const [manageAccessQR, setManageAccessQR] = useState<QRPage | null>(null);
   const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
@@ -157,6 +163,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           scan_limit_type,
           max_scans,
           daily_limit,
+          show_install_popup,
+          show_footer_branding,
           qr_page_items (id)
         `)
         .eq("user_id", userId)
@@ -198,6 +206,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         scan_limit_type: page.scan_limit_type || 'unlimited',
         max_scans: page.max_scans,
         daily_limit: page.daily_limit,
+        show_install_popup: page.show_install_popup !== false,
+        show_footer_branding: page.show_footer_branding !== false,
       }));
 
       setQrPages(pages);
@@ -318,6 +328,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setEditScanLimitType((qrPage.scan_limit_type || 'unlimited') as ScanLimitType);
     setEditMaxScans(qrPage.max_scans || 100);
     setEditDailyLimit(qrPage.daily_limit || 50);
+    setEditShowInstallPopup(qrPage.show_install_popup !== false);
+    setEditShowFooterBranding(qrPage.show_footer_branding !== false);
     await fetchQRItems(qrPage.id);
     setIsEditQROpen(true);
   };
@@ -383,6 +395,10 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       // Handle starred item
       updateData.starred_item_id = editStarredItemId || null;
 
+      // Handle branding toggles
+      updateData.show_install_popup = editShowInstallPopup;
+      updateData.show_footer_branding = editShowFooterBranding;
+
       const { error } = await supabase
         .from("qr_pages")
         .update(updateData)
@@ -402,6 +418,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
               starred_item_id: editStarredItemId || null,
+              show_install_popup: editShowInstallPopup,
+              show_footer_branding: editShowFooterBranding,
             }
           : p
       ));
@@ -939,7 +957,33 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               onDailyLimitChange={setEditDailyLimit}
             />
 
-            {/* Items in QR Code */}
+            {/* Branding Controls */}
+            <div className="space-y-4 p-4 rounded-lg border bg-secondary/20">
+              <Label className="text-sm font-semibold">Branding Controls</Label>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="edit-install-popup" className="text-sm">Show Install App Popup</Label>
+                  <p className="text-xs text-muted-foreground">Show PWA install prompt to visitors</p>
+                </div>
+                <Switch
+                  id="edit-install-popup"
+                  checked={editShowInstallPopup}
+                  onCheckedChange={setEditShowInstallPopup}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="edit-footer-branding" className="text-sm">Show Footer Branding</Label>
+                  <p className="text-xs text-muted-foreground">"Powered by ConnectHUB" footer</p>
+                </div>
+                <Switch
+                  id="edit-footer-branding"
+                  checked={editShowFooterBranding}
+                  onCheckedChange={setEditShowFooterBranding}
+                />
+              </div>
+            </div>
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>

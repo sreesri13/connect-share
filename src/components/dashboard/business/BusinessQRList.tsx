@@ -88,6 +88,8 @@ interface BusinessQRPage {
   max_scans: number | null;
   daily_limit: number | null;
   store_slug: string | null;
+  show_install_popup: boolean;
+  show_footer_branding: boolean;
 }
 
 interface BusinessQRListProps {
@@ -147,6 +149,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
   // Manage Access state
   const [manageAccessQR, setManageAccessQR] = useState<BusinessQRPage | null>(null);
   const [isManageAccessOpen, setIsManageAccessOpen] = useState(false);
+
+  // Branding toggles state
+  const [editShowInstallPopup, setEditShowInstallPopup] = useState(true);
+  const [editShowFooterBranding, setEditShowFooterBranding] = useState(true);
   
   const qrPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -207,6 +213,8 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
             business_twitter: (page as any).business_twitter || null,
             business_whatsapp: (page as any).business_whatsapp || null,
             store_slug: (page as any).store_slug || null,
+            show_install_popup: (page as any).show_install_popup !== false,
+            show_footer_branding: (page as any).show_footer_branding !== false,
           };
         })
       );
@@ -270,6 +278,8 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     setEditScanLimitType((page.scan_limit_type || 'unlimited') as ScanLimitType);
     setEditMaxScans(page.max_scans || 100);
     setEditDailyLimit(page.daily_limit || 50);
+    setEditShowInstallPopup(page.show_install_popup !== false);
+    setEditShowFooterBranding(page.show_footer_branding !== false);
     setIsEditOpen(true);
   };
 
@@ -436,6 +446,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       // Handle show expires at setting
       updateData.show_expires_at = editShowExpiryToVisitors;
 
+      // Handle branding toggles
+      updateData.show_install_popup = editShowInstallPopup;
+      updateData.show_footer_branding = editShowFooterBranding;
+
       // Handle location lock settings
       updateData.location_locked = editEnableLocationLock;
       if (editEnableLocationLock && editLocationData) {
@@ -467,6 +481,8 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
               location_lng: editEnableLocationLock ? editLocationData?.lng ?? null : null,
               location_name: editEnableLocationLock ? editLocationData?.name ?? null : null,
               show_expires_at: editShowExpiryToVisitors,
+              show_install_popup: editShowInstallPopup,
+              show_footer_branding: editShowFooterBranding,
             }
           : p
       ));
@@ -1010,6 +1026,33 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
                 dailyLimit={editDailyLimit}
                 onDailyLimitChange={setEditDailyLimit}
               />
+
+              {/* Branding Controls */}
+              <div className="space-y-4 p-4 rounded-lg border bg-secondary/20">
+                <Label className="text-sm font-semibold">Branding Controls</Label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="edit-biz-install-popup" className="text-sm">Show Install App Popup</Label>
+                    <p className="text-xs text-muted-foreground">Show PWA install prompt to visitors</p>
+                  </div>
+                  <Switch
+                    id="edit-biz-install-popup"
+                    checked={editShowInstallPopup}
+                    onCheckedChange={setEditShowInstallPopup}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="edit-biz-footer-branding" className="text-sm">Show Footer Branding</Label>
+                    <p className="text-xs text-muted-foreground">"Powered by ConnectHUB" footer</p>
+                  </div>
+                  <Switch
+                    id="edit-biz-footer-branding"
+                    checked={editShowFooterBranding}
+                    onCheckedChange={setEditShowFooterBranding}
+                  />
+                </div>
+              </div>
 
               {/* Business Information */}
               <BusinessInfoForm value={editBusinessInfo} onChange={setEditBusinessInfo} userId={userId} />
