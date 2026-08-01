@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Keystore files
+*.jks
+*.keystore
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

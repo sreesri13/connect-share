@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.connecthub.app",
+      "sha256_cert_fingerprints": [
+        "71:49:B7:AD:63:DE:13:38:54:E0:C2:D8:B0:19:13:0C:BB:7C:20:ED:0F:11:EE:72:75:0F:6D:8C:FC:E2:46:B4"
+      ]
+    }
+  }
+]
