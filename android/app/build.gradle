@@ -19,12 +19,8 @@ android {
 
     signingConfigs {
         release {
-            def ksFile = file("connecthub-upload-key.jks")
-            if (!ksFile.exists()) {
-                ksFile = file("connecthub-release-key.jks")
-            }
-            def password = System.getenv("KEYSTORE_PASSWORD") ?: (project.hasProperty('RELEASE_STORE_PASSWORD') ? RELEASE_STORE_PASSWORD : "connecthub123")
-            storeFile ksFile
+            def password = System.getenv("KEYSTORE_PASSWORD") ?: (project.hasProperty('RELEASE_STORE_PASSWORD') ? RELEASE_STORE_PASSWORD : "SreeSri@2007")
+            storeFile file("connecthub-release-key.jks")
             storePassword password
             keyAlias "connecthub"
             keyPassword password
