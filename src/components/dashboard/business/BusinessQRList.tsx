@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
-import { hashPassword } from "@/lib/crypto";
+import { setQRPassword } from "@/lib/crypto";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours } from "date-fns";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
@@ -337,11 +337,12 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     try {
       const updateData: any = {};
 
+      let batchNewPassword: string | null | undefined = undefined;
       if (batchOperation === "password") {
         if (batchEnablePassword && batchPassword.trim()) {
-          updateData.password_hash = hashPassword(batchPassword.trim());
+          batchNewPassword = batchPassword.trim();
         } else if (!batchEnablePassword) {
-          updateData.password_hash = null;
+          batchNewPassword = null;
         }
       } else if (batchOperation === "location") {
         updateData.location_locked = batchEnableLocation;
@@ -407,12 +408,12 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     setIsSaving(true);
 
     try {
-      let passwordHash: string | null | undefined = undefined;
+      let newPassword: string | null | undefined = undefined;
 
       if (editEnablePassword && editPassword.trim()) {
-        passwordHash = hashPassword(editPassword.trim());
+        newPassword = editPassword.trim();
       } else if (!editEnablePassword) {
-        passwordHash = null;
+        newPassword = null;
       }
 
       const updateData: any = { 
@@ -433,9 +434,6 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         business_hours: editBusinessInfo.business_hours || null,
       };
       
-      if (passwordHash !== undefined) {
-        updateData.password_hash = passwordHash;
-      }
       
       // Handle expiration
       const newExpiration = calculateNewExpirationDate();
@@ -474,7 +472,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
           ? { 
               ...p, 
               title: editTitle, 
-              password_hash: passwordHash !== undefined ? passwordHash : p.password_hash,
+              password_hash: newPassword !== undefined ? (newPassword ? "set" : null) : p.password_hash,
               expires_at: newExpiration !== undefined ? newExpiration : p.expires_at,
               location_locked: editEnableLocationLock,
               location_lat: editEnableLocationLock ? editLocationData?.lat ?? null : null,

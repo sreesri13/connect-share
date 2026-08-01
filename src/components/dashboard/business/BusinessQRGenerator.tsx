@@ -17,7 +17,7 @@ import { useQRStyles } from "@/hooks/useQRStyles";
 import { defaultQRStyle, oceanPresetStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
-import { hashPassword } from "@/lib/crypto";
+import { setQRPassword } from "@/lib/crypto";
 import { addHours, addDays, format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -233,7 +233,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         ? `${window.location.origin}/store/${storeSlug}`
         : `${window.location.origin}/business/${publicId}`;
       const expiresAt = calculateExpirationDate();
-      const passwordHash = enablePassword && password.trim() ? hashPassword(password.trim()) : null;
+      const newPassword = enablePassword && password.trim() ? password.trim() : null;
 
       const { data: pageData, error: pageError } = await supabase
         .from("qr_business_pages")
@@ -246,7 +246,6 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
           location_lat: locationData?.lat || null,
           location_lng: locationData?.lng || null,
           location_name: locationData?.name || null,
-          password_hash: passwordHash,
           expires_at: expiresAt,
           show_expires_at: showExpiryToVisitors,
           business_name: businessInfo.business_name || null,
@@ -269,6 +268,10 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
         .single();
 
       if (pageError) throw pageError;
+
+      if (newPassword) {
+        await setQRPassword("business", pageData.id, newPassword);
+      }
 
       const productEntries = Array.from(selectedProducts).map((productId, index) => ({
         qr_page_id: pageData.id,

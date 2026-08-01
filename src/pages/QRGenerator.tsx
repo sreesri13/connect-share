@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { hashPassword } from "@/lib/crypto";
+import { setQRPassword } from "@/lib/crypto";
 import { format, addDays, addHours, addMinutes } from "date-fns";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { QRCustomizationPanel } from "@/components/qr/QRCustomizationPanel";
@@ -177,11 +177,7 @@ const QRGenerator = () => {
     try {
       const publicId = generatePublicId();
 
-      // Hash password if enabled using client-side hashing
-      let passwordHash = null;
-      if (enablePassword && password.trim()) {
-        passwordHash = hashPassword(password.trim());
-      }
+      const wantsPassword = enablePassword && !!password.trim();
 
       // Calculate expiration date
       const expiresAt = calculateExpirationDate();
@@ -193,7 +189,6 @@ const QRGenerator = () => {
           user_id: user.id,
           public_id: publicId,
           title: qrTitle || `QR ${new Date().toLocaleDateString()}`,
-          password_hash: passwordHash,
           expires_at: expiresAt,
           show_expires_at: enableExpiration ? showExpiryToVisitors : false,
           style_config: enableCustomization ? (qrStyle as any) : null,
@@ -212,6 +207,10 @@ const QRGenerator = () => {
         .single();
 
       if (qrError) throw qrError;
+
+      if (wantsPassword) {
+        await setQRPassword("profile", qrPage.id, password.trim());
+      }
 
       // Add items to QR page
       const qrPageItems = selectedItems.map((item, index) => ({
