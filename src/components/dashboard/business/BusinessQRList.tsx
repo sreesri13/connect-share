@@ -363,16 +363,21 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         }
       }
 
-      if (Object.keys(updateData).length === 0) {
+      if (Object.keys(updateData).length === 0 && batchNewPassword === undefined) {
         toast.error("No changes to apply");
         return;
       }
 
       for (const id of selectedIds) {
-        await supabase
-          .from("qr_business_pages")
-          .update(updateData)
-          .eq("id", id);
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from("qr_business_pages")
+            .update(updateData)
+            .eq("id", id);
+        }
+        if (batchNewPassword !== undefined) {
+          await setQRPassword("business", id, batchNewPassword);
+        }
       }
 
       toast.success(`Updated ${selectedIds.size} QR code(s)`);
@@ -466,6 +471,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
         .eq("id", editingQR.id);
 
       if (error) throw error;
+
+      if (newPassword !== undefined) {
+        await setQRPassword("business", editingQR.id, newPassword);
+      }
 
       setPages(pages.map((p) =>
         p.id === editingQR.id

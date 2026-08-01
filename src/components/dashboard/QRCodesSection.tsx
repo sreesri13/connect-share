@@ -403,6 +403,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
       if (error) throw error;
 
+      if (newPassword !== undefined) {
+        await setQRPassword("profile", editingQR.id, newPassword);
+      }
+
+
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id
           ? { 
