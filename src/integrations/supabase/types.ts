@@ -739,7 +739,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      hash_qr_password: { Args: { password: string }; Returns: string }
+      can_view_qr_business_page: {
+        Args: { p_page_id: string }
+        Returns: boolean
+      }
+      can_view_qr_page: { Args: { p_page_id: string }; Returns: boolean }
+      resolve_upi_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          amount: number
+          display_name: string
+          upi_id: string
+        }[]
+      }
+      set_qr_password: {
+        Args: { p_page_id: string; p_page_type: string; p_password: string }
+        Returns: boolean
+      }
       verify_qr_password: {
         Args: { password: string; qr_public_id: string }
         Returns: boolean
