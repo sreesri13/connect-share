@@ -169,6 +169,7 @@
   html.native-app .fixed.bottom-4 {
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
 
 
 @layer utilities {
