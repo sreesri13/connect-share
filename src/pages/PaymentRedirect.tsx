@@ -53,13 +53,13 @@ const PaymentRedirect = () => {
 
   const resolveAndRedirect = async () => {
     try {
-      const { data, error: dbError } = await supabase
-        .from("upi_payments")
-        .select("upi_id, display_name, amount")
-        .eq("public_code", code)
-        .maybeSingle();
+      const { data: rows, error: dbError } = await supabase.rpc("resolve_upi_by_code", {
+        p_code: code,
+      } as any);
 
       if (dbError) throw dbError;
+
+      const data = Array.isArray(rows) ? (rows[0] as typeof upiData) : null;
 
       if (!data) {
         setError("Payment link not found or expired");

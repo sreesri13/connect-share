@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
-import { hashPassword } from "@/lib/crypto";
+import { setQRPassword } from "@/lib/crypto";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { defaultQRStyle } from "@/lib/qr-styles";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
@@ -249,20 +249,14 @@ const QRCodesList = () => {
     if (!editingQR) return;
 
     try {
-      let passwordHash: string | null | undefined = undefined;
-      
-      // If password enabled and new password provided, hash it using client-side hashing
+      let newPassword: string | null | undefined = undefined;
       if (editEnablePassword && editPassword.trim()) {
-        passwordHash = hashPassword(editPassword.trim());
+        newPassword = editPassword.trim();
       } else if (!editEnablePassword) {
-        // If password disabled, remove it
-        passwordHash = null;
+        newPassword = null;
       }
 
       const updateData: any = { title: editQRTitle };
-      if (passwordHash !== undefined) {
-        updateData.password_hash = passwordHash;
-      }
       
       // Handle expiration extension
       const newExpiration = calculateNewExpirationDate();
@@ -292,6 +286,10 @@ const QRCodesList = () => {
         .eq("id", editingQR.id);
 
       if (error) throw error;
+
+      if (newPassword !== undefined) {
+        await setQRPassword("profile", editingQR.id, newPassword);
+      }
 
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id

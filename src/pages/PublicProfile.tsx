@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyPassword } from "@/lib/crypto";
+import { verifyQRPassword } from "@/lib/crypto";
 import { toast } from "sonner";
 import { initGA, trackProfileView, trackQRScan, trackLinkClick, isQRTraffic } from "@/lib/analytics";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -246,17 +246,10 @@ const PublicProfile = () => {
     setPasswordError("");
 
     try {
-      // Get the stored password hash
-      const { data: qrPage, error } = await supabase
-        .from("qr_pages")
-        .select("password_hash")
-        .eq("public_id", profileId)
-        .single();
+      // Verify password server-side (bcrypt)
+      const isValid = await verifyQRPassword(profileId!, password.trim());
 
-      if (error) throw error;
-
-      // Verify password using client-side hashing
-      if (qrPage?.password_hash && verifyPassword(password.trim(), qrPage.password_hash)) {
+      if (isValid) {
         setIsPasswordVerified(true);
         setIsLoading(true);
         fetchPublicProfile(qrPageData!);

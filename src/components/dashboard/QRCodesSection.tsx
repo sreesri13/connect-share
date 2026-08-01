@@ -36,7 +36,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FileUpload } from "@/components/FileUpload";
-import { hashPassword } from "@/lib/crypto";
+import { setQRPassword } from "@/lib/crypto";
 import { CustomQRCode } from "@/components/qr/CustomQRCode";
 import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
@@ -355,12 +355,12 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     setIsSaving(true);
 
     try {
-      let passwordHash: string | null | undefined = undefined;
+      let newPassword: string | null | undefined = undefined;
 
       if (editEnablePassword && editPassword.trim()) {
-        passwordHash = hashPassword(editPassword.trim());
+        newPassword = editPassword.trim();
       } else if (!editEnablePassword) {
-        passwordHash = null;
+        newPassword = null;
       }
 
       const updateData: any = { title: editQRTitle };
@@ -370,9 +370,6 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       updateData.max_scans = editScanLimitType === 'total' ? editMaxScans : null;
       updateData.daily_limit = editScanLimitType === 'daily' ? editDailyLimit : null;
       
-      if (passwordHash !== undefined) {
-        updateData.password_hash = passwordHash;
-      }
       
       // Handle expiration
       const newExpiration = calculateNewExpirationDate();
@@ -405,6 +402,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         .eq("id", editingQR.id);
 
       if (error) throw error;
+
+      if (newPassword !== undefined) {
+        await setQRPassword("profile", editingQR.id, newPassword);
+      }
+
 
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id
