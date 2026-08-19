@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { QrCode, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 
 const AuthPage = () => {
+  const isNative = Capacitor.isNativePlatform();
+  const requiresRecaptcha = !isNative;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, signUp, signIn, loading: authLoading } = useAuth();
@@ -108,8 +111,8 @@ const AuthPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Require reCAPTCHA verification for both signup and signin
-    if (!isVerified) {
+    // Require reCAPTCHA verification only on web if enabled
+    if (requiresRecaptcha && !isVerified) {
       toast.error("Please complete the reCAPTCHA verification");
       return;
     }
@@ -117,8 +120,8 @@ const AuthPage = () => {
     setIsLoading(true);
 
     try {
-      // Verify reCAPTCHA token on server
-      if (recaptchaToken) {
+      // Verify reCAPTCHA token on server for web
+      if (requiresRecaptcha && recaptchaToken) {
         const isValid = await verifyRecaptcha(recaptchaToken);
         if (!isValid) {
           toast.error("reCAPTCHA verification failed. Please try again.");
@@ -315,17 +318,19 @@ const AuthPage = () => {
                 </div>
               </div>
 
-              {/* reCAPTCHA for both signup and signin */}
-              <div className="flex justify-center py-2">
-                <div id="recaptcha-container" ref={recaptchaRef}></div>
-              </div>
+              {/* reCAPTCHA for web */}
+              {requiresRecaptcha && (
+                <div className="flex justify-center py-2">
+                  <div id="recaptcha-container" ref={recaptchaRef}></div>
+                </div>
+              )}
 
               <Button 
                 type="submit" 
                 variant="hero" 
                 size="lg" 
                 className="w-full mt-6" 
-                disabled={isLoading || !isVerified}
+                disabled={isLoading || (requiresRecaptcha && !isVerified)}
               >
                 {isLoading ? (
                   <span className="flex items-center gap-2">

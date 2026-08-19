@@ -1,0 +1,56 @@
+name: connecthub
+description: "ConnectHub - Complete Native Flutter Mobile Application"
+publish_to: 'none'
+version: 1.0.5+5
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Supabase & Auth
+  supabase_flutter: ^2.8.3
+  google_sign_in: ^6.2.2
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # QR Code & Scanning
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.4
+
+  # UI, Charts & Icons
+  fl_chart: ^0.69.2
+  cached_network_image: ^3.4.1
+
+  # Native Device Features
+  url_launcher: ^6.3.1
+  image_picker: ^1.1.2
+  file_picker: ^8.1.7
+  geolocator: ^13.0.2
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
+  screenshot: ^3.0.0
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # Utilities
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  crypto: ^3.0.6
+  http: ^1.2.2
+  shared_preferences: ^2.3.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+dependency_overrides:
+  path_provider_android: 2.2.15
+
+flutter:
+  uses-material-design: true
