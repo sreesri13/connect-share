@@ -112,19 +112,26 @@ const AuthPage = () => {
       return;
     }
 
-    // Standard web OAuth fallback
+    // Standard web path: Lovable managed Google sign-in
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
       });
-      if (error) throw error;
+
+      if (result.error) {
+        toast.error(result.error.message || "Failed to sign in with Google");
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      if (result.redirected) return;
+
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
-      toast.error(error.message || "Failed to sign in with Google");
+      toast.error(error?.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);
     }
+
   };
 
   const verifyRecaptcha = async (token: string): Promise<boolean> => {
