@@ -199,15 +199,17 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
       ),
     );
 
-    final success = await _authBridge.handleNativeGoogleSignIn(_webViewController);
-    if (!success && mounted) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Google sign-in was cancelled or encountered an error.'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 3),
-        ),
-      );
+    final result = await _authBridge.handleNativeGoogleSignIn(_webViewController);
+    if (!result.success && mounted) {
+      if (!result.cancelled) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage ?? 'Google Sign-In was cancelled or encountered an error.'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 

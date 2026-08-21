@@ -1,10 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
+
+class AuthBridgeResult {
+  final bool success;
+  final bool cancelled;
+  final String? errorMessage;
+
+  AuthBridgeResult({
+    required this.success,
+    this.cancelled = false,
+    this.errorMessage,
+  });
+}
 
 class WebViewAuthBridge {
   static final WebViewAuthBridge _instance = WebViewAuthBridge._internal();
@@ -40,7 +53,6 @@ class WebViewAuthBridge {
 
       // Function to attach listener to Google buttons
       function hookGoogleButtons() {
-        // Find buttons containing Google text or SVG
         const buttons = document.querySelectorAll('button');
         buttons.forEach(button => {
           if (button.innerText && button.innerText.includes('Continue with Google') && !button._hasGoogleHook) {
@@ -67,11 +79,16 @@ class WebViewAuthBridge {
   }
 
   /// Perform native in-app Google Sign-In and inject the authenticated session into WebView
-  Future<bool> handleNativeGoogleSignIn(InAppWebViewController? controller) async {
+  Future<AuthBridgeResult> handleNativeGoogleSignIn(InAppWebViewController? controller) async {
     try {
       if (kDebugMode) {
-        print('[WebViewAuthBridge] Starting native Google Sign-In...');
+        print('[WebViewAuthBridge] Clearing cached session & starting native Google Sign-In...');
       }
+
+      // Ensure previous cached/stale account state is cleared so account chooser always displays
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
 
       // 1. Native Google account picker
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -79,7 +96,7 @@ class WebViewAuthBridge {
         if (kDebugMode) {
           print('[WebViewAuthBridge] Google Sign-In cancelled by user');
         }
-        return false;
+        return AuthBridgeResult(success: false, cancelled: true);
       }
 
       // 2. Obtain auth credentials
@@ -88,7 +105,7 @@ class WebViewAuthBridge {
       final String? accessToken = googleAuth.accessToken;
 
       if (idToken == null) {
-        throw Exception('Failed to obtain Google ID Token');
+        throw Exception('Failed to obtain Google ID Token. Please verify serverClientId in Google Cloud Console.');
       }
 
       // 3. Authenticate with Supabase via ID token exchange
@@ -138,12 +155,19 @@ class WebViewAuthBridge {
         print('[WebViewAuthBridge] Native Google Sign-In succeeded & injected into WebView');
       }
 
-      return true;
-    } catch (e) {
+      return AuthBridgeResult(success: true);
+    } on PlatformException catch (e) {
+      final msg = 'Google Sign-In Error (${e.code}): ${e.message ?? 'Check Google Cloud SHA-1 & OAuth Consent'}';
       if (kDebugMode) {
-        print('[WebViewAuthBridge] Google Sign-In Error: $e');
+        print('[WebViewAuthBridge] PlatformException: $msg');
       }
-      return false;
+      return AuthBridgeResult(success: false, errorMessage: msg);
+    } catch (e) {
+      final msg = 'Google Sign-In Error: $e';
+      if (kDebugMode) {
+        print('[WebViewAuthBridge] $msg');
+      }
+      return AuthBridgeResult(success: false, errorMessage: msg);
     }
   }
 
