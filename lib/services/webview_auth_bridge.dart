@@ -13,6 +13,7 @@ class WebViewAuthBridge {
 
   final SupabaseClient _supabase = Supabase.instance.client;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: AppConfig.webClientId.isNotEmpty ? AppConfig.webClientId : null,
     scopes: ['email', 'profile'],
   );
 

@@ -13,7 +13,7 @@ class AppConfig {
   static const String googleMapsApiKey =
       'AIzaSyCNt5Y9zS-bcyCkQHyndtPjlbyTiEwWj50';
   static const String webClientId =
-      ''; // Optional web client ID if needed for server auth
+      '881030051398-opn38vq4gufl0et4u9tlj77l9qh8l82t.apps.googleusercontent.com';
   static const String androidPackageName = 'in.connecthub.app';
 
   // Storage Buckets
