@@ -21,4 +21,8 @@ class AppConfig {
 
   // Deep Link / Web Base URLs
   static const String webBaseUrl = 'https://connecthub.app';
+  static const String productionWebsiteUrl = 'https://connect-hub-gamma.vercel.app';
+  static const String userAgent =
+      'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
 }
+
