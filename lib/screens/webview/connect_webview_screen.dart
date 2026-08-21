@@ -37,6 +37,10 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
   DateTime? _lastBackPressTime;
   final WebViewAuthBridge _authBridge = WebViewAuthBridge();
 
+  String _currentUrl = AppConfig.productionWebsiteUrl;
+  String _targetInitialUrl = AppConfig.productionWebsiteUrl;
+  bool _isInitialUrlReady = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +49,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     _initHighRefreshRate();
     _initConnectivity();
     _initPullToRefresh();
+    _determineInitialUrl();
   }
 
   @override
@@ -63,6 +68,32 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         print('[ConnectWebView] High refresh rate error: $e');
       }
     }
+  }
+
+  /// Determine whether to start at / (landing) or /dashboard (authenticated)
+  Future<void> _determineInitialUrl() async {
+    if (widget.initialRoute != null && widget.initialRoute!.isNotEmpty) {
+      final route = widget.initialRoute!.startsWith('/')
+          ? widget.initialRoute!
+          : '/${widget.initialRoute!}';
+      setState(() {
+        _targetInitialUrl = '${AppConfig.productionWebsiteUrl}$route';
+        _currentUrl = _targetInitialUrl;
+        _isInitialUrlReady = true;
+      });
+      return;
+    }
+
+    final isSignedIn = await _authBridge.hasSavedSession();
+    setState(() {
+      if (isSignedIn) {
+        _targetInitialUrl = '${AppConfig.productionWebsiteUrl}/dashboard';
+      } else {
+        _targetInitialUrl = '${AppConfig.productionWebsiteUrl}/';
+      }
+      _currentUrl = _targetInitialUrl;
+      _isInitialUrlReady = true;
+    });
   }
 
   /// Set up network connectivity listener
@@ -121,15 +152,27 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     _webViewController?.reload();
   }
 
-  String _getTargetUrl() {
-    final base = AppConfig.productionWebsiteUrl;
-    if (widget.initialRoute != null && widget.initialRoute!.isNotEmpty) {
-      if (widget.initialRoute!.startsWith('/')) {
-        return '$base${widget.initialRoute}';
-      }
-      return '$base/${widget.initialRoute}';
-    }
-    return base;
+  /// Check if the given URL corresponds to the public Landing / Home / Auth page
+  bool _isLandingPage(String url) {
+    final clean = url.trim().toLowerCase().replaceAll(RegExp(r'#.*$'), '');
+    final base = AppConfig.productionWebsiteUrl.toLowerCase();
+    return clean == base ||
+        clean == '$base/' ||
+        clean.endsWith('/auth') ||
+        clean.endsWith('/login') ||
+        clean.endsWith('/signup') ||
+        clean == 'https://connect-hub-gamma.vercel.app' ||
+        clean == 'https://connect-hub-gamma.vercel.app/' ||
+        clean == 'https://connecthub.app' ||
+        clean == 'https://connecthub.app/';
+  }
+
+  /// Check if the given URL corresponds to the Profile Dashboard
+  bool _isDashboardPage(String url) {
+    final clean = url.trim().toLowerCase();
+    return clean.contains('/dashboard') ||
+        clean.endsWith('/dashboard') ||
+        clean.contains('/profile-dashboard');
   }
 
   /// Native Google Sign In flow with Supabase session injection
@@ -178,36 +221,219 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     }
   }
 
-  /// Android Back Navigation handling
-  Future<void> _handleBackPress() async {
-    if (_webViewController != null) {
-      final canGoBack = await _webViewController!.canGoBack();
-      if (canGoBack) {
-        await _webViewController!.goBack();
-        return;
-      }
-    }
-
-    final now = DateTime.now();
-    if (_lastBackPressTime == null ||
-        now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-      _lastBackPressTime = now;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Press back again to exit ConnectHUB'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF1E293B).withValues(alpha: 0.95),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+  /// Show website-themed exit confirmation dialog with Cancel & Exit buttons
+  Future<void> _showExitConfirmationDialog() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF334155),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Glowing Icon Badge
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.power_settings_new_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Exit ConnectHUB',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Are you sure you want to exit the application?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    // Cancel Button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF334155)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor: const Color(0xFF1E293B),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Color(0xFFE2E8F0),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Exit / OK Button
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            SystemNavigator.pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Exit',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
-      }
-    } else {
+      },
+    );
+  }
+
+  /// Android Back Navigation handling
+  Future<void> _handleBackPress() async {
+    if (_webViewController == null) {
       await SystemNavigator.pop();
+      return;
     }
+
+    final currentWebUri = await _webViewController!.getUrl();
+    final currentUrl = currentWebUri?.toString() ?? _currentUrl;
+
+    // 1. Unauthenticated or Landing Home Page:
+    // Double click back to exit to phone home screen; do not show previous redirect pages
+    if (_isLandingPage(currentUrl)) {
+      final now = DateTime.now();
+      if (_lastBackPressTime == null ||
+          now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+        _lastBackPressTime = now;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 18),
+                  SizedBox(width: 8),
+                  Text('Press back again to exit ConnectHUB'),
+                ],
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF1E293B).withValues(alpha: 0.95),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFF334155)),
+              ),
+            ),
+          );
+        }
+      } else {
+        await SystemNavigator.pop();
+      }
+      return;
+    }
+
+    // 2. Profile Dashboard (Root Authenticated Page):
+    // Show website-themed exit confirmation popup
+    if (_isDashboardPage(currentUrl)) {
+      _showExitConfirmationDialog();
+      return;
+    }
+
+    // 3. Authenticated Subpages:
+    // Back button navigates back to previous page in history
+    final canGoBack = await _webViewController!.canGoBack();
+    if (canGoBack) {
+      await _webViewController!.goBack();
+      return;
+    }
+
+    // 4. Top-level Fallback
+    _showExitConfirmationDialog();
   }
 
   @override
@@ -225,13 +451,21 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
           bottom: true,
           child: LayoutBuilder(
             builder: (context, constraints) {
+              if (!_isInitialUrlReady) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                  ),
+                );
+              }
+
               return Stack(
                 children: [
                   // Main WebView
                   if (!_hasError)
                     InAppWebView(
                       initialUrlRequest: URLRequest(
-                        url: WebUri(_getTargetUrl()),
+                        url: WebUri(_targetInitialUrl),
                       ),
                       initialSettings: InAppWebViewSettings(
                         // Performance & Hardware Acceleration
@@ -240,7 +474,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         allowsInlineMediaPlayback: true,
                         useHybridComposition: true,
                         hardwareAcceleration: true,
-                        
+
                         // User Agent: Clean Chrome Mobile User-Agent to avoid Google OAuth blocks
                         userAgent: AppConfig.userAgent,
 
@@ -282,7 +516,9 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         _authBridge.restoreSavedSession(controller);
                       },
                       onLoadStart: (controller, url) {
+                        final urlStr = url?.toString() ?? '';
                         setState(() {
+                          _currentUrl = urlStr;
                           _isLoading = true;
                           _hasError = false;
                         });
@@ -291,9 +527,19 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                           source: WebViewAuthBridge.getAuthInterceptorScript(),
                         );
                       },
+                      onUpdateVisitedHistory: (controller, url, isReload) {
+                        final urlStr = url?.toString() ?? '';
+                        if (urlStr.isNotEmpty) {
+                          setState(() {
+                            _currentUrl = urlStr;
+                          });
+                        }
+                      },
                       onLoadStop: (controller, url) async {
                         _pullToRefreshController?.endRefreshing();
+                        final urlStr = url?.toString() ?? '';
                         setState(() {
+                          _currentUrl = urlStr;
                           _isLoading = false;
                         });
 
@@ -303,13 +549,16 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         );
 
                         // Synchronize signout state if navigated to root or auth
-                        final urlStr = url?.toString() ?? '';
-                        if (urlStr.endsWith('/auth') || urlStr == AppConfig.productionWebsiteUrl || urlStr == '${AppConfig.productionWebsiteUrl}/') {
-                          // Check if token exists in localStorage
+                        if (urlStr.endsWith('/auth') ||
+                            urlStr == AppConfig.productionWebsiteUrl ||
+                            urlStr == '${AppConfig.productionWebsiteUrl}/') {
                           final tokenCheck = await controller.evaluateJavascript(
-                            source: "localStorage.getItem('sb-${AppConfig.supabaseProjectId}-auth-token')",
+                            source:
+                                "localStorage.getItem('sb-${AppConfig.supabaseProjectId}-auth-token')",
                           );
-                          if (tokenCheck == null || tokenCheck == 'null' || tokenCheck.toString().isEmpty) {
+                          if (tokenCheck == null ||
+                              tokenCheck == 'null' ||
+                              tokenCheck.toString().isEmpty) {
                             // User is logged out on web
                           }
                         }
@@ -327,7 +576,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         // Only trigger full error screen if it's the main frame request
                         if (request.isForMainFrame ?? true) {
                           if (_isOffline) {
-                            // Suppress full error screen if offline cache is loading or network will recover
+                            // Suppress full error screen if offline cache is loading
                           } else {
                             setState(() {
                               _hasError = true;
@@ -389,7 +638,6 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         return NavigationActionPolicy.ALLOW;
                       },
                       onPermissionRequest: (controller, permissionRequest) async {
-                        // Request camera / microphone / storage permissions when web page requests them
                         for (final resource in permissionRequest.resources) {
                           if (resource.toString().contains('CAMERA')) {
                             await Permission.camera.request();

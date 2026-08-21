@@ -1,7 +1,7 @@
 class AppConfig {
   static const String appName = 'ConnectHUB';
-  static const String appVersion = '1.0.5';
-  static const int buildNumber = 5;
+  static const String appVersion = '1.0.6';
+  static const int buildNumber = 6;
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://kyzazsmsqrqwbjpkqjqm.supabase.co';

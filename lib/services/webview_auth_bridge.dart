@@ -19,6 +19,18 @@ class WebViewAuthBridge {
 
   static const String _sessionPrefKey = 'connecthub_saved_session';
 
+  /// Check if user is currently signed in (via Supabase or saved session)
+  Future<bool> hasSavedSession() async {
+    if (_supabase.auth.currentSession != null) return true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_sessionPrefKey);
+      return saved != null && saved.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Get JavaScript code to inject into the web page to intercept Google Auth button
   static String getAuthInterceptorScript() {
     return """
