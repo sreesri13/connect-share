@@ -60,6 +60,33 @@ const AuthPage = () => {
     }
   }, [user, authLoading, navigate]);
 
+  // Detect session token injected by the native Android WebView wrapper
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const hasToken =
+        !!localStorage.getItem("sb-kyzazsmsqrqwbjpkqjqm-auth-token") ||
+        !!localStorage.getItem("supabase.auth.token");
+      if (hasToken) {
+        setIsProcessingOAuth(true);
+        navigate("/dashboard", { replace: true });
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [navigate]);
+
+  // Listen for Supabase auth state changes from injected sessions
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        setIsProcessingOAuth(true);
+        navigate("/dashboard", { replace: true });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   // Render reCAPTCHA when loaded
   useEffect(() => {
     if (recaptchaLoaded) {
@@ -73,6 +100,19 @@ const AuthPage = () => {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
+
+    // Native Android WebView wrapper path: delegate to Flutter Google Sign-In
+    if (typeof window !== "undefined" && window.flutter_inappwebview?.callHandler) {
+      try {
+        window.flutter_inappwebview.callHandler("googleSignIn");
+      } catch (error: any) {
+        toast.error(error.message || "Failed to sign in with Google");
+        setIsGoogleLoading(false);
+      }
+      return;
+    }
+
+    // Standard web OAuth fallback
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
