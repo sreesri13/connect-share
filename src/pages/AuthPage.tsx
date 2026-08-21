@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
+
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 
 const AuthPage = () => {
