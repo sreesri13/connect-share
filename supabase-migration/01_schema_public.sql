@@ -2,7 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict gqlH77bYUKAd5mzEJ5T4BuPR0VzIENTF97ebUQ5LAK19Hz8NkvtwrMDYxcs6Ed8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9
@@ -1688,5 +1687,4 @@ ALTER TABLE public.upi_payments ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gqlH77bYUKAd5mzEJ5T4BuPR0VzIENTF97ebUQ5LAK19Hz8NkvtwrMDYxcs6Ed8
 
