@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 
@@ -115,21 +114,19 @@ const AuthPage = () => {
       return;
     }
 
-    // Standard web path: Lovable managed Google sign-in
+    // Standard web path: Supabase native Google sign-in
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
       });
 
-      if (result.error) {
-        toast.error(result.error.message || "Failed to sign in with Google");
+      if (error) {
+        toast.error(error.message || "Failed to sign in with Google");
         setIsGoogleLoading(false);
-        return;
       }
-
-      if (result.redirected) return;
-
-      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       toast.error(error?.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);
