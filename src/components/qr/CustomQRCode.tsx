@@ -295,6 +295,9 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
             // Draw logo
             ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
           };
+          logoImg.onerror = (e) => {
+            console.warn('QR logo failed to load:', e);
+          };
           logoImg.src = mergedStyle.logoUrl;
         }
 

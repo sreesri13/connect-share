@@ -13,6 +13,9 @@ import {
   Shield,
   Camera,
   X,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +53,13 @@ const SettingsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  // Password state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (!user && !authLoading) {
@@ -115,6 +125,40 @@ const SettingsPage = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully in Supabase!");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      console.error("Error changing password:", err);
+      toast.error(err.message || "Failed to update password");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -373,6 +417,79 @@ const SettingsPage = () => {
             {/* Account Section */}
             {activeSection === "account" && (
               <div className="space-y-6">
+                {/* Change Password */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Lock className="w-5 h-5 text-primary" />
+                      Change Password
+                    </CardTitle>
+                    <CardDescription>
+                      Update your account password securely in Supabase.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleChangePassword} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-new-password">New Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="settings-new-password"
+                            type={showNewPassword ? "text" : "password"}
+                            placeholder="Enter new password (min. 6 characters)"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                          >
+                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-confirm-password">Confirm New Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="settings-confirm-password"
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Confirm new password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button type="submit" disabled={isChangingPassword}>
+                        {isChangingPassword ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating Password...
+                          </span>
+                        ) : (
+                          "Update Password"
+                        )}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
                 {/* Sign Out */}
                 <Card>
                   <CardHeader>

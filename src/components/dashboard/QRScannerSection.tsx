@@ -79,10 +79,38 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
     fetchHistory();
   }, [userId]);
 
-  const handleScanSuccess = (decodedText: string) => {
+  const handleScanSuccess = async (decodedText: string) => {
     setScanResult(decodedText);
     setIsScannerOpen(false);
     setShowResultDialog(true);
+
+    if (userId) {
+      try {
+        const isUrl = /^https?:\/\//i.test(decodedText) || /^www\./i.test(decodedText);
+        const contentType = isUrl
+          ? "url"
+          : decodedText.startsWith("mailto:")
+          ? "email"
+          : decodedText.startsWith("tel:")
+          ? "phone"
+          : decodedText.startsWith("WIFI:")
+          ? "wifi"
+          : "text";
+        const title = isUrl
+          ? (decodedText.startsWith("www.") ? `https://${decodedText}` : decodedText).substring(0, 50)
+          : decodedText.substring(0, 50);
+
+        await supabase.from("scan_history").insert({
+          user_id: userId,
+          scanned_content: decodedText,
+          content_type: contentType,
+          title: title,
+        });
+        fetchHistory();
+      } catch (err) {
+        console.error("Auto-save scan error:", err);
+      }
+    }
   };
 
   const handleDeleteScan = async (id: string) => {
@@ -157,6 +185,34 @@ export function QRScannerSection({ userId }: QRScannerSectionProps) {
       toast({ description: "QR Code scanned from image!" });
       
       html5QrCode.clear();
+
+      if (userId) {
+        try {
+          const isUrl = /^https?:\/\//i.test(result) || /^www\./i.test(result);
+          const contentType = isUrl
+            ? "url"
+            : result.startsWith("mailto:")
+            ? "email"
+            : result.startsWith("tel:")
+            ? "phone"
+            : result.startsWith("WIFI:")
+            ? "wifi"
+            : "text";
+          const title = isUrl
+            ? (result.startsWith("www.") ? `https://${result}` : result).substring(0, 50)
+            : result.substring(0, 50);
+
+          await supabase.from("scan_history").insert({
+            user_id: userId,
+            scanned_content: result,
+            content_type: contentType,
+            title: title,
+          });
+          fetchHistory();
+        } catch (err) {
+          console.error("Auto-save image scan error:", err);
+        }
+      }
     } catch (err: any) {
       console.error("Image scan error:", err);
       toast({ 

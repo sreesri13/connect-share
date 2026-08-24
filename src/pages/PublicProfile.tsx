@@ -296,13 +296,15 @@ const PublicProfile = () => {
 
       if (itemsError) throw itemsError;
 
-      const formattedItems = (qrPageItems || []).map((qpItem: any) => ({
-        id: qpItem.items.id,
-        title: qpItem.items.title,
-        type: qpItem.items.type,
-        content: qpItem.items.content,
-        category_name: qpItem.items.categories?.name || "Unknown",
-      }));
+      const formattedItems = (qrPageItems || [])
+        .filter((qpItem: any) => qpItem && qpItem.items)
+        .map((qpItem: any) => ({
+          id: qpItem.items.id,
+          title: qpItem.items.title,
+          type: qpItem.items.type,
+          content: qpItem.items.content,
+          category_name: qpItem.items.categories?.name || "Unknown",
+        }));
 
       // Check for starred item - redirect directly
       if (qrPage.starred_item_id) {

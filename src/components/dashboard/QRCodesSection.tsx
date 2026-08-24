@@ -168,7 +168,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           qr_page_items (id)
         `)
         .eq("user_id", userId)
-        .eq("is_deleted", false)
+        .or("is_deleted.eq.false,is_deleted.is.null")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

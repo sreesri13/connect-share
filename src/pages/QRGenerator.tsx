@@ -202,6 +202,9 @@ const QRGenerator = () => {
           daily_limit: scanLimitType === 'daily' ? dailyLimit : null,
           show_install_popup: showInstallPopup,
           show_footer_branding: showFooterBranding,
+          is_deleted: false,
+          public_view: true,
+          allow_requests: false,
         } as any)
         .select()
         .single();
