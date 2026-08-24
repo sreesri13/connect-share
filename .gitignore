@@ -39,3 +39,7 @@ dist-ssr
 build/
 android/app/build/
 android/.gradle/
+
+# Large migration video files (>100MB)
+supabase-migration/large_videos/
+

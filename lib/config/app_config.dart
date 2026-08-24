@@ -4,10 +4,10 @@ class AppConfig {
   static const int buildNumber = 6;
 
   // Supabase Configuration
-  static const String supabaseUrl = 'https://kyzazsmsqrqwbjpkqjqm.supabase.co';
+  static const String supabaseUrl = 'https://sizxlgxdawklesbkxmfb.supabase.co';
   static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5emF6c21zcXJxd2JqcGtxanFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTAyMjIsImV4cCI6MjA4MTM4NjIyMn0.IkBjLc-U-EJDcfQ6IiMW5Ja3Xei4SAQhZtpTjq7lD14';
-  static const String supabaseProjectId = 'kyzazsmsqrqwbjpkqjqm';
+      'sb_publishable_9C53mB5TJqUxlusG-Z4hmA_Gx0-BSon';
+  static const String supabaseProjectId = 'sizxlgxdawklesbkxmfb';
 
   // Google OAuth / Maps Configuration
   static const String googleMapsApiKey =

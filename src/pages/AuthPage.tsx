@@ -66,6 +66,7 @@ const AuthPage = () => {
   useEffect(() => {
     const handleStorageChange = () => {
       const hasToken =
+        !!localStorage.getItem("sb-sizxlgxdawklesbkxmfb-auth-token") ||
         !!localStorage.getItem("sb-kyzazsmsqrqwbjpkqjqm-auth-token") ||
         !!localStorage.getItem("supabase.auth.token");
       if (hasToken) {

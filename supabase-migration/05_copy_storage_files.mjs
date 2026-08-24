@@ -2,15 +2,6 @@
  * 05_copy_storage_files.mjs
  * Copies every file (images, videos, PDFs, avatars, product photos...) from the
  * OLD Supabase storage bucket to the NEW project's bucket.
- *
- * Usage:
- *   npm install @supabase/supabase-js
- *   NEW_SUPABASE_URL=https://sizxlgxdawklesbkxmfb.supabase.co \
- *   NEW_SERVICE_KEY=sb_secret_xxxxxxxx \
- *   node 05_copy_storage_files.mjs
- *
- * The old bucket is public, so no old-project key is needed — files are read
- * over plain HTTPS.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -43,32 +34,58 @@ const rows = fs
 // Make sure the bucket exists and is public (same as the old project).
 for (const bucket of new Set(rows.map((r) => r.bucket))) {
   const { error } = await supabase.storage.createBucket(bucket, { public: true });
-  if (error && !/already exists/i.test(error.message)) throw error;
+  if (error && !/already exists/i.test(error.message)) {
+    console.warn(`createBucket note: ${error.message}`);
+  }
+  // Try to update bucket to allow public access
+  await supabase.storage.updateBucket(bucket, { public: true });
   console.log(`bucket ready: ${bucket}`);
 }
 
 let ok = 0;
+let skipped = 0;
 let failed = 0;
 
-for (const row of rows) {
+for (let i = 0; i < rows.length; i++) {
+  const row = rows[i];
+  const destUrl = `${NEW_URL}/storage/v1/object/public/${row.bucket}/${row.name
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+
+  // Check if destination already has this file
+  try {
+    const checkRes = await fetch(destUrl, { method: "HEAD", signal: AbortSignal.timeout(5000) });
+    if (checkRes.ok && Number(checkRes.headers.get("content-length")) > 0) {
+      skipped++;
+      console.log(`[${i + 1}/${rows.length}] ALREADY EXISTS: ${row.bucket}/${row.name}`);
+      continue;
+    }
+  } catch {
+    // If check fails, proceed to attempt copy
+  }
+
   const sourceUrl = `${OLD_URL}/storage/v1/object/public/${row.bucket}/${row.name
     .split("/")
     .map(encodeURIComponent)
     .join("/")}`;
+
   try {
-    const res = await fetch(sourceUrl);
+    console.log(`[${i + 1}/${rows.length}] Downloading ${row.bucket}/${row.name}...`);
+    const res = await fetch(sourceUrl, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) throw new Error(`download ${res.status}`);
     const body = Buffer.from(await res.arrayBuffer());
+    console.log(`[${i + 1}/${rows.length}] Uploading ${row.bucket}/${row.name} (${body.length} bytes)...`);
     const { error } = await supabase.storage
       .from(row.bucket)
       .upload(row.name, body, { contentType: row.mimetype, upsert: true });
     if (error) throw error;
     ok++;
-    console.log(`copied  ${row.bucket}/${row.name} (${body.length} bytes)`);
+    console.log(`[${i + 1}/${rows.length}] COPIED ${row.bucket}/${row.name}`);
   } catch (err) {
     failed++;
-    console.error(`FAILED  ${row.bucket}/${row.name}: ${err.message}`);
+    console.error(`[${i + 1}/${rows.length}] FAILED ${row.bucket}/${row.name}: ${err.message}`);
   }
 }
 
-console.log(`\nDone. copied=${ok} failed=${failed} total=${rows.length}`);
+console.log(`\nDone. copied=${ok} already_existed=${skipped} failed=${failed} total=${rows.length}`);
