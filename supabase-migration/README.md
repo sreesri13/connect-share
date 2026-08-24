@@ -63,6 +63,18 @@ In Lovable: open the Supabase integration and connect your own project
 (`sb_publishable_9C53mB5TJqUxlusG-Z4hmA_Gx0-BSon`) and regenerates
 `src/integrations/supabase/types.ts`. Do not hand-edit those files.
 
+For the Android/Flutter app, update `lib/config/app_config.dart` **after** the new
+project is verified working:
+```dart
+static const String supabaseUrl = 'https://sizxlgxdawklesbkxmfb.supabase.co';
+static const String supabaseAnonKey = '<new publishable/anon key>';
+static const String supabaseProjectId = 'sizxlgxdawklesbkxmfb';
+```
+Also update the token key checked in `src/pages/AuthPage.tsx`
+(`sb-kyzazsmsqrqwbjpkqjqm-auth-token` → `sb-sizxlgxdawklesbkxmfb-auth-token`) and
+rebuild the APK/AAB. Tell me when the new project is live and I'll make both edits.
+
+
 ### 7. Redeploy the edge functions
 Three functions live in `supabase/functions/`: `verify-recaptcha`, `resolve-upi`,
 `get-analytics`. Deploy them to the new project:
