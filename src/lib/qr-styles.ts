@@ -1,6 +1,6 @@
-// QR Style Types and Defaults
+// QR Style Types, Defaults, and Scannability Algorithms
 
-export type BodyShape = 'square' | 'dots' | 'rounded' | 'diamond' | 'star';
+export type BodyShape = 'square' | 'dots' | 'rounded' | 'diamond' | 'star' | 'classy';
 export type EyeFrameShape = 'square' | 'rounded' | 'circle' | 'leaf' | 'dotted';
 export type EyeBallShape = 'square' | 'rounded' | 'circle' | 'diamond' | 'leaf';
 export type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
@@ -28,12 +28,12 @@ export const defaultQRStyle: QRStyleConfig = {
   eyeFrameColor: '#000000',
   eyeBallColor: '#000000',
   backgroundColor: '#ffffff',
-  size: 200,
+  size: 240,
   margin: 4,
   errorCorrectionLevel: 'H',
 };
 
-// Ocean preset for when customization is enabled
+// Ocean preset with guaranteed white background
 export const oceanPresetStyle: QRStyleConfig = {
   bodyShape: 'rounded',
   eyeFrameShape: 'rounded',
@@ -42,17 +42,18 @@ export const oceanPresetStyle: QRStyleConfig = {
   eyeFrameColor: '#023e8a',
   eyeBallColor: '#0096c7',
   backgroundColor: '#ffffff',
-  size: 200,
+  size: 240,
   margin: 4,
   errorCorrectionLevel: 'H',
 };
 
-export const bodyShapeOptions: { value: BodyShape; label: string }[] = [
-  { value: 'square', label: 'Square' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'diamond', label: 'Diamond' },
-  { value: 'star', label: 'Star' },
+export const bodyShapeOptions: { value: BodyShape; label: string; description: string }[] = [
+  { value: 'square', label: 'Square', description: 'Standard high-density square blocks' },
+  { value: 'dots', label: 'Dots', description: 'Modern circular dots' },
+  { value: 'rounded', label: 'Rounded', description: 'Smooth rounded module corners' },
+  { value: 'diamond', label: 'Diamond', description: 'Refined geometric diamond facets' },
+  { value: 'classy', label: 'Classy', description: 'Diagonal rounded corner modules' },
+  { value: 'star', label: 'Star', description: 'Stylized star module matrix' },
 ];
 
 export const eyeFrameShapeOptions: { value: EyeFrameShape; label: string }[] = [
@@ -72,15 +73,17 @@ export const eyeBallShapeOptions: { value: EyeBallShape; label: string }[] = [
 ];
 
 export const errorCorrectionOptions: { value: ErrorCorrectionLevel; label: string; description: string }[] = [
-  { value: 'L', label: 'Low (7%)', description: 'Minimal error recovery' },
-  { value: 'M', label: 'Medium (15%)', description: 'Balanced recovery' },
-  { value: 'Q', label: 'Quartile (25%)', description: 'Good recovery' },
-  { value: 'H', label: 'High (30%)', description: 'Best recovery for designs' },
+  { value: 'L', label: 'Low (7%)', description: 'Minimal recovery' },
+  { value: 'M', label: 'Medium (15%)', description: 'Standard recovery' },
+  { value: 'Q', label: 'Quartile (25%)', description: 'Strong recovery' },
+  { value: 'H', label: 'High (30%)', description: 'Best for custom styles & logos' },
 ];
 
-export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = [
+// Presets with 100% white background and high contrast for instant phone camera scanning
+export const presetThemes: { name: string; description: string; config: Partial<QRStyleConfig> }[] = [
   {
     name: 'Classic',
+    description: 'Black & White',
     config: {
       bodyShape: 'square',
       eyeFrameShape: 'square',
@@ -89,90 +92,175 @@ export const presetThemes: { name: string; config: Partial<QRStyleConfig> }[] = 
       eyeFrameColor: '#000000',
       eyeBallColor: '#000000',
       backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
     },
   },
   {
-    name: 'Modern',
+    name: 'Midnight',
+    description: 'Deep Navy',
     config: {
       bodyShape: 'rounded',
       eyeFrameShape: 'rounded',
       eyeBallShape: 'rounded',
-      bodyColor: '#1a1a2e',
-      eyeFrameColor: '#16213e',
-      eyeBallColor: '#0f3460',
+      bodyColor: '#0f172a',
+      eyeFrameColor: '#1e293b',
+      eyeBallColor: '#2563eb',
       backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
     },
   },
   {
-    name: 'Minimal',
+    name: 'Emerald Pro',
+    description: 'Forest Green',
+    config: {
+      bodyShape: 'rounded',
+      eyeFrameShape: 'leaf',
+      eyeBallShape: 'circle',
+      bodyColor: '#064e3b',
+      eyeFrameColor: '#047857',
+      eyeBallColor: '#059669',
+      backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
+    },
+  },
+  {
+    name: 'Royal Purple',
+    description: 'Vibrant Violet',
     config: {
       bodyShape: 'dots',
       eyeFrameShape: 'circle',
       eyeBallShape: 'circle',
-      bodyColor: '#333333',
-      eyeFrameColor: '#333333',
-      eyeBallColor: '#333333',
+      bodyColor: '#4c1d95',
+      eyeFrameColor: '#6d28d9',
+      eyeBallColor: '#7c3aed',
       backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
     },
   },
   {
-    name: 'Ocean',
+    name: 'Ocean Blue',
+    description: 'Sapphire Azure',
     config: {
       bodyShape: 'rounded',
       eyeFrameShape: 'rounded',
       eyeBallShape: 'circle',
-      bodyColor: '#0077b6',
-      eyeFrameColor: '#023e8a',
-      eyeBallColor: '#0096c7',
+      bodyColor: '#1e3a8a',
+      eyeFrameColor: '#1d4ed8',
+      eyeBallColor: '#0284c7',
       backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
     },
   },
   {
-    name: 'Forest',
-    config: {
-      bodyShape: 'rounded',
-      eyeFrameShape: 'leaf',
-      eyeBallShape: 'rounded',
-      bodyColor: '#2d6a4f',
-      eyeFrameColor: '#1b4332',
-      eyeBallColor: '#40916c',
-      backgroundColor: '#ffffff',
-    },
-  },
-  {
-    name: 'Diamond',
+    name: 'Crimson',
+    description: 'Deep Ruby',
     config: {
       bodyShape: 'diamond',
       eyeFrameShape: 'rounded',
       eyeBallShape: 'rounded',
-      bodyColor: '#2c3e50',
-      eyeFrameColor: '#2c3e50',
-      eyeBallColor: '#3498db',
+      bodyColor: '#881337',
+      eyeFrameColor: '#be123c',
+      eyeBallColor: '#e11d48',
       backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
+    },
+  },
+  {
+    name: 'Cyber Teal',
+    description: 'Modern Teal',
+    config: {
+      bodyShape: 'classy',
+      eyeFrameShape: 'rounded',
+      eyeBallShape: 'diamond',
+      bodyColor: '#134e4a',
+      eyeFrameColor: '#0f766e',
+      eyeBallColor: '#0d9488',
+      backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
+    },
+  },
+  {
+    name: 'Graphite',
+    description: 'Dark Slate',
+    config: {
+      bodyShape: 'dots',
+      eyeFrameShape: 'square',
+      eyeBallShape: 'rounded',
+      bodyColor: '#18181b',
+      eyeFrameColor: '#27272a',
+      eyeBallColor: '#3f3f46',
+      backgroundColor: '#ffffff',
+      errorCorrectionLevel: 'H',
     },
   },
 ];
 
-export function getContrastWarning(bodyColor: string, backgroundColor: string): string | null {
+/**
+ * Calculates WCAG / QR code contrast ratio between foreground and background
+ */
+export function getContrastRatio(hex1: string, hex2: string): number {
   const getRelativeLuminance = (hex: string) => {
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
+    const r = parseInt(cleanHex.slice(0, 2), 16) / 255 || 0;
+    const g = parseInt(cleanHex.slice(2, 4), 16) / 255 || 0;
+    const b = parseInt(cleanHex.slice(4, 6), 16) / 255 || 0;
     
     const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     
     return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
   };
   
-  const l1 = getRelativeLuminance(bodyColor);
-  const l2 = getRelativeLuminance(backgroundColor);
-  const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  
-  if (ratio < 3) {
-    return 'Low contrast may affect scannability. Consider using darker/lighter colors.';
+  const l1 = getRelativeLuminance(hex1);
+  const l2 = getRelativeLuminance(hex2);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+export interface ContrastStatus {
+  ratio: number;
+  status: 'excellent' | 'moderate' | 'poor';
+  warningMessage: string | null;
+  scannable: boolean;
+}
+
+export function evaluateQRScannability(
+  bodyColor: string,
+  eyeFrameColor: string,
+  eyeBallColor: string,
+  backgroundColor: string
+): ContrastStatus {
+  const bodyRatio = getContrastRatio(bodyColor, backgroundColor);
+  const frameRatio = getContrastRatio(eyeFrameColor, backgroundColor);
+  const ballRatio = getContrastRatio(eyeBallColor, backgroundColor);
+
+  const minRatio = Math.min(bodyRatio, frameRatio, ballRatio);
+
+  if (minRatio < 2.5) {
+    return {
+      ratio: minRatio,
+      status: 'poor',
+      scannable: false,
+      warningMessage: 'Critical: Extremely low color contrast! Phone cameras will NOT be able to scan this QR code. Please use dark colors on a white/light background.',
+    };
   }
-  if (ratio < 4.5) {
-    return 'Moderate contrast. QR should scan but may have issues in low light.';
+
+  if (minRatio < 4.0) {
+    return {
+      ratio: minRatio,
+      status: 'moderate',
+      scannable: true,
+      warningMessage: 'Notice: Moderate contrast. This QR will scan on most phones, but may struggle in dim lighting or at smaller print sizes.',
+    };
   }
-  return null;
+
+  return {
+    ratio: minRatio,
+    status: 'excellent',
+    scannable: true,
+    warningMessage: null,
+  };
+}
+
+export function getContrastWarning(bodyColor: string, backgroundColor: string): string | null {
+  const status = evaluateQRScannability(bodyColor, bodyColor, bodyColor, backgroundColor);
+  return status.warningMessage;
 }

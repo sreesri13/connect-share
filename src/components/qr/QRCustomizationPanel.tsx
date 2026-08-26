@@ -1,15 +1,35 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Square, Eye, Settings2, ChevronDown, ChevronUp, Sparkles, Save, Wand2, Image as ImageIcon, X, Upload } from 'lucide-react';
+import {
+  Palette,
+  Square,
+  Eye,
+  Settings2,
+  Sparkles,
+  Save,
+  Wand2,
+  Image as ImageIcon,
+  X,
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+  ShieldCheck,
+  Circle,
+  HelpCircle,
+  Loader2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Select,
   SelectContent,
@@ -25,7 +45,7 @@ import {
   eyeBallShapeOptions,
   errorCorrectionOptions,
   presetThemes,
-  getContrastWarning,
+  evaluateQRScannability,
 } from '@/lib/qr-styles';
 
 interface QRCustomizationPanelProps {
@@ -34,29 +54,9 @@ interface QRCustomizationPanelProps {
   onSaveStyle?: (name: string) => void;
   savedStyles?: { id: string; name: string; config: QRStyleConfig }[];
   onLoadStyle?: (id: string) => void;
+  hideCardWrapper?: boolean;
+  className?: string;
 }
-
-const ShapePreview = ({ shape, type }: { shape: string; type: 'body' | 'eyeFrame' | 'eyeBall' }) => {
-  const getPath = () => {
-    if (type === 'body') {
-      switch (shape) {
-        case 'dots': return 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z';
-        case 'rounded': return 'M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z';
-        case 'diamond': return 'M12 2l10 10-10 10L2 12 12 2z';
-        case 'star': return 'M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z';
-        case 'classy': return 'M4 4h16v16H4z';
-        default: return 'M4 4h16v16H4z';
-      }
-    }
-    return 'M4 4h16v16H4z';
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
-      <path d={getPath()} />
-    </svg>
-  );
-};
 
 export function QRCustomizationPanel({
   value,
@@ -64,412 +64,636 @@ export function QRCustomizationPanel({
   onSaveStyle,
   savedStyles = [],
   onLoadStyle,
+  hideCardWrapper = false,
+  className = '',
 }: QRCustomizationPanelProps) {
-  const [expandedSection, setExpandedSection] = useState<string | null>('shapes');
   const [newStyleName, setNewStyleName] = useState('');
-  const contrastWarning = getContrastWarning(value.bodyColor, value.backgroundColor);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  // Evaluate real-time scannability based on contrast
+  const scannability = evaluateQRScannability(
+    value.bodyColor,
+    value.eyeFrameColor,
+    value.eyeBallColor,
+    value.backgroundColor || '#ffffff'
+  );
 
   const updateStyle = (updates: Partial<QRStyleConfig>) => {
     onChange({ ...value, ...updates });
   };
 
   const applyPreset = (preset: typeof presetThemes[0]) => {
-    updateStyle(preset.config);
+    updateStyle({
+      ...preset.config,
+      backgroundColor: '#ffffff', // Ensure white background
+      errorCorrectionLevel: value.logoUrl ? 'H' : (preset.config.errorCorrectionLevel || 'H'),
+    });
   };
 
-  return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Sparkles className="w-5 h-5 text-primary" />
-          Customize QR Code
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Preset Themes */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Quick Presets</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {presetThemes.map((preset) => (
-              <Button
-                key={preset.name}
-                variant="outline"
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => applyPreset(preset)}
-              >
-                {preset.name}
-              </Button>
-            ))}
-          </div>
+  const handleAutoFixContrast = () => {
+    updateStyle({
+      backgroundColor: '#ffffff',
+      bodyColor: value.bodyColor === '#ffffff' ? '#000000' : value.bodyColor,
+      eyeFrameColor: value.eyeFrameColor === '#ffffff' ? '#000000' : value.eyeFrameColor,
+      eyeBallColor: value.eyeBallColor === '#ffffff' ? '#000000' : value.eyeBallColor,
+      errorCorrectionLevel: 'H',
+    });
+  };
+
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo image must be under 5MB');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `qr-logos/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+
+      // Upload to Supabase storage 'uploads' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file, { upsert: true });
+
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(fileName);
+        updateStyle({
+          logoUrl: publicUrl,
+          logoSize: 'medium',
+          errorCorrectionLevel: 'H',
+        });
+        toast.success('Logo uploaded successfully!');
+        return;
+      }
+
+      // Fallback: Read as data URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        updateStyle({
+          logoUrl: reader.result as string,
+          logoSize: 'medium',
+          errorCorrectionLevel: 'H',
+        });
+        toast.success('Logo added!');
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Logo upload error:', err);
+      toast.error('Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const content = (
+    <div className={`space-y-5 sm:space-y-6 ${className}`}>
+      
+      {/* 1. Quick Presets (100% White Background & High Scannability) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+            Quick Presets (100% Scannable)
+          </Label>
+          <span className="text-[10px] sm:text-[11px] text-muted-foreground">White bg verified</span>
         </div>
 
-        {/* Saved Styles */}
-        {savedStyles.length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">My Saved Styles</Label>
-            <Select onValueChange={onLoadStyle}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Load a saved style..." />
-              </SelectTrigger>
-              <SelectContent>
-                {savedStyles.map((style) => (
-                  <SelectItem key={style.id} value={style.id}>
-                    {style.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {presetThemes.map((preset) => {
+            const isSelected =
+              value.bodyColor === preset.config.bodyColor &&
+              value.eyeFrameColor === preset.config.eyeFrameColor &&
+              value.bodyShape === preset.config.bodyShape;
+
+            return (
+              <button
+                key={preset.name}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 group ${
+                  isSelected
+                    ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                    : 'border-border/50 bg-secondary/30 hover:border-primary/40 hover:bg-secondary/60'
+                }`}
+              >
+                <div
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg border border-border/40 flex items-center justify-center flex-shrink-0 shadow-xs"
+                  style={{ backgroundColor: '#ffffff' }}
+                >
+                  <div
+                    className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-xs"
+                    style={{ backgroundColor: preset.config.bodyColor }}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] sm:text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                    {preset.name}
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-muted-foreground truncate">
+                    {preset.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. Saved Custom Styles */}
+      {savedStyles.length > 0 && (
+        <div className="space-y-1.5 pt-1 border-t border-border/40">
+          <Label className="text-xs font-semibold text-muted-foreground">Saved Styles</Label>
+          <Select onValueChange={onLoadStyle}>
+            <SelectTrigger className="w-full h-9 sm:h-10 bg-secondary/30 text-xs">
+              <SelectValue placeholder="Load a saved custom style..." />
+            </SelectTrigger>
+            <SelectContent>
+              {savedStyles.map((style) => (
+                <SelectItem key={style.id} value={style.id} className="text-xs">
+                  {style.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* 3. Scannability Warning & Auto-Fix Banner */}
+      <AnimatePresence>
+        {scannability.status === 'poor' ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert variant="destructive" className="bg-destructive/15 border-destructive/30 p-3">
+              <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+              <AlertTitle className="text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <span>⚠️ Color Warning: Cannot Scan!</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAutoFixContrast}
+                  className="h-7 text-xs bg-background text-foreground border-destructive/40 w-full sm:w-auto"
+                >
+                  <Wand2 className="w-3 h-3 mr-1 text-primary" />
+                  Auto-Fix Contrast
+                </Button>
+              </AlertTitle>
+              <AlertDescription className="text-[11px] mt-1">
+                {scannability.warningMessage}
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        ) : scannability.status === 'moderate' ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300 p-3">
+              <Info className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <AlertTitle className="text-xs font-semibold flex items-center justify-between">
+                <span>Notice: Moderate Contrast</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAutoFixContrast}
+                  className="h-6 text-[11px] text-amber-700 dark:text-amber-300 underline p-0"
+                >
+                  Maximize
+                </Button>
+              </AlertTitle>
+              <AlertDescription className="text-[11px] mt-0.5">
+                {scannability.warningMessage}
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        ) : (
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 font-medium text-[11px]">
+              Scannability Verified: 100% High Contrast on white background.
+            </span>
           </div>
         )}
+      </AnimatePresence>
 
-        <Tabs defaultValue="shapes" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-9">
-            <TabsTrigger value="shapes" className="text-xs">
-              <Square className="w-3 h-3 mr-1" />
-              Shapes
-            </TabsTrigger>
-            <TabsTrigger value="colors" className="text-xs">
-              <Palette className="w-3 h-3 mr-1" />
-              Colors
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="text-xs">
-              <Settings2 className="w-3 h-3 mr-1" />
-              Advanced
-            </TabsTrigger>
-          </TabsList>
+      {/* 4. Customization Tabs: Shapes, Colors, Advanced, Logo */}
+      <Tabs defaultValue="shapes" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 h-10 p-1 bg-secondary/40 rounded-lg border border-border/40">
+          <TabsTrigger value="shapes" className="text-[11px] sm:text-xs font-medium px-1 sm:px-3">
+            <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+            Shapes
+          </TabsTrigger>
+          <TabsTrigger value="colors" className="text-[11px] sm:text-xs font-medium px-1 sm:px-3">
+            <Palette className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+            Colors
+          </TabsTrigger>
+          <TabsTrigger value="logo" className="text-[11px] sm:text-xs font-medium px-1 sm:px-3">
+            <ImageIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+            Logo
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="text-[11px] sm:text-xs font-medium px-1 sm:px-3">
+            <Settings2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+            Rules
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="shapes" className="space-y-4 mt-4">
-            {/* Body Shape */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Body Shape</Label>
-              <div className="grid grid-cols-5 gap-2">
-                {bodyShapeOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateStyle({ bodyShape: option.value })}
-                    className={`p-2 rounded-lg border transition-all flex flex-col items-center gap-1 ${
-                      value.bodyShape === option.value
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
+        {/* ---------------------------------------------------- */}
+        {/* SHAPES SUB-TAB                                       */}
+        {/* ---------------------------------------------------- */}
+        <TabsContent value="shapes" className="space-y-4 mt-4">
+          {/* Body Shape */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Body Pattern Shape</Label>
+              <span className="text-[10px] text-muted-foreground">Internal matrix dots</span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {bodyShapeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateStyle({ bodyShape: option.value })}
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col items-center gap-1.5 ${
+                    value.bodyShape === option.value
+                      ? 'border-primary bg-primary/15 text-primary shadow-xs ring-1 ring-primary'
+                      : 'border-border/50 bg-secondary/30 hover:border-primary/40'
+                  }`}
+                >
+                  <div className="w-5 h-5 flex items-center justify-center">
                     {option.value === 'star' ? (
                       <svg viewBox="0 0 24 24" className={`w-4 h-4 ${value.bodyShape === option.value ? 'fill-primary' : 'fill-foreground'}`}>
                         <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" />
                       </svg>
+                    ) : option.value === 'classy' ? (
+                      <div className={`w-4 h-4 rounded-tl-md rounded-br-md ${value.bodyShape === option.value ? 'bg-primary' : 'bg-foreground'}`} />
                     ) : (
                       <div className={`w-4 h-4 ${value.bodyShape === option.value ? 'bg-primary' : 'bg-foreground'} ${
                         option.value === 'dots' ? 'rounded-full' :
-                        option.value === 'rounded' ? 'rounded-md' :
-                        option.value === 'diamond' ? 'rotate-45' :
+                        option.value === 'rounded' ? 'rounded-xs' :
+                        option.value === 'diamond' ? 'rotate-45 scale-85' :
                         ''
                       }`} />
                     )}
-                    <span className="text-[10px]">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Eye Frame Shape */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-1">
-                <Eye className="w-3 h-3" />
-                Eye Frame
-              </Label>
-              <div className="grid grid-cols-5 gap-2">
-                {eyeFrameShapeOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateStyle({ eyeFrameShape: option.value })}
-                    className={`p-2 rounded-lg border transition-all text-center ${
-                      value.eyeFrameShape === option.value
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <span className="text-[10px]">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Eye Ball Shape */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Eye Center</Label>
-              <div className="grid grid-cols-5 gap-2">
-                {eyeBallShapeOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateStyle({ eyeBallShape: option.value })}
-                    className={`p-2 rounded-lg border transition-all text-center ${
-                      value.eyeBallShape === option.value
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <span className="text-[10px]">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="colors" className="space-y-4 mt-4">
-            {/* Color Pickers */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">Body Color</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={value.bodyColor}
-                    onChange={(e) => updateStyle({ bodyColor: e.target.value })}
-                    className="w-10 h-10 rounded-lg border cursor-pointer"
-                  />
-                  <Input
-                    value={value.bodyColor}
-                    onChange={(e) => updateStyle({ bodyColor: e.target.value })}
-                    className="flex-1 font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Background</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={value.backgroundColor}
-                    onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
-                    className="w-10 h-10 rounded-lg border cursor-pointer"
-                  />
-                  <Input
-                    value={value.backgroundColor}
-                    onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
-                    className="flex-1 font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Eye Frame</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={value.eyeFrameColor}
-                    onChange={(e) => updateStyle({ eyeFrameColor: e.target.value })}
-                    className="w-10 h-10 rounded-lg border cursor-pointer"
-                  />
-                  <Input
-                    value={value.eyeFrameColor}
-                    onChange={(e) => updateStyle({ eyeFrameColor: e.target.value })}
-                    className="flex-1 font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Eye Center</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={value.eyeBallColor}
-                    onChange={(e) => updateStyle({ eyeBallColor: e.target.value })}
-                    className="w-10 h-10 rounded-lg border cursor-pointer"
-                  />
-                  <Input
-                    value={value.eyeBallColor}
-                    onChange={(e) => updateStyle({ eyeBallColor: e.target.value })}
-                    className="flex-1 font-mono text-xs"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Contrast Warning */}
-            <AnimatePresence>
-              {contrastWarning && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <Alert variant="destructive" className="bg-destructive/10 border-destructive/20">
-                    <AlertDescription className="text-xs">
-                      ⚠️ {contrastWarning}
-                    </AlertDescription>
-                  </Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Auto-fix button */}
-            {contrastWarning && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateStyle({
-                  bodyColor: '#000000',
-                  backgroundColor: '#ffffff',
-                })}
-                className="w-full"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Auto-fix Contrast
-              </Button>
-            )}
-          </TabsContent>
-
-          <TabsContent value="advanced" className="space-y-4 mt-4">
-            {/* Size */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">QR Size</Label>
-                <span className="text-xs text-muted-foreground">{value.size}px</span>
-              </div>
-              <Slider
-                value={[value.size]}
-                onValueChange={([size]) => updateStyle({ size })}
-                min={100}
-                max={400}
-                step={10}
-              />
-            </div>
-
-            {/* Margin */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Quiet Zone (Margin)</Label>
-                <span className="text-xs text-muted-foreground">{value.margin} modules</span>
-              </div>
-              <Slider
-                value={[value.margin]}
-                onValueChange={([margin]) => updateStyle({ margin: Math.max(1, margin) })}
-                min={1}
-                max={10}
-                step={1}
-              />
-            </div>
-
-            {/* Error Correction Level */}
-            <div className="space-y-2">
-              <Label className="text-sm">Error Correction Level</Label>
-              <RadioGroup
-                value={value.errorCorrectionLevel}
-                onValueChange={(level) => updateStyle({ errorCorrectionLevel: level as ErrorCorrectionLevel })}
-                className="grid grid-cols-2 gap-2"
-              >
-                {errorCorrectionOptions.map((option) => (
-                  <div
-                    key={option.value}
-                    className={`flex items-center space-x-2 p-2 rounded-lg border cursor-pointer ${
-                      value.errorCorrectionLevel === option.value
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border'
-                    }`}
-                    onClick={() => updateStyle({ errorCorrectionLevel: option.value })}
-                  >
-                    <RadioGroupItem value={option.value} id={option.value} />
-                    <div>
-                      <Label htmlFor={option.value} className="text-xs font-medium cursor-pointer">
-                        {option.label}
-                      </Label>
-                      <p className="text-[10px] text-muted-foreground">{option.description}</p>
-                    </div>
                   </div>
-                ))}
-              </RadioGroup>
+                  <span className="text-[11px] font-medium">{option.label}</span>
+                </button>
+              ))}
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
 
-        {/* Logo Upload Section */}
-        <div className="pt-4 border-t border-border space-y-3">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-primary" />
-            Logo in Center
-          </Label>
-          <p className="text-xs text-muted-foreground">Add your logo to the center of the QR code. Use error correction level H for best results.</p>
-          
+          {/* Eye Frame Shape */}
+          <div className="space-y-2 pt-2 border-t border-border/40">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5 text-primary" />
+                Corner Eye Frame Shape
+              </Label>
+              <span className="text-[10px] text-muted-foreground">3 corner outer boxes</span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {eyeFrameShapeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateStyle({ eyeFrameShape: option.value })}
+                  className={`p-2 rounded-lg border text-center transition-all min-h-[38px] flex items-center justify-center ${
+                    value.eyeFrameShape === option.value
+                      ? 'border-primary bg-primary/15 text-primary shadow-xs ring-1 ring-primary'
+                      : 'border-border/50 bg-secondary/30 hover:border-primary/40'
+                  }`}
+                >
+                  <span className="text-[11px] font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Eye Center (Ball) Shape */}
+          <div className="space-y-2 pt-2 border-t border-border/40">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                <Circle className="w-3.5 h-3.5 text-primary" />
+                Corner Eye Center Pupil
+              </Label>
+              <span className="text-[10px] text-muted-foreground">Inner corner pupil dots</span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {eyeBallShapeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateStyle({ eyeBallShape: option.value })}
+                  className={`p-2 rounded-lg border text-center transition-all min-h-[38px] flex items-center justify-center ${
+                    value.eyeBallShape === option.value
+                      ? 'border-primary bg-primary/15 text-primary shadow-xs ring-1 ring-primary'
+                      : 'border-border/50 bg-secondary/30 hover:border-primary/40'
+                  }`}
+                >
+                  <span className="text-[11px] font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ---------------------------------------------------- */}
+        {/* COLORS SUB-TAB                                       */}
+        {/* ---------------------------------------------------- */}
+        <TabsContent value="colors" className="space-y-4 mt-4">
+          <div className="p-3 rounded-lg bg-secondary/30 border border-border/40 text-[11px] text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1">
+              <Info className="w-3.5 h-3.5 text-primary" />
+              Optimal Scannability Color Guidelines:
+            </p>
+            <p>• Keep the <strong>Background</strong> pure White (<code className="text-primary font-mono">#ffffff</code>) for instant detection by phone cameras.</p>
+            <p>• Use rich, deep colors for <strong>Body</strong>, <strong>Eye Frame</strong>, and <strong>Eye Center</strong>.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 1. Body Color */}
+            <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+              <div>
+                <Label className="text-xs font-semibold">1. Body Pattern Color</Label>
+                <p className="text-[10px] text-muted-foreground">Data matrix modules</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={value.bodyColor}
+                  onChange={(e) => updateStyle({ bodyColor: e.target.value })}
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5 bg-background flex-shrink-0"
+                />
+                <Input
+                  value={value.bodyColor}
+                  onChange={(e) => updateStyle({ bodyColor: e.target.value })}
+                  className="flex-1 font-mono text-xs h-10"
+                  placeholder="#000000"
+                />
+              </div>
+            </div>
+
+            {/* 2. Background Color */}
+            <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-xs font-semibold">2. Canvas Background</Label>
+                  <p className="text-[10px] text-muted-foreground">Always recommended: White</p>
+                </div>
+                {value.backgroundColor !== '#ffffff' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateStyle({ backgroundColor: '#ffffff' })}
+                    className="h-6 text-[10px] px-2"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={value.backgroundColor || '#ffffff'}
+                  onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5 bg-background flex-shrink-0"
+                />
+                <Input
+                  value={value.backgroundColor || '#ffffff'}
+                  onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+                  className="flex-1 font-mono text-xs h-10"
+                  placeholder="#ffffff"
+                />
+              </div>
+            </div>
+
+            {/* 3. Eye Frame Color */}
+            <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+              <div>
+                <Label className="text-xs font-semibold">3. Eye Frame Color</Label>
+                <p className="text-[10px] text-muted-foreground">3 corner outer boxes</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={value.eyeFrameColor}
+                  onChange={(e) => updateStyle({ eyeFrameColor: e.target.value })}
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5 bg-background flex-shrink-0"
+                />
+                <Input
+                  value={value.eyeFrameColor}
+                  onChange={(e) => updateStyle({ eyeFrameColor: e.target.value })}
+                  className="flex-1 font-mono text-xs h-10"
+                  placeholder="#000000"
+                />
+              </div>
+            </div>
+
+            {/* 4. Eye Ball (Center) Color */}
+            <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+              <div>
+                <Label className="text-xs font-semibold">4. Eye Center Pupil Color</Label>
+                <p className="text-[10px] text-muted-foreground">3 corner inner dots</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={value.eyeBallColor}
+                  onChange={(e) => updateStyle({ eyeBallColor: e.target.value })}
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5 bg-background flex-shrink-0"
+                />
+                <Input
+                  value={value.eyeBallColor}
+                  onChange={(e) => updateStyle({ eyeBallColor: e.target.value })}
+                  className="flex-1 font-mono text-xs h-10"
+                  placeholder="#000000"
+                />
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ---------------------------------------------------- */}
+        {/* LOGO SUB-TAB                                         */}
+        {/* ---------------------------------------------------- */}
+        <TabsContent value="logo" className="space-y-4 mt-4">
+          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong>100% Scan Protection Active:</strong> When a center logo is added, Error Correction Level is automatically locked to <strong>High (30% recovery)</strong> with a protective white badge, ensuring phone cameras scan the QR instantly without interference.
+            </div>
+          </div>
+
           {value.logoUrl ? (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
-              <img src={value.logoUrl} alt="QR Logo" className="w-12 h-12 rounded-lg object-cover border" />
+            <div className="flex items-center gap-3 p-3.5 sm:p-4 rounded-xl border border-border/50 bg-secondary/30">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-border bg-white flex items-center justify-center p-1 shadow-xs flex-shrink-0">
+                <img src={value.logoUrl} alt="Center Logo" className="w-full h-full object-contain" />
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Logo added</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Label className="text-xs text-muted-foreground">Size:</Label>
+                <p className="text-xs font-semibold truncate text-foreground">Center Logo Attached</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Label className="text-[11px] text-muted-foreground">Size:</Label>
                   <select
                     value={value.logoSize || 'medium'}
                     onChange={(e) => updateStyle({ logoSize: e.target.value as 'small' | 'medium' | 'large' })}
-                    className="text-xs border rounded px-1.5 py-0.5 bg-background"
+                    className="text-xs border border-border rounded-md px-2 py-1 bg-background text-foreground"
                   >
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
+                    <option value="small">Small (16%)</option>
+                    <option value="medium">Medium (21%)</option>
+                    <option value="large">Large (26%)</option>
                   </select>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => updateStyle({ logoUrl: undefined, logoSize: undefined })}>
-                <X className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                onClick={() => updateStyle({ logoUrl: undefined, logoSize: undefined })}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Remove
               </Button>
             </div>
           ) : (
             <div className="relative">
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/jpg,image/webp"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 2 * 1024 * 1024) {
-                    alert("Logo must be under 2MB");
-                    return;
-                  }
-                  // Convert to data URL for preview
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    updateStyle({ logoUrl: reader.result as string, logoSize: 'medium', errorCorrectionLevel: 'H' });
-                  };
-                  reader.readAsDataURL(file);
-                }}
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                disabled={isUploadingLogo}
+                onChange={handleLogoFileUpload}
               />
-              <div className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer">
-                <Upload className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Upload Logo (PNG/JPG, max 2MB)</span>
+              <div className="flex flex-col items-center justify-center gap-2 p-5 sm:p-6 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/60 bg-secondary/20 transition-all cursor-pointer text-center">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  {isUploadingLogo ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">
+                    {isUploadingLogo ? 'Uploading logo...' : 'Upload Center Logo'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">PNG, JPG, WebP or SVG (Max 5MB)</p>
+                </div>
               </div>
             </div>
           )}
-        </div>
+        </TabsContent>
 
-        {/* Save Style */}
-        {onSaveStyle && (
-          <div className="pt-4 border-t border-border">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Style name..."
-                value={newStyleName}
-                onChange={(e) => setNewStyleName(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (newStyleName.trim()) {
-                    onSaveStyle(newStyleName.trim());
-                    setNewStyleName('');
-                  }
-                }}
-                disabled={!newStyleName.trim()}
-              >
-                <Save className="w-4 h-4 mr-1" />
-                Save
-              </Button>
+        {/* ---------------------------------------------------- */}
+        {/* ADVANCED SUB-TAB                                     */}
+        {/* ---------------------------------------------------- */}
+        <TabsContent value="advanced" className="space-y-4 mt-4">
+          {/* Quiet Zone Margin */}
+          <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Quiet Zone (Outer White Margin)</Label>
+              <span className="text-xs text-muted-foreground font-mono">{value.margin} modules</span>
             </div>
+            <Slider
+              value={[value.margin]}
+              onValueChange={([margin]) => updateStyle({ margin: Math.max(1, margin) })}
+              min={1}
+              max={8}
+              step={1}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              A minimum margin of 4 modules is standard for guaranteed scanner isolation.
+            </p>
           </div>
-        )}
+
+          {/* Error Correction Level */}
+          <div className="p-3 rounded-xl bg-secondary/30 border border-border/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Error Correction Level</Label>
+              {value.logoUrl && (
+                <Badge variant="secondary" className="text-[10px] bg-primary/15 text-primary">
+                  Level H Locked for Logo
+                </Badge>
+              )}
+            </div>
+            <RadioGroup
+              value={value.errorCorrectionLevel}
+              onValueChange={(level) => updateStyle({ errorCorrectionLevel: level as ErrorCorrectionLevel })}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              disabled={!!value.logoUrl}
+            >
+              {errorCorrectionOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer ${
+                    value.errorCorrectionLevel === option.value
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border/50 bg-background'
+                  }`}
+                  onClick={() => !value.logoUrl && updateStyle({ errorCorrectionLevel: option.value })}
+                >
+                  <RadioGroupItem value={option.value} id={`ec-${option.value}`} />
+                  <div>
+                    <Label htmlFor={`ec-${option.value}`} className="text-xs font-medium cursor-pointer">
+                      {option.label}
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground">{option.description}</p>
+                  </div>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* 5. Save Custom Style to Profile */}
+      {onSaveStyle && (
+        <div className="pt-3 border-t border-border/40">
+          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+            Save This Custom Style
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="e.g. My Brand Style..."
+              value={newStyleName}
+              onChange={(e) => setNewStyleName(e.target.value)}
+              className="flex-1 h-9 text-xs"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (newStyleName.trim()) {
+                  onSaveStyle(newStyleName.trim());
+                  setNewStyleName('');
+                }
+              }}
+              disabled={!newStyleName.trim()}
+              className="h-9 text-xs"
+            >
+              <Save className="w-3.5 h-3.5 mr-1" />
+              Save Style
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (hideCardWrapper) {
+    return content;
+  }
+
+  return (
+    <Card className="w-full border-border/60 bg-card/85 backdrop-blur-md shadow-elevated">
+      <CardHeader className="pb-3 border-b border-border/40">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sparkles className="w-4 h-4 text-primary" />
+          Customize QR Code
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 sm:p-6">
+        {content}
       </CardContent>
     </Card>
   );

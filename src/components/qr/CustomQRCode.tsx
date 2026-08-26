@@ -10,303 +10,504 @@ interface CustomQRCodeProps {
   id?: string;
 }
 
-// QR Code position detection patterns are at these positions
+// Finder patterns (3 corner positioning eyes: 7x7 modules each)
 const getEyePositions = (moduleCount: number) => [
-  { x: 0, y: 0 }, // top-left
-  { x: moduleCount - 7, y: 0 }, // top-right
-  { x: 0, y: moduleCount - 7 }, // bottom-left
+  { x: 0, y: 0 }, // Top-left
+  { x: moduleCount - 7, y: 0 }, // Top-right
+  { x: 0, y: moduleCount - 7 }, // Bottom-left
 ];
 
 const isInEyeArea = (row: number, col: number, moduleCount: number): boolean => {
   const eyePositions = getEyePositions(moduleCount);
-  return eyePositions.some(eye => 
-    col >= eye.x && col < eye.x + 7 && row >= eye.y && row < eye.y + 7
+  return eyePositions.some(
+    eye => col >= eye.x && col < eye.x + 7 && row >= eye.y && row < eye.y + 7
   );
 };
 
-const isEyeFrame = (row: number, col: number, moduleCount: number): boolean => {
-  const eyePositions = getEyePositions(moduleCount);
-  return eyePositions.some(eye => {
-    const localX = col - eye.x;
-    const localY = row - eye.y;
-    if (localX < 0 || localX >= 7 || localY < 0 || localY >= 7) return false;
-    // Outer ring (frame)
-    return localX === 0 || localX === 6 || localY === 0 || localY === 6;
-  });
-};
-
-const isEyeBall = (row: number, col: number, moduleCount: number): boolean => {
-  const eyePositions = getEyePositions(moduleCount);
-  return eyePositions.some(eye => {
-    const localX = col - eye.x;
-    const localY = row - eye.y;
-    if (localX < 0 || localX >= 7 || localY < 0 || localY >= 7) return false;
-    // Inner square (2-4 range)
-    return localX >= 2 && localX <= 4 && localY >= 2 && localY <= 4;
-  });
-};
-
-// Shape rendering functions
+// Shape rendering functions for data modules
 const renderBodyModule = (
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, size: number,
-  shape: BodyShape, color: string
+  x: number,
+  y: number,
+  size: number,
+  shape: BodyShape,
+  color: string
 ) => {
   ctx.fillStyle = color;
 
   switch (shape) {
     case 'dots':
       ctx.beginPath();
-      ctx.arc(x + size / 2, y + size / 2, size * 0.4, 0, Math.PI * 2);
+      ctx.arc(x + size / 2, y + size / 2, size * 0.44, 0, Math.PI * 2);
       ctx.fill();
       break;
+
     case 'rounded':
       ctx.beginPath();
-      const r = size * 0.25;
-      ctx.roundRect(x, y, size, size, r);
+      const r = size * 0.28;
+      ctx.roundRect(x + size * 0.03, y + size * 0.03, size * 0.94, size * 0.94, r);
       ctx.fill();
       break;
+
     case 'diamond':
       ctx.beginPath();
-      ctx.moveTo(x + size / 2, y);
-      ctx.lineTo(x + size, y + size / 2);
-      ctx.lineTo(x + size / 2, y + size);
-      ctx.lineTo(x, y + size / 2);
+      ctx.moveTo(x + size / 2, y + size * 0.05);
+      ctx.lineTo(x + size * 0.95, y + size / 2);
+      ctx.lineTo(x + size / 2, y + size * 0.95);
+      ctx.lineTo(x + size * 0.05, y + size / 2);
       ctx.closePath();
       ctx.fill();
       break;
+
+    case 'classy':
+      ctx.beginPath();
+      ctx.roundRect(x, y, size, size, [size * 0.4, 0, size * 0.4, 0]);
+      ctx.fill();
+      break;
+
     case 'star':
       const cx = x + size / 2;
       const cy = y + size / 2;
-      const outerR = size * 0.5;
-      const innerR = size * 0.22;
+      const outerR = size * 0.48;
+      const innerR = size * 0.28;
       ctx.beginPath();
       for (let i = 0; i < 5; i++) {
-        const angle = (i * 72 - 90) * Math.PI / 180;
+        const angle = (i * 72 - 90) * (Math.PI / 180);
         const px = cx + outerR * Math.cos(angle);
         const py = cy + outerR * Math.sin(angle);
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
-        const innerAngle = ((i * 72) + 36 - 90) * Math.PI / 180;
+        const innerAngle = (i * 72 + 36 - 90) * (Math.PI / 180);
         ctx.lineTo(cx + innerR * Math.cos(innerAngle), cy + innerR * Math.sin(innerAngle));
       }
       ctx.closePath();
       ctx.fill();
       break;
-    default: // square - fill completely with no padding
+
+    default: // square - standard high-density solid module
       ctx.fillRect(x, y, size, size);
+      break;
   }
 };
 
+// Render 7x7 outer eye frame with solid background filling to guarantee 100% contrast & scannability
 const renderEyeFrame = (
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, size: number,
-  shape: EyeFrameShape, color: string
+  x: number,
+  y: number,
+  size: number,
+  shape: EyeFrameShape,
+  frameColor: string,
+  bgColor: string
 ) => {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  const lineWidth = size;
+  const outerWidth = size * 7;
+  const innerWidth = size * 5;
+  const innerOffset = size * 1;
 
   switch (shape) {
     case 'rounded':
+      ctx.fillStyle = frameColor;
       ctx.beginPath();
-      ctx.roundRect(x, y, size * 7, size * 7, size * 1.5);
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      // Clear inside
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.roundRect(x + size, y + size, size * 5, size * 5, size);
+      ctx.roundRect(x, y, outerWidth, outerWidth, size * 1.6);
       ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.roundRect(x + innerOffset, y + innerOffset, innerWidth, innerWidth, size * 0.9);
+      ctx.fill();
       break;
+
     case 'circle':
+      const center = x + outerWidth / 2;
+      const centerY = y + outerWidth / 2;
+
+      ctx.fillStyle = frameColor;
       ctx.beginPath();
-      ctx.arc(x + size * 3.5, y + size * 3.5, size * 3.5, 0, Math.PI * 2);
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.arc(x + size * 3.5, y + size * 3.5, size * 2.5, 0, Math.PI * 2);
+      ctx.arc(center, centerY, outerWidth / 2, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.arc(center, centerY, innerWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
       break;
+
     case 'leaf':
+      ctx.fillStyle = frameColor;
       ctx.beginPath();
-      ctx.roundRect(x, y, size * 7, size * 7, [0, size * 3, 0, size * 3]);
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.roundRect(x + size, y + size, size * 5, size * 5, [0, size * 2, 0, size * 2]);
+      ctx.roundRect(x, y, outerWidth, outerWidth, [0, size * 3, 0, size * 3]);
       ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-      break;
-    case 'dotted':
-      const dotCount = 14;
-      const radius = size * 3;
+
+      ctx.fillStyle = bgColor;
       ctx.beginPath();
+      ctx.roundRect(x + innerOffset, y + innerOffset, innerWidth, innerWidth, [0, size * 2, 0, size * 2]);
+      ctx.fill();
+      break;
+
+    case 'dotted':
+      ctx.fillStyle = frameColor;
+      const dotCount = 16;
+      const ringRadius = size * 3;
+      const dotRadius = size * 0.46;
+      const cX = x + outerWidth / 2;
+      const cY = y + outerWidth / 2;
+
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.roundRect(x, y, outerWidth, outerWidth, size);
+      ctx.fill();
+
+      ctx.fillStyle = frameColor;
       for (let i = 0; i < dotCount; i++) {
         const angle = (i / dotCount) * Math.PI * 2;
-        ctx.moveTo(
-          x + size * 3.5 + Math.cos(angle) * (radius + size * 0.3),
-          y + size * 3.5 + Math.sin(angle) * (radius + size * 0.3)
-        );
-        ctx.arc(
-          x + size * 3.5 + Math.cos(angle) * radius,
-          y + size * 3.5 + Math.sin(angle) * radius,
-          size * 0.5, 0, Math.PI * 2
-        );
+        const dotX = cX + Math.cos(angle) * ringRadius;
+        const dotY = cY + Math.sin(angle) * ringRadius;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.fill();
       break;
-    default: // square
-      ctx.fillRect(x, y, size * 7, size);
-      ctx.fillRect(x, y + size * 6, size * 7, size);
-      ctx.fillRect(x, y + size, size, size * 5);
-      ctx.fillRect(x + size * 6, y + size, size, size * 5);
+
+    default: // square (standard 7x7 outer frame, 5x5 inner)
+      ctx.fillStyle = frameColor;
+      ctx.fillRect(x, y, outerWidth, outerWidth);
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(x + innerOffset, y + innerOffset, innerWidth, innerWidth);
+      break;
   }
 };
 
+// Render 3x3 inner eye pupil / center
 const renderEyeBall = (
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, size: number,
-  shape: EyeBallShape, color: string
+  x: number,
+  y: number,
+  size: number,
+  shape: EyeBallShape,
+  color: string
 ) => {
   ctx.fillStyle = color;
-  const centerX = x + size * 1.5;
-  const centerY = y + size * 1.5;
+  const ballSize = size * 3;
+  const centerX = x + ballSize / 2;
+  const centerY = y + ballSize / 2;
 
   switch (shape) {
     case 'rounded':
       ctx.beginPath();
-      ctx.roundRect(x, y, size * 3, size * 3, size * 0.8);
+      ctx.roundRect(x, y, ballSize, ballSize, size * 0.85);
       ctx.fill();
       break;
+
     case 'circle':
       ctx.beginPath();
-      ctx.arc(centerX, centerY, size * 1.5, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, ballSize / 2, 0, Math.PI * 2);
       ctx.fill();
       break;
+
     case 'diamond':
-      // Diamond shape for eye center
       ctx.beginPath();
       ctx.moveTo(centerX, y);
-      ctx.lineTo(x + size * 3, centerY);
-      ctx.lineTo(centerX, y + size * 3);
+      ctx.lineTo(x + ballSize, centerY);
+      ctx.lineTo(centerX, y + ballSize);
       ctx.lineTo(x, centerY);
       ctx.closePath();
       ctx.fill();
       break;
+
     case 'leaf':
-      // Leaf/teardrop shape for eye center
       ctx.beginPath();
-      ctx.roundRect(x, y, size * 3, size * 3, [0, size * 1.2, 0, size * 1.2]);
+      ctx.roundRect(x, y, ballSize, ballSize, [0, size * 1.3, 0, size * 1.3]);
       ctx.fill();
       break;
+
     default: // square
-      ctx.fillRect(x, y, size * 3, size * 3);
+      ctx.fillRect(x, y, ballSize, ballSize);
+      break;
   }
 };
 
+/**
+ * Dedicated high-resolution vector QR generator for pristine, print-ready image downloads
+ */
+export async function renderHighResQRCanvas(
+  value: string,
+  style: Partial<QRStyleConfig> = {},
+  canvasSize: number = 2048
+): Promise<HTMLCanvasElement> {
+  const mergedStyle: QRStyleConfig = {
+    ...defaultQRStyle,
+    ...style,
+    size: canvasSize,
+    backgroundColor: style.backgroundColor || '#ffffff',
+    errorCorrectionLevel: style.logoUrl ? 'H' : (style.errorCorrectionLevel || 'H'),
+  };
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasSize;
+  canvas.height = canvasSize;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get 2d context');
+
+  // Paint solid background color
+  ctx.fillStyle = mergedStyle.backgroundColor;
+  ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+  // Generate QR code data matrix
+  const qrData = await QRCodeGenerator.create(value, {
+    errorCorrectionLevel: mergedStyle.errorCorrectionLevel,
+  });
+
+  const moduleCount = qrData.modules.size;
+  const margin = Math.max(1, mergedStyle.margin ?? 4);
+  const totalModules = moduleCount + margin * 2;
+  const moduleSize = canvasSize / totalModules;
+  const offset = moduleSize * margin;
+
+  // Draw data modules
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qrData.modules.get(row, col) && !isInEyeArea(row, col, moduleCount)) {
+        const x = offset + col * moduleSize;
+        const y = offset + row * moduleSize;
+        renderBodyModule(
+          ctx,
+          x,
+          y,
+          moduleSize,
+          mergedStyle.bodyShape,
+          mergedStyle.bodyColor
+        );
+      }
+    }
+  }
+
+  // Draw finder eyes
+  const eyePositions = getEyePositions(moduleCount);
+  eyePositions.forEach(eye => {
+    const frameX = offset + eye.x * moduleSize;
+    const frameY = offset + eye.y * moduleSize;
+    renderEyeFrame(
+      ctx,
+      frameX,
+      frameY,
+      moduleSize,
+      mergedStyle.eyeFrameShape,
+      mergedStyle.eyeFrameColor,
+      mergedStyle.backgroundColor
+    );
+
+    const ballX = offset + (eye.x + 2) * moduleSize;
+    const ballY = offset + (eye.y + 2) * moduleSize;
+    renderEyeBall(
+      ctx,
+      ballX,
+      ballY,
+      moduleSize,
+      mergedStyle.eyeBallShape,
+      mergedStyle.eyeBallColor
+    );
+  });
+
+  // Draw center logo if present
+  if (mergedStyle.logoUrl) {
+    await new Promise<void>((resolve) => {
+      const logoImg = new window.Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        const logoSizeRatio =
+          mergedStyle.logoSize === 'large'
+            ? 0.26
+            : mergedStyle.logoSize === 'small'
+            ? 0.16
+            : 0.21;
+        const logoSize = canvasSize * logoSizeRatio;
+        const logoX = (canvasSize - logoSize) / 2;
+        const logoY = (canvasSize - logoSize) / 2;
+        const padding = logoSize * 0.15;
+
+        // Protective white badge behind logo
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+        ctx.shadowBlur = Math.max(4, canvasSize * 0.008);
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = Math.max(2, canvasSize * 0.003);
+
+        const rx = logoX - padding;
+        const ry = logoY - padding;
+        const rw = logoSize + padding * 2;
+        const rh = logoSize + padding * 2;
+        const cornerRadius = padding * 1.5;
+
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, rw, rh, cornerRadius);
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+        ctx.lineWidth = Math.max(1, canvasSize * 0.002);
+        ctx.stroke();
+
+        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+        resolve();
+      };
+      logoImg.onerror = () => {
+        console.warn('Failed to load logo for high-res export');
+        resolve();
+      };
+      logoImg.src = mergedStyle.logoUrl!;
+    });
+  }
+
+  return canvas;
+}
+
 export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const mergedStyle = useMemo(() => ({ ...defaultQRStyle, ...style }), [style]);
+  
+  // Force Error Correction Level 'H' (30%) if a center logo is attached
+  const mergedStyle = useMemo(() => {
+    const base = { ...defaultQRStyle, ...style };
+    if (base.logoUrl) {
+      base.errorCorrectionLevel = 'H';
+    }
+    if (!base.backgroundColor) {
+      base.backgroundColor = '#ffffff';
+    }
+    return base;
+  }, [style]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !value) return;
 
+    let isSubscribed = true;
+
     const render = async () => {
       try {
-        // Generate QR code data
         const qrData = await QRCodeGenerator.create(value, {
           errorCorrectionLevel: mergedStyle.errorCorrectionLevel,
         });
 
+        if (!isSubscribed) return;
+
         const moduleCount = qrData.modules.size;
-        const moduleSize = mergedStyle.size / (moduleCount + mergedStyle.margin * 2);
-        const canvasSize = mergedStyle.size;
-        const offset = moduleSize * mergedStyle.margin;
+        const canvasSize = mergedStyle.size || 240;
+        const margin = Math.max(1, mergedStyle.margin ?? 4);
+        const totalModules = moduleCount + margin * 2;
+        const moduleSize = canvasSize / totalModules;
+        const offset = moduleSize * margin;
 
         canvas.width = canvasSize;
         canvas.height = canvasSize;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Clear and draw background
-        ctx.fillStyle = mergedStyle.backgroundColor;
+        ctx.fillStyle = mergedStyle.backgroundColor || '#ffffff';
         ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-        // Draw data modules (excluding eye areas)
         for (let row = 0; row < moduleCount; row++) {
           for (let col = 0; col < moduleCount; col++) {
             if (qrData.modules.get(row, col) && !isInEyeArea(row, col, moduleCount)) {
               const x = offset + col * moduleSize;
               const y = offset + row * moduleSize;
-              renderBodyModule(ctx, x, y, moduleSize, mergedStyle.bodyShape, mergedStyle.bodyColor);
+              renderBodyModule(
+                ctx,
+                x,
+                y,
+                moduleSize,
+                mergedStyle.bodyShape,
+                mergedStyle.bodyColor
+              );
             }
           }
         }
 
-        // Draw eye frames and balls
         const eyePositions = getEyePositions(moduleCount);
         eyePositions.forEach(eye => {
           const frameX = offset + eye.x * moduleSize;
           const frameY = offset + eye.y * moduleSize;
-          renderEyeFrame(ctx, frameX, frameY, moduleSize, mergedStyle.eyeFrameShape, mergedStyle.eyeFrameColor);
-          
+          renderEyeFrame(
+            ctx,
+            frameX,
+            frameY,
+            moduleSize,
+            mergedStyle.eyeFrameShape,
+            mergedStyle.eyeFrameColor,
+            mergedStyle.backgroundColor || '#ffffff'
+          );
+
           const ballX = offset + (eye.x + 2) * moduleSize;
           const ballY = offset + (eye.y + 2) * moduleSize;
-          renderEyeBall(ctx, ballX, ballY, moduleSize, mergedStyle.eyeBallShape, mergedStyle.eyeBallColor);
+          renderEyeBall(
+            ctx,
+            ballX,
+            ballY,
+            moduleSize,
+            mergedStyle.eyeBallShape,
+            mergedStyle.eyeBallColor
+          );
         });
 
-        // Draw logo in center if provided
         if (mergedStyle.logoUrl) {
           const logoImg = new window.Image();
-          logoImg.crossOrigin = "anonymous";
+          logoImg.crossOrigin = 'anonymous';
           logoImg.onload = () => {
-            const logoSizeRatio = mergedStyle.logoSize === 'large' ? 0.3 : mergedStyle.logoSize === 'small' ? 0.15 : 0.22;
+            if (!isSubscribed) return;
+
+            const logoSizeRatio =
+              mergedStyle.logoSize === 'large'
+                ? 0.26
+                : mergedStyle.logoSize === 'small'
+                ? 0.16
+                : 0.21;
             const logoSize = canvasSize * logoSizeRatio;
             const logoX = (canvasSize - logoSize) / 2;
             const logoY = (canvasSize - logoSize) / 2;
-            const padding = logoSize * 0.12;
+            const padding = logoSize * 0.15;
 
-            // White background behind logo
             ctx.fillStyle = '#ffffff';
-            const radius = padding * 1.5;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+
             const rx = logoX - padding;
             const ry = logoY - padding;
             const rw = logoSize + padding * 2;
             const rh = logoSize + padding * 2;
+            const cornerRadius = padding * 1.5;
+
             ctx.beginPath();
-            ctx.moveTo(rx + radius, ry);
-            ctx.lineTo(rx + rw - radius, ry);
-            ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius);
-            ctx.lineTo(rx + rw, ry + rh - radius);
-            ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh);
-            ctx.lineTo(rx + radius, ry + rh);
-            ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius);
-            ctx.lineTo(rx, ry + radius);
-            ctx.quadraticCurveTo(rx, ry, rx + radius, ry);
-            ctx.closePath();
+            ctx.roundRect(rx, ry, rw, rh, cornerRadius);
             ctx.fill();
 
-            // Draw logo
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
             ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
           };
-          logoImg.onerror = (e) => {
-            console.warn('QR logo failed to load:', e);
-          };
+
           logoImg.src = mergedStyle.logoUrl;
         }
-
       } catch (error) {
-        console.error('Failed to generate QR code:', error);
+        console.error('Failed to generate QR code canvas:', error);
       }
     };
 
     render();
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [value, mergedStyle]);
 
   return (
@@ -314,12 +515,13 @@ export function CustomQRCode({ value, style = {}, className, id }: CustomQRCodeP
       ref={canvasRef}
       id={id}
       className={className}
-      style={{ 
+      style={{
         display: 'block',
-        width: '100%', 
+        width: '100%',
         height: 'auto',
         maxWidth: '100%',
-        aspectRatio: '1 / 1'
+        aspectRatio: '1 / 1',
+        imageRendering: 'crisp-edges',
       }}
     />
   );
