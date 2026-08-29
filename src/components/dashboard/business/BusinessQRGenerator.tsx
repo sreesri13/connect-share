@@ -288,7 +288,7 @@ export const BusinessQRGenerator = ({ userId }: BusinessQRGeneratorProps) => {
       setGeneratedQR({ publicId, url: qrUrl, style: enableCustomization ? qrStyle : defaultQRStyle });
       toast.success("QR code generated successfully!");
     } catch (error: any) {
-      toast.error("Failed to generate QR code");
+      toast.error(`Failed to generate QR code: ${error?.message || 'Database error'}`);
       console.error(error);
     } finally {
       setIsGenerating(false);

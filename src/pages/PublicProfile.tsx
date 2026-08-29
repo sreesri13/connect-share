@@ -18,6 +18,7 @@ import { FileViewer } from "@/components/FileViewer";
 import { ScanLimitReached } from "@/components/qr/ScanLimitReached";
 import { PlatformIcon } from "@/lib/platform-icons";
 import { AccessDenied } from "@/components/qr/AccessDenied";
+import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfileItem {
@@ -87,6 +88,8 @@ const PublicProfile = () => {
   const [selectedItem, setSelectedItem] = useState<ProfileItem | null>(null);
   const [qrPageData, setQrPageData] = useState<QRPageData | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const [expiredAt, setExpiredAt] = useState<string | null>(null);
   const [scanLimitReached, setScanLimitReached] = useState(false);
   const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
 
@@ -189,7 +192,18 @@ const PublicProfile = () => {
         }
       }
 
-      // Check scan limit before anything else
+      // Step 1: Check for expiration
+      if (qrPage.expires_at) {
+        const expiryDate = new Date(qrPage.expires_at);
+        if (expiryDate.getTime() < Date.now()) {
+          setIsExpired(true);
+          setExpiredAt(qrPage.expires_at);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Step 2: Check scan limit
       if (qrPage.scan_limit_type && qrPage.scan_limit_type !== 'unlimited') {
         const limitCheck = await checkScanLimit(
           qrPage.id, qrPage.scan_limit_type, qrPage.max_scans, qrPage.daily_limit, false
@@ -202,21 +216,27 @@ const PublicProfile = () => {
         }
       }
 
-      // Check for location lock first
-      if (qrPage.location_locked && qrPage.location_lat && qrPage.location_lng) {
+      // Step 3: Check security locks (password and location)
+      const hasPassword = Boolean(qrPage.password_hash);
+      const isLocationSecured = Boolean(qrPage.location_locked && qrPage.location_lat && qrPage.location_lng);
+
+      if (hasPassword) {
+        setIsPasswordProtected(true);
+      }
+
+      if (isLocationSecured) {
         setIsLocationLocked(true);
+      }
+
+      if (hasPassword || isLocationSecured) {
         setIsLoading(false);
         return;
       }
 
-      // Then check for password
-      if (qrPage.password_hash) {
-        setIsPasswordProtected(true);
-        setIsLoading(false);
-      } else {
-        setIsPasswordVerified(true);
-        fetchPublicProfile(qrPage);
-      }
+      // If no password and no location restrictions, fetch content
+      setIsPasswordVerified(true);
+      setIsLocationVerified(true);
+      fetchPublicProfile(qrPage);
     } catch (err) {
       console.error(err);
       setError("Failed to load profile");
@@ -226,11 +246,10 @@ const PublicProfile = () => {
 
   const handleLocationVerified = () => {
     setIsLocationVerified(true);
-    // After location verification, check for password
-    if (qrPageData?.password_hash) {
+    if (qrPageData?.password_hash && !isPasswordVerified) {
       setIsPasswordProtected(true);
+      setIsLoading(false);
     } else {
-      setIsPasswordVerified(true);
       setIsLoading(true);
       fetchPublicProfile(qrPageData!);
     }
@@ -251,8 +270,13 @@ const PublicProfile = () => {
 
       if (isValid) {
         setIsPasswordVerified(true);
-        setIsLoading(true);
-        fetchPublicProfile(qrPageData!);
+        if (qrPageData?.location_locked && qrPageData.location_lat && qrPageData.location_lng && !isLocationVerified) {
+          setIsLocationLocked(true);
+          setIsLoading(false);
+        } else {
+          setIsLoading(true);
+          fetchPublicProfile(qrPageData!);
+        }
       } else {
         setPasswordError("Incorrect password");
       }
@@ -303,27 +327,24 @@ const PublicProfile = () => {
           title: qpItem.items.title,
           type: qpItem.items.type,
           content: qpItem.items.content,
-          category_name: qpItem.items.categories?.name || "Unknown",
+          category_name: qpItem.items.categories?.name || "General",
         }));
 
-      // Check for starred item - redirect directly
+      // Check for starred item - redirect if valid URL, or auto-open file viewer
       if (qrPage.starred_item_id) {
         const starredItem = formattedItems.find((item: ProfileItem) => item.id === qrPage.starred_item_id);
         if (starredItem) {
-          if (starredItem.type === "url") {
+          if (starredItem.type === "url" && starredItem.content && starredItem.content.trim()) {
             setIsRedirecting(true);
-            let url = starredItem.content;
+            let url = starredItem.content.trim();
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'https://' + url;
             }
             window.location.replace(url);
             return;
-          } else {
-            // For file types, show only that item
-            setItems([starredItem]);
-            setProfile(profileData);
+          } else if (starredItem.content) {
+            setItems(formattedItems);
             setIsLoading(false);
-            // Auto-open the file viewer
             setSelectedItem(starredItem);
             return;
           }
@@ -404,6 +425,11 @@ const PublicProfile = () => {
     acc[item.category_name].push(item);
     return acc;
   }, {} as Record<string, ProfileItem[]>);
+
+  // Expired screen
+  if (isExpired) {
+    return <QRExpiredScreen expiredAt={expiredAt} title={qrPageData?.title} />;
+  }
 
   // Access denied screen
   if (accessDenied) {
@@ -595,67 +621,77 @@ const PublicProfile = () => {
 
         {/* Categories & Items */}
         <div className="space-y-6">
-          {Object.entries(groupedItems).map(([categoryName, categoryItems], catIndex) => (
-            <motion.div
-              key={categoryName}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + catIndex * 0.1 }}
-            >
-              <h3 className="text-sm font-medium text-muted-foreground mb-3 px-1">
-                {categoryName}
-              </h3>
-              <div className="space-y-2">
-                {categoryItems.map((item, itemIndex) => {
-                  const isMedia = ["image", "video", "audio", "pdf"].includes(item.type);
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.5 + catIndex * 0.1 + itemIndex * 0.05 }}
-                    >
-                      <Card
-                        className="cursor-pointer hover:border-primary/50 hover:shadow-glow transition-all group"
-                        onClick={() => handleItemClick(item)}
+          {items.length === 0 ? (
+            <Card className="p-8 text-center bg-card/60 backdrop-blur border-border/50">
+              <QrCode className="w-12 h-12 mx-auto mb-3 text-muted-foreground/60" />
+              <h3 className="text-base font-semibold text-foreground mb-1">No Items Added Yet</h3>
+              <p className="text-sm text-muted-foreground">
+                This QR page doesn't have any active links or files attached to it.
+              </p>
+            </Card>
+          ) : (
+            Object.entries(groupedItems).map(([categoryName, categoryItems], catIndex) => (
+              <motion.div
+                key={categoryName}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + catIndex * 0.1 }}
+              >
+                <h3 className="text-sm font-medium text-muted-foreground mb-3 px-1">
+                  {categoryName}
+                </h3>
+                <div className="space-y-2">
+                  {categoryItems.map((item, itemIndex) => {
+                    const isMedia = ["image", "video", "audio", "pdf"].includes(item.type);
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 + catIndex * 0.1 + itemIndex * 0.05 }}
                       >
-                        <CardContent className="flex items-center gap-4 p-4">
-                          <PlatformIcon type={item.type} content={item.content} size="lg" className="group-hover:scale-110 transition-transform" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground">{item.title}</p>
-                            {item.type === "url" && (
-                              <p className="text-sm text-muted-foreground truncate">{item.content}</p>
-                            )}
-                            {item.type === "text" && (
-                              <p className="text-sm text-muted-foreground">Click to view</p>
+                        <Card
+                          className="cursor-pointer hover:border-primary/50 hover:shadow-glow transition-all group"
+                          onClick={() => handleItemClick(item)}
+                        >
+                          <CardContent className="flex items-center gap-4 p-4">
+                            <PlatformIcon type={item.type} content={item.content} size="lg" className="group-hover:scale-110 transition-transform" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground">{item.title}</p>
+                              {item.type === "url" && (
+                                <p className="text-sm text-muted-foreground truncate">{item.content}</p>
+                              )}
+                              {item.type === "text" && (
+                                <p className="text-sm text-muted-foreground">Click to view</p>
+                              )}
+                              {item.type === "wifi" && (
+                                <p className="text-sm text-muted-foreground">Tap to connect</p>
+                              )}
+                              {isMedia && item.type !== "pdf" && (
+                                <p className="text-sm text-muted-foreground">Click to view</p>
+                              )}
+                              {item.type === "pdf" && (
+                                <p className="text-sm text-muted-foreground">Click to open PDF</p>
+                              )}
+                            </div>
+                            {(item.type === "url" || item.type === "pdf") && (
+                              <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                             )}
                             {item.type === "wifi" && (
-                              <p className="text-sm text-muted-foreground">Tap to connect</p>
+                              <Wifi className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                             )}
-                            {isMedia && item.type !== "pdf" && (
-                              <p className="text-sm text-muted-foreground">Click to view</p>
+                            {["image", "video", "audio"].includes(item.type) && (
+                              <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                             )}
-                            {item.type === "pdf" && (
-                              <p className="text-sm text-muted-foreground">Click to open PDF</p>
-                            )}
-                          </div>
-                          {(item.type === "url" || item.type === "pdf") && (
-                            <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                          )}
-                          {item.type === "wifi" && (
-                            <Wifi className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                          )}
-                          {["image", "video", "audio"].includes(item.type) && (
-                            <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                          )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          ))}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
 
         {/* Footer - conditional on show_footer_branding */}

@@ -79,48 +79,60 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
     }
 
     setIsUploading(true);
-    setUploadProgress(0);
+    setUploadProgress(10);
 
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      // Use XMLHttpRequest for progress tracking
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const currentUserId = userId || session?.user?.id;
+      if (!currentUserId) {
         toast.error("Please sign in to upload files");
         setIsUploading(false);
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const uploadUrl = `${supabaseUrl}/storage/v1/object/uploads/${fileName}`;
+      // Clean and sanitize filename
+      const rawExt = file.name.split(".").pop() || "bin";
+      const cleanExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const cleanBaseName = file.name
+        .substring(0, file.name.lastIndexOf(".") > 0 ? file.name.lastIndexOf(".") : file.name.length)
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .substring(0, 30);
+      const fileName = `${currentUserId}/${Date.now()}-${cleanBaseName}.${cleanExt}`;
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            const percent = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(percent);
-          }
+      setUploadProgress(40);
+
+      // Upload directly via Supabase Storage SDK
+      const { error: uploadError } = await supabase.storage
+        .from("uploads")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true,
         });
 
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
+      if (uploadError) {
+        console.warn("SDK upload failed, attempting direct storage endpoint:", uploadError);
+        // Fallback to direct REST endpoint with apikey and auth header
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/uploads/${fileName}`;
+
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "apikey": anonKey,
+            "Authorization": `Bearer ${session?.access_token || anonKey}`,
+            "x-upsert": "true",
+          },
+          body: file,
         });
 
-        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(uploadError.message || errText || "Upload failed");
+        }
+      }
 
-        xhr.open("POST", uploadUrl);
-        xhr.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
-        xhr.setRequestHeader("x-upsert", "false");
-        xhr.send(file);
-      });
+      setUploadProgress(90);
 
       const { data: { publicUrl } } = supabase.storage
         .from("uploads")
@@ -128,13 +140,14 @@ export const FileUpload = ({ type, userId, onUploadComplete, value }: FileUpload
 
       setUploadedFile({ name: file.name, url: publicUrl });
       onUploadComplete(publicUrl);
+      setUploadProgress(100);
       toast.success("File uploaded successfully!");
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload file");
+      toast.error(`Failed to upload file: ${error?.message || 'Please check your connection and try again'}`);
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
+      setTimeout(() => setUploadProgress(0), 1000);
     }
   };
 

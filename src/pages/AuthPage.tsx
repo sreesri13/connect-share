@@ -89,6 +89,26 @@ const AuthPage = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Listen for native Google Sign-In events from Flutter bridge
+  useEffect(() => {
+    const handleGoogleCancelled = () => {
+      setIsGoogleLoading(false);
+    };
+    const handleGoogleFailed = (e: any) => {
+      setIsGoogleLoading(false);
+      const err = e?.detail?.error;
+      if (err) {
+        toast.error(err);
+      }
+    };
+    window.addEventListener("googleSignInCancelled", handleGoogleCancelled);
+    window.addEventListener("googleSignInFailed", handleGoogleFailed);
+    return () => {
+      window.removeEventListener("googleSignInCancelled", handleGoogleCancelled);
+      window.removeEventListener("googleSignInFailed", handleGoogleFailed);
+    };
+  }, []);
+
   // Render reCAPTCHA when loaded
   useEffect(() => {
     if (recaptchaLoaded) {

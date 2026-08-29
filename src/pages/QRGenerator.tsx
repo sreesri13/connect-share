@@ -55,6 +55,8 @@ import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
 import { defaultQRStyle, oceanPresetStyle, presetThemes, evaluateQRScannability } from "@/lib/qr-styles";
 import { PlatformIcon } from "@/lib/platform-icons";
+import { saveOrDownloadQRCode } from "@/lib/download-utils";
+
 
 interface ItemWithCategory {
   id: string;
@@ -84,8 +86,8 @@ const QRGenerator = () => {
   const [qrTitle, setQrTitle] = useState("");
   
   // QR Style
-  const [qrStyle, setQrStyle] = useState<QRStyleConfig>(oceanPresetStyle);
-  const [enableCustomization, setEnableCustomization] = useState(true);
+  const [qrStyle, setQrStyle] = useState<QRStyleConfig>(defaultQRStyle);
+  const [enableCustomization, setEnableCustomization] = useState(false);
   const [generatedStyle, setGeneratedStyle] = useState<QRStyleConfig | null>(null);
   const [showFullCustomizer, setShowFullCustomizer] = useState(false);
   
@@ -309,12 +311,7 @@ const QRGenerator = () => {
       if (!qrPage?.id) throw new Error("No QR Page ID returned by server");
 
       if (wantsPassword) {
-        try {
-          await setQRPassword("profile", qrPage.id, password.trim());
-        } catch (pwErr: any) {
-          console.warn("Password hash warning:", pwErr);
-          toast.warning("QR code created, but password could not be applied. You can set it in settings.");
-        }
+        await setQRPassword("profile", qrPage.id, password.trim());
       }
 
       if (selectedItems.length > 0) {
@@ -345,6 +342,12 @@ const QRGenerator = () => {
 
   const handleUpdateLiveQR = async () => {
     if (!qrPageDbId || !user) return;
+
+    if (enablePassword && !password.trim()) {
+      setActiveTab("security");
+      toast.error("Please enter a password in the Security tab");
+      return;
+    }
 
     setIsUpdating(true);
     try {
@@ -383,12 +386,12 @@ const QRGenerator = () => {
 
       if (updateError) throw updateError;
 
-      if (enablePassword && password.trim()) {
-        try {
+      if (enablePassword) {
+        if (password.trim()) {
           await setQRPassword("profile", qrPageDbId, password.trim());
-        } catch (pwErr) {
-          console.warn("Password update error:", pwErr);
         }
+      } else {
+        await setQRPassword("profile", qrPageDbId, null);
       }
 
       setGeneratedStyle(finalStyleConfig);
@@ -414,16 +417,10 @@ const QRGenerator = () => {
     setIsDownloading(true);
     try {
       const highResCanvas = await renderHighResQRCanvas(urlToEncode, styleToUse, 2048);
-      
-      const pngUrl = highResCanvas.toDataURL("image/png", 1.0);
-      const downloadLink = document.createElement("a");
       const filename = qrPageId 
         ? `connecthub-qr-${qrPageId}-hd.png` 
         : `connecthub-qr-${qrTitle ? qrTitle.toLowerCase().replace(/\s+/g, '-') : 'preview'}-hd.png`;
-      downloadLink.download = filename;
-      downloadLink.href = pngUrl;
-      downloadLink.click();
-      toast.success("Crystal-clear High-Res (2048px) QR code downloaded!");
+      await saveOrDownloadQRCode(highResCanvas, filename);
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to generate high-resolution QR image");

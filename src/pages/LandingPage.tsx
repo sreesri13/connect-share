@@ -1,11 +1,22 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { QrCode, Layers, Share2, Shield, Zap, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PublicQRScanner } from "@/components/scanner/PublicQRScanner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LandingPage = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, loading, navigate]);
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gradient-hero overflow-hidden">
       {/* Background Effects */}

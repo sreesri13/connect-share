@@ -99,31 +99,22 @@ export async function checkScanLimit(
     return { allowed: true, currentScans: 0, limit: 0 };
   }
 
-  const column = isBusinessPage ? 'qr_business_page_id' : 'qr_page_id';
-
   try {
-    if (scanLimitType === 'total' && maxScans) {
-      const { count } = await supabase
-        .from('qr_scans')
-        .select('*', { count: 'exact', head: true })
-        .eq(column, pageId);
-      const current = count || 0;
-      return { allowed: current < maxScans, currentScans: current, limit: maxScans };
-    }
+    const { data, error } = await supabase.rpc('check_qr_scan_limit', {
+      p_page_id: pageId,
+      p_is_business: isBusinessPage,
+    } as any);
 
-    if (scanLimitType === 'daily' && dailyLimit) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count } = await supabase
-        .from('qr_scans')
-        .select('*', { count: 'exact', head: true })
-        .eq(column, pageId)
-        .gte('scanned_at', today.toISOString());
-      const current = count || 0;
-      return { allowed: current < dailyLimit, currentScans: current, limit: dailyLimit };
+    if (!error && data) {
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      return {
+        allowed: parsed.allowed !== false,
+        currentScans: parsed.current_scans || 0,
+        limit: parsed.limit || (scanLimitType === 'daily' ? (dailyLimit || 0) : (maxScans || 0)),
+      };
     }
   } catch (error) {
-    console.error('Failed to check scan limit:', error);
+    console.error('Failed to check scan limit via RPC:', error);
   }
 
   return { allowed: true, currentScans: 0, limit: 0 };

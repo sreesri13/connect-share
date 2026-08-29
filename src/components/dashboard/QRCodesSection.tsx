@@ -43,6 +43,8 @@ import { defaultQRStyle, QRStyleConfig } from "@/lib/qr-styles";
 import { format, isPast, addDays, addHours, addMonths } from "date-fns";
 import { PlatformIcon } from "@/lib/platform-icons";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
+import { saveOrDownloadQRCode } from "@/lib/download-utils";
+
 import { Progress } from "@/components/ui/progress";
 import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
 
@@ -352,14 +354,22 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
   const handleSaveQRChanges = async () => {
     if (!editingQR) return;
+
+    if (editEnablePassword && !editingQR.has_password && !editPassword.trim()) {
+      toast.error("Please enter a password");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       let newPassword: string | null | undefined = undefined;
 
-      if (editEnablePassword && editPassword.trim()) {
-        newPassword = editPassword.trim();
-      } else if (!editEnablePassword) {
+      if (editEnablePassword) {
+        if (editPassword.trim()) {
+          newPassword = editPassword.trim();
+        }
+      } else {
         newPassword = null;
       }
 
@@ -429,8 +439,8 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       toast.success("QR code updated!");
       setIsEditQROpen(false);
       setEditingQR(null);
-    } catch (error) {
-      toast.error("Failed to update QR code");
+    } catch (error: any) {
+      toast.error(`Failed to update QR code: ${error?.message || 'Database error'}`);
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -441,25 +451,22 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     if (!editingQR) return;
 
     try {
-      const { error } = await supabase
-        .from("qr_pages")
-        .update({ password_hash: null })
-        .eq("id", editingQR.id);
-
-      if (error) throw error;
+      await setQRPassword("profile", editingQR.id, null);
 
       setEditEnablePassword(false);
+      setEditPassword("");
+      setEditingQR((prev) => (prev ? { ...prev, has_password: false } : null));
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id ? { ...p, has_password: false } : p
       ));
       toast.success("Password removed!");
-    } catch (error) {
-      toast.error("Failed to remove password");
+    } catch (error: any) {
+      toast.error(`Failed to remove password: ${error?.message || 'Database error'}`);
       console.error(error);
     }
   };
 
-  const handleDownloadQR = () => {
+  const handleDownloadQR = async () => {
     if (!qrPreviewRef.current || !editingQR) return;
     
     const canvas = qrPreviewRef.current.querySelector("canvas");
@@ -480,11 +487,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
       ctx.drawImage(canvas, 0, 0);
     }
 
-    const link = document.createElement("a");
-    link.download = `qr-${editingQR.public_id}.png`;
-    link.href = downloadCanvas.toDataURL("image/png");
-    link.click();
-    toast.success("QR code downloaded (high quality)");
+    await saveOrDownloadQRCode(downloadCanvas, `qr-${editingQR.public_id}.png`);
   };
 
   const handleEditItem = async () => {

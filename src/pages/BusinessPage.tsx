@@ -17,6 +17,7 @@ import { verifyQRPassword } from "@/lib/crypto";
 import { ExpiryCountdown } from "@/components/qr/ExpiryCountdown";
 import { BusinessInstallPrompt } from "@/components/business/BusinessInstallPrompt";
 import { AccessDenied } from "@/components/qr/AccessDenied";
+import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Category {
@@ -97,6 +98,8 @@ const BusinessPage = () => {
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [isExpired, setIsExpired] = useState(false);
+  const [expiredAt, setExpiredAt] = useState<string | null>(null);
   const [scanLimitReached, setScanLimitReached] = useState(false);
   const [scanLimitReachedType, setScanLimitReachedType] = useState<'total' | 'daily'>('total');
 
@@ -255,7 +258,18 @@ const BusinessPage = () => {
         }
       }
 
-      // Check scan limit before security checks
+      // Step 1: Check for expiration
+      if (pageDataResult.expires_at) {
+        const expiryDate = new Date(pageDataResult.expires_at);
+        if (expiryDate.getTime() < Date.now()) {
+          setIsExpired(true);
+          setExpiredAt(pageDataResult.expires_at);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Step 2: Check scan limit before security checks
       const limitType = (pageDataResult as any).scan_limit_type;
       if (limitType && limitType !== 'unlimited') {
         const limitCheck = await checkScanLimit(
@@ -269,18 +283,26 @@ const BusinessPage = () => {
         }
       }
 
-      if (pageDataResult.password_hash) {
+      // Step 3: Check security locks (password and location)
+      const hasPassword = Boolean(pageDataResult.password_hash);
+      const isLocationSecured = Boolean(pageDataResult.location_locked && pageDataResult.location_lat && pageDataResult.location_lng);
+
+      if (hasPassword) {
         setIsPasswordProtected(true);
-        setIsLoading(false);
-        return;
       }
 
-      if (pageDataResult.location_locked && pageDataResult.location_lat && pageDataResult.location_lng) {
+      if (isLocationSecured) {
         setIsLocationLocked(true);
+      }
+
+      if (hasPassword || isLocationSecured) {
         setIsLoading(false);
         return;
       }
 
+      // If no locks, fetch products
+      setIsPasswordVerified(true);
+      setIsLocationVerified(true);
       fetchPageProducts(pageDataResult.id);
     } catch (error: any) {
       console.error(error);
@@ -298,8 +320,9 @@ const BusinessPage = () => {
       setIsPasswordVerified(true);
       setPasswordError("");
 
-      if (pageData.location_locked && pageData.location_lat && pageData.location_lng) {
+      if (pageData.location_locked && pageData.location_lat && pageData.location_lng && !isLocationVerified) {
         setIsLocationLocked(true);
+        setIsLoading(false);
       } else {
         setIsLoading(true);
         fetchPageProducts(pageData.id);
@@ -312,8 +335,13 @@ const BusinessPage = () => {
   const handleLocationVerified = () => {
     setIsLocationVerified(true);
     if (pageData) {
-      setIsLoading(true);
-      fetchPageProducts(pageData.id);
+      if (isPasswordProtected && !isPasswordVerified) {
+        setIsPasswordProtected(true);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+        fetchPageProducts(pageData.id);
+      }
     }
   };
 
@@ -437,6 +465,11 @@ const BusinessPage = () => {
     cart.forEach((item) => { total += getProductPrice(item.product) * item.quantity; });
     return total;
   };
+
+  // Expired screen
+  if (isExpired) {
+    return <QRExpiredScreen expiredAt={expiredAt} title={pageData?.business_name || pageData?.title} />;
+  }
 
   // Access denied
   if (accessDenied) {

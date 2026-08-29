@@ -21,6 +21,8 @@ import { format, isPast, addDays, addHours } from "date-fns";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { Progress } from "@/components/ui/progress";
 import { ManageAccessDialog } from "@/components/qr/ManageAccessDialog";
+import { saveOrDownloadQRCode } from "@/lib/download-utils";
+
 import {
   Dialog,
   DialogContent,
@@ -410,14 +412,22 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
 
   const handleSaveChanges = async () => {
     if (!editingQR) return;
+
+    if (editEnablePassword && !editingQR.password_hash && !editPassword.trim()) {
+      toast.error("Please enter a password");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       let newPassword: string | null | undefined = undefined;
 
-      if (editEnablePassword && editPassword.trim()) {
-        newPassword = editPassword.trim();
-      } else if (!editEnablePassword) {
+      if (editEnablePassword) {
+        if (editPassword.trim()) {
+          newPassword = editPassword.trim();
+        }
+      } else {
         newPassword = null;
       }
 
@@ -497,8 +507,8 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       toast.success("QR code updated!");
       setIsEditOpen(false);
       setEditingQR(null);
-    } catch (error) {
-      toast.error("Failed to update QR code");
+    } catch (error: any) {
+      toast.error(`Failed to update QR code: ${error?.message || 'Database error'}`);
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -509,25 +519,22 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
     if (!editingQR) return;
 
     try {
-      const { error } = await supabase
-        .from("qr_business_pages")
-        .update({ password_hash: null })
-        .eq("id", editingQR.id);
-
-      if (error) throw error;
+      await setQRPassword("business", editingQR.id, null);
 
       setEditEnablePassword(false);
+      setEditPassword("");
+      setEditingQR((prev) => (prev ? { ...prev, password_hash: null } : null));
       setPages(pages.map((p) =>
         p.id === editingQR.id ? { ...p, password_hash: null } : p
       ));
       toast.success("Password removed!");
-    } catch (error) {
-      toast.error("Failed to remove password");
+    } catch (error: any) {
+      toast.error(`Failed to remove password: ${error?.message || 'Database error'}`);
       console.error(error);
     }
   };
 
-  const handleDownloadQR = () => {
+  const handleDownloadQR = async () => {
     if (!qrPreviewRef.current || !editingQR) return;
     
     const canvas = qrPreviewRef.current.querySelector("canvas");
@@ -547,14 +554,10 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       ctx.drawImage(canvas, 0, 0);
     }
 
-    const link = document.createElement("a");
-    link.download = `business-qr-${editingQR.public_id}.png`;
-    link.href = downloadCanvas.toDataURL("image/png");
-    link.click();
-    toast.success("QR code downloaded (high quality)");
+    await saveOrDownloadQRCode(downloadCanvas, `business-qr-${editingQR.public_id}.png`);
   };
 
-  const handleDownload = (page: BusinessQRPage) => {
+  const handleDownload = async (page: BusinessQRPage) => {
     const ref = qrRefs.current.get(page.id);
     if (!ref) return;
 
@@ -575,11 +578,7 @@ export const BusinessQRList = ({ userId }: BusinessQRListProps) => {
       ctx.drawImage(canvas, 0, 0);
     }
 
-    const link = document.createElement("a");
-    link.download = `business-qr-${page.public_id}.png`;
-    link.href = downloadCanvas.toDataURL("image/png");
-    link.click();
-    toast.success("QR code downloaded");
+    await saveOrDownloadQRCode(downloadCanvas, `business-qr-${page.public_id}.png`);
   };
 
   const handleCopyUrl = (page: BusinessQRPage) => {

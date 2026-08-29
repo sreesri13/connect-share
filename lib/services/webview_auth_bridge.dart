@@ -38,13 +38,29 @@ class WebViewAuthBridge {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_sessionPrefKey);
-      return saved != null && saved.isNotEmpty;
+      return saved != null && saved.isNotEmpty && saved != 'null';
     } catch (_) {
       return false;
     }
   }
 
-  /// Get JavaScript code to inject into the web page to intercept Google Auth button
+  /// Save session JSON string to SharedPreferences (e.g. from web login or Google login)
+  Future<void> saveSessionJson(String sessionJson) async {
+    try {
+      if (sessionJson.isEmpty || sessionJson == 'null') return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sessionPrefKey, sessionJson);
+      if (kDebugMode) {
+        print('[WebViewAuthBridge] Session successfully saved to SharedPreferences');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('[WebViewAuthBridge] Error saving session to SharedPreferences: $e');
+      }
+    }
+  }
+
+  /// Get JavaScript code to inject into the web page to intercept Google Auth button and sync auth state
   static String getAuthInterceptorScript() {
     return """
     (function() {
@@ -68,12 +84,31 @@ class WebViewAuthBridge {
         });
       }
 
+      // Sync Supabase auth token changes to Flutter
+      function checkAndSyncStorage() {
+        try {
+          const key = 'sb-${AppConfig.supabaseProjectId}-auth-token';
+          const tokenData = localStorage.getItem(key) || localStorage.getItem('supabase.auth.token');
+          if (tokenData && tokenData !== 'null') {
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+              window.flutter_inappwebview.callHandler('onAuthStateChange', tokenData);
+            }
+          }
+        } catch(e) {}
+      }
+
       // Hook immediately and observe DOM changes
       hookGoogleButtons();
+      checkAndSyncStorage();
+
       const observer = new MutationObserver(function() {
         hookGoogleButtons();
       });
       observer.observe(document.body, { childList: true, subtree: true });
+
+      window.addEventListener('storage', function() {
+        checkAndSyncStorage();
+      });
     })();
     """;
   }
@@ -95,6 +130,12 @@ class WebViewAuthBridge {
       if (googleUser == null) {
         if (kDebugMode) {
           print('[WebViewAuthBridge] Google Sign-In cancelled by user');
+        }
+        // Notify webview to reset button loading state
+        if (controller != null) {
+          await controller.evaluateJavascript(
+            source: "window.dispatchEvent(new CustomEvent('googleSignInCancelled'));",
+          );
         }
         return AuthBridgeResult(success: false, cancelled: true);
       }
@@ -161,11 +202,21 @@ class WebViewAuthBridge {
       if (kDebugMode) {
         print('[WebViewAuthBridge] PlatformException: $msg');
       }
+      if (controller != null) {
+        await controller.evaluateJavascript(
+          source: "window.dispatchEvent(new CustomEvent('googleSignInFailed', { detail: { error: ${jsonEncode(msg)} } }));",
+        );
+      }
       return AuthBridgeResult(success: false, errorMessage: msg);
     } catch (e) {
       final msg = 'Google Sign-In Error: $e';
       if (kDebugMode) {
         print('[WebViewAuthBridge] $msg');
+      }
+      if (controller != null) {
+        await controller.evaluateJavascript(
+          source: "window.dispatchEvent(new CustomEvent('googleSignInFailed', { detail: { error: ${jsonEncode(msg)} } }));",
+        );
       }
       return AuthBridgeResult(success: false, errorMessage: msg);
     }
@@ -207,7 +258,7 @@ class WebViewAuthBridge {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedSession = prefs.getString(_sessionPrefKey);
-      if (savedSession != null && savedSession.isNotEmpty) {
+      if (savedSession != null && savedSession.isNotEmpty && savedSession != 'null') {
         await injectSessionIntoWebView(controller, savedSession, navigateToDashboard: false);
       }
     } catch (e) {

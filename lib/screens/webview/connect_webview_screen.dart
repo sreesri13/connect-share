@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_config.dart';
 import '../../services/webview_auth_bridge.dart';
+
 
 class ConnectWebViewScreen extends StatefulWidget {
   final String? initialRoute;
@@ -219,6 +223,90 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
       final text = args[0]?.toString() ?? '';
       if (text.isNotEmpty) {
         await Share.share(text);
+      }
+    }
+  }
+
+  /// Native Save QR Code Handler (saves directly to ConnectHub folder in mobile storage)
+  Future<void> _handleSaveQRCode(List<dynamic> args) async {
+    try {
+      if (args.isEmpty || args[0] == null) return;
+      final data = args[0] is Map ? args[0] as Map<dynamic, dynamic> : {};
+      final base64String = data['base64Data']?.toString() ?? '';
+      String filename = data['filename']?.toString() ?? 'connecthub-qr.png';
+      if (!filename.toLowerCase().endsWith('.png')) {
+        filename = '$filename.png';
+      }
+
+      if (base64String.isEmpty) return;
+
+      // Extract raw base64 payload
+      final cleanBase64 = base64String.contains(',')
+          ? base64String.split(',').last
+          : base64String;
+      final bytes = base64Decode(cleanBase64.trim());
+
+      Directory? targetDir;
+      if (Platform.isAndroid) {
+        // Preferred: Public Pictures/ConnectHub folder
+        final picturesConnectHub = Directory('/storage/emulated/0/Pictures/ConnectHub');
+        final downloadsConnectHub = Directory('/storage/emulated/0/Download/ConnectHub');
+
+        if (await Directory('/storage/emulated/0/Pictures').exists()) {
+          targetDir = picturesConnectHub;
+        } else if (await Directory('/storage/emulated/0/Download').exists()) {
+          targetDir = downloadsConnectHub;
+        } else {
+          final extDir = await getExternalStorageDirectory();
+          targetDir = Directory('${extDir?.path}/ConnectHub');
+        }
+      } else {
+        final docDir = await getApplicationDocumentsDirectory();
+        targetDir = Directory('${docDir.path}/ConnectHub');
+      }
+
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+
+      final file = File('${targetDir.path}/$filename');
+      await file.writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Saved to ConnectHub folder ($filename)',
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Color(0xFF334155)),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[WebView] Error saving QR code to ConnectHub folder: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save QR code: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
       }
     }
   }
@@ -506,12 +594,27 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                           callback: (args) => _handleGoogleSignIn(),
                         );
                         controller.addJavaScriptHandler(
+                          handlerName: 'onAuthStateChange',
+                          callback: (args) {
+                            if (args.isNotEmpty && args[0] != null) {
+                              final sessionStr = args[0].toString();
+                              if (sessionStr.isNotEmpty && sessionStr != 'null') {
+                                _authBridge.saveSessionJson(sessionStr);
+                              }
+                            }
+                          },
+                        );
+                        controller.addJavaScriptHandler(
                           handlerName: 'logout',
                           callback: (args) => _authBridge.handleSignOut(controller),
                         );
                         controller.addJavaScriptHandler(
                           handlerName: 'nativeShare',
                           callback: (args) => _handleShare(args),
+                        );
+                        controller.addJavaScriptHandler(
+                          handlerName: 'saveQRCode',
+                          callback: (args) => _handleSaveQRCode(args),
                         );
 
                         // Pre-restore session if available

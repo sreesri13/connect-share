@@ -1,7 +1,7 @@
 name: connecthub
 description: "ConnectHub - Complete Native Flutter Mobile Application"
 publish_to: 'none'
-version: 1.0.6+6
+version: 1.0.8+8
 
 environment:
   sdk: ^3.10.7

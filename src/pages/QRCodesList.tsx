@@ -248,11 +248,18 @@ const QRCodesList = () => {
   const handleSaveQRChanges = async () => {
     if (!editingQR) return;
 
+    if (editEnablePassword && !editingQR.has_password && !editPassword.trim()) {
+      toast.error("Please enter a password");
+      return;
+    }
+
     try {
       let newPassword: string | null | undefined = undefined;
-      if (editEnablePassword && editPassword.trim()) {
-        newPassword = editPassword.trim();
-      } else if (!editEnablePassword) {
+      if (editEnablePassword) {
+        if (editPassword.trim()) {
+          newPassword = editPassword.trim();
+        }
+      } else {
         newPassword = null;
       }
 
@@ -311,8 +318,8 @@ const QRCodesList = () => {
       toast.success("QR code updated!");
       setIsEditQROpen(false);
       setEditingQR(null);
-    } catch (error) {
-      toast.error("Failed to update QR code");
+    } catch (error: any) {
+      toast.error(`Failed to update QR code: ${error?.message || 'Database error'}`);
       console.error(error);
     }
   };
@@ -321,20 +328,17 @@ const QRCodesList = () => {
     if (!editingQR) return;
 
     try {
-      const { error } = await supabase
-        .from("qr_pages")
-        .update({ password_hash: null })
-        .eq("id", editingQR.id);
-
-      if (error) throw error;
+      await setQRPassword("profile", editingQR.id, null);
 
       setEditEnablePassword(false);
+      setEditPassword("");
+      setEditingQR((prev) => (prev ? { ...prev, has_password: false } : null));
       setQrPages(qrPages.map((p) =>
         p.id === editingQR.id ? { ...p, has_password: false } : p
       ));
       toast.success("Password removed!");
-    } catch (error) {
-      toast.error("Failed to remove password");
+    } catch (error: any) {
+      toast.error(`Failed to remove password: ${error?.message || 'Database error'}`);
       console.error(error);
     }
   };

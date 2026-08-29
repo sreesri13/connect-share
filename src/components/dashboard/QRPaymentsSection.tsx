@@ -23,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveOrDownloadQRCode } from "@/lib/download-utils";
+
 import { QRCodeSVG } from "qrcode.react";
 import {
   AlertDialog,
@@ -244,21 +246,16 @@ export const QRPaymentsSection = ({ userId }: QRPaymentsSectionProps) => {
     const ctx = canvas.getContext("2d");
     const img = new Image();
 
-    img.onload = () => {
-      canvas.width = 400;
-      canvas.height = 400;
+    img.onload = async () => {
+      canvas.width = 800;
+      canvas.height = 800;
       if (ctx) {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, 400, 400);
+        ctx.drawImage(img, 0, 0, 800, 800);
       }
 
-      const pngUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.download = "upi-qr-code.png";
-      link.href = pngUrl;
-      link.click();
-      toast.success("QR Code downloaded!");
+      await saveOrDownloadQRCode(canvas, `connecthub-payment-qr-${paymentId}.png`);
     };
 
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
