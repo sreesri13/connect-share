@@ -744,6 +744,10 @@ export type Database = {
         Returns: boolean
       }
       can_view_qr_page: { Args: { p_page_id: string }; Returns: boolean }
+      check_qr_scan_limit: {
+        Args: { p_page_id: string; p_is_business?: boolean }
+        Returns: Json
+      }
       resolve_upi_by_code: {
         Args: { p_code: string }
         Returns: {

@@ -103,7 +103,7 @@ export async function checkScanLimit(
     const { data, error } = await supabase.rpc('check_qr_scan_limit', {
       p_page_id: pageId,
       p_is_business: isBusinessPage,
-    } as any);
+    });
 
     if (!error && data) {
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
