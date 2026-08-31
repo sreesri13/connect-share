@@ -46,6 +46,7 @@ import {
   errorCorrectionOptions,
   presetThemes,
   evaluateQRScannability,
+  autoFixQRContrast,
 } from '@/lib/qr-styles';
 
 interface QRCustomizationPanelProps {
@@ -91,13 +92,9 @@ export function QRCustomizationPanel({
   };
 
   const handleAutoFixContrast = () => {
-    updateStyle({
-      backgroundColor: '#ffffff',
-      bodyColor: value.bodyColor === '#ffffff' ? '#000000' : value.bodyColor,
-      eyeFrameColor: value.eyeFrameColor === '#ffffff' ? '#000000' : value.eyeFrameColor,
-      eyeBallColor: value.eyeBallColor === '#ffffff' ? '#000000' : value.eyeBallColor,
-      errorCorrectionLevel: 'H',
-    });
+    const fixedStyle = autoFixQRContrast(value);
+    onChange(fixedStyle);
+    toast.success('Auto-fixed contrast! QR code colors are now 100% scannable.');
   };
 
   const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

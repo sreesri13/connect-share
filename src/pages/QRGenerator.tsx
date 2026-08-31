@@ -53,7 +53,7 @@ import { LocationPicker, LocationData } from "@/components/qr/LocationPicker";
 import { ScanLimitInput, ScanLimitType } from "@/components/qr/ScanLimitInput";
 import { useQRStyles } from "@/hooks/useQRStyles";
 import type { QRStyleConfig } from "@/lib/qr-styles";
-import { defaultQRStyle, oceanPresetStyle, presetThemes, evaluateQRScannability } from "@/lib/qr-styles";
+import { defaultQRStyle, oceanPresetStyle, crimsonPresetStyle, presetThemes, evaluateQRScannability, autoFixQRContrast } from "@/lib/qr-styles";
 import { PlatformIcon } from "@/lib/platform-icons";
 import { saveOrDownloadQRCode } from "@/lib/download-utils";
 
@@ -128,18 +128,14 @@ const QRGenerator = () => {
     activeStyleConfig.backgroundColor || '#ffffff'
   );
 
-  // Load default or Ocean preset initially
+  // When custom QR code is enabled, select the Crimson preset by default
   useEffect(() => {
     if (enableCustomization) {
-      if (defaultStyle) {
-        setQrStyle({ ...defaultStyle, backgroundColor: '#ffffff' });
-      } else {
-        setQrStyle(oceanPresetStyle);
-      }
+      setQrStyle(crimsonPresetStyle);
     } else {
       setQrStyle(defaultQRStyle);
     }
-  }, [defaultStyle, enableCustomization]);
+  }, [enableCustomization]);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -635,10 +631,26 @@ const QRGenerator = () => {
                   {/* Scannability indicator */}
                   <div className="text-center mt-2 sm:mt-2.5">
                     {scannability.status === 'poor' ? (
-                      <p className="text-[10px] sm:text-[11px] font-semibold text-destructive flex items-center justify-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Contrast warning: May not scan on phones
-                      </p>
+                      <div className="space-y-1.5 flex flex-col items-center">
+                        <p className="text-[10px] sm:text-[11px] font-semibold text-destructive flex items-center justify-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>Contrast warning: May not scan on phones</span>
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const fixed = autoFixQRContrast(qrStyle);
+                            setQrStyle(fixed);
+                            if (generatedStyle) setGeneratedStyle(fixed);
+                            toast.success("Contrast auto-fixed! QR code colors are now 100% scannable.");
+                          }}
+                          className="h-6 text-[10px] px-2.5 bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20 font-medium"
+                        >
+                          Auto-Fix Contrast
+                        </Button>
+                      </div>
                     ) : (
                       <p className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />

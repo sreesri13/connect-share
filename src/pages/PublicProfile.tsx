@@ -125,37 +125,45 @@ const PublicProfile = () => {
 
   const checkSecurityRequirements = async () => {
     try {
-      const { data: qrPage, error: qrError } = await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId || "");
+      let query = supabase
         .from("qr_pages")
-        .select("id, user_id, title, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests, show_install_popup, show_footer_branding")
-        .eq("public_id", profileId)
-        .maybeSingle();
+        .select("id, user_id, title, public_id, password_hash, location_locked, location_lat, location_lng, location_name, expires_at, show_expires_at, starred_item_id, scan_limit_type, max_scans, daily_limit, public_view, allow_requests, show_install_popup, show_footer_branding, is_deleted");
 
-      if (qrError) throw qrError;
+      if (isUuid) {
+        query = query.or(`public_id.eq.${profileId},id.eq.${profileId}`);
+      } else {
+        query = query.eq("public_id", profileId);
+      }
 
-      if (!qrPage) {
+      const { data: qrPage, error: qrError } = await query.maybeSingle();
+
+      if (qrError) {
+        console.error("Error fetching QR page:", qrError);
+        throw qrError;
+      }
+
+      if (!qrPage || qrPage.is_deleted) {
         setError("Profile not found");
         setIsLoading(false);
         return;
       }
 
-      setQrPageData(qrPage);
+      setQrPageData(qrPage as any);
       setQrIdForAccess(qrPage.id);
 
-      // Check access control
+      // Check access control (Public vs Private)
       const isPublic = (qrPage as any).public_view ?? true;
       const reqsAllowed = (qrPage as any).allow_requests ?? false;
       setAllowRequests(reqsAllowed);
 
       if (!isPublic) {
-        // Check if user is owner
         const { data: { session } } = await supabase.auth.getSession();
         const isOwner = session?.user?.id === qrPage.user_id;
         
         if (isOwner) {
           setUserRole("owner");
         } else {
-          // Check if user has permission
           let permRole: string | null = null;
           if (session?.user?.email) {
             const { data: perm } = await supabase
@@ -176,7 +184,6 @@ const PublicProfile = () => {
           setUserRole(permRole);
         }
       } else {
-        // Public page - still check role for banner display
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id === qrPage.user_id) {
           setUserRole("owner");
@@ -192,7 +199,12 @@ const PublicProfile = () => {
         }
       }
 
-      // Step 1: Check for expiration
+      // =========================================================================
+      // STRICT ORDER OF VERIFICATION:
+      // 1. Expiration Time -> 2. Scan Limit -> 3. Location Lock -> 4. Password
+      // =========================================================================
+
+      // Step 1: Verify Expiration Time First
       if (qrPage.expires_at) {
         const expiryDate = new Date(qrPage.expires_at);
         if (expiryDate.getTime() < Date.now()) {
@@ -203,7 +215,7 @@ const PublicProfile = () => {
         }
       }
 
-      // Step 2: Check scan limit
+      // Step 2: Verify Scan Limit Next
       if (qrPage.scan_limit_type && qrPage.scan_limit_type !== 'unlimited') {
         const limitCheck = await checkScanLimit(
           qrPage.id, qrPage.scan_limit_type, qrPage.max_scans, qrPage.daily_limit, false
@@ -216,29 +228,29 @@ const PublicProfile = () => {
         }
       }
 
-      // Step 3: Check security locks (password and location)
-      const hasPassword = Boolean(qrPage.password_hash);
+      // Step 3: Verify Location Lock (Before Password)
       const isLocationSecured = Boolean(qrPage.location_locked && qrPage.location_lat && qrPage.location_lng);
-
-      if (hasPassword) {
-        setIsPasswordProtected(true);
-      }
-
       if (isLocationSecured) {
         setIsLocationLocked(true);
-      }
-
-      if (hasPassword || isLocationSecured) {
+        // Note: isLocationVerified is false initially, so location screen will show first
         setIsLoading(false);
         return;
       }
 
-      // If no password and no location restrictions, fetch content
+      // Step 4: Verify Password (If not location locked, or location verified)
+      const hasPassword = Boolean(qrPage.password_hash);
+      if (hasPassword) {
+        setIsPasswordProtected(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 5: All verifications passed - Fetch content directly
       setIsPasswordVerified(true);
       setIsLocationVerified(true);
-      fetchPublicProfile(qrPage);
+      fetchPublicProfile(qrPage as any);
     } catch (err) {
-      console.error(err);
+      console.error("Profile check security error:", err);
       setError("Failed to load profile");
       setIsLoading(false);
     }
@@ -246,6 +258,7 @@ const PublicProfile = () => {
 
   const handleLocationVerified = () => {
     setIsLocationVerified(true);
+    // After location is verified, check if password is required before showing content
     if (qrPageData?.password_hash && !isPasswordVerified) {
       setIsPasswordProtected(true);
       setIsLoading(false);
@@ -266,19 +279,15 @@ const PublicProfile = () => {
 
     try {
       // Verify password server-side (bcrypt)
-      const isValid = await verifyQRPassword(profileId!, password.trim());
+      const lookupPublicId = qrPageData?.public_id || profileId!;
+      const isValid = await verifyQRPassword(lookupPublicId, password.trim());
 
       if (isValid) {
         setIsPasswordVerified(true);
-        if (qrPageData?.location_locked && qrPageData.location_lat && qrPageData.location_lng && !isLocationVerified) {
-          setIsLocationLocked(true);
-          setIsLoading(false);
-        } else {
-          setIsLoading(true);
-          fetchPublicProfile(qrPageData!);
-        }
+        setIsLoading(true);
+        fetchPublicProfile(qrPageData!);
       } else {
-        setPasswordError("Incorrect password");
+        setPasswordError("Incorrect password. Please try again.");
       }
     } catch (err) {
       console.error(err);
@@ -291,44 +300,53 @@ const PublicProfile = () => {
   const fetchPublicProfile = async (qrPage: QRPageData) => {
     try {
       // Record scan in database
-      recordQRScan(qrPage.id, false);
+      recordQRScan(qrPage.id, false).catch(e => console.warn("Scan record error:", e));
 
       // Fetch profile of the owner
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("display_name, bio, avatar_url")
-        .eq("user_id", qrPage.user_id)
-        .maybeSingle();
+      try {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("display_name, bio, avatar_url")
+          .eq("user_id", qrPage.user_id)
+          .maybeSingle();
 
-      setProfile(profileData);
+        setProfile(profileData);
+      } catch (profErr) {
+        console.warn("Owner profile fetch error:", profErr);
+      }
 
       // Fetch items associated with this QR page
-      const { data: qrPageItems, error: itemsError } = await supabase
-        .from("qr_page_items")
-        .select(`
-          display_order,
-          items (
-            id,
-            title,
-            type,
-            content,
-            categories (name)
-          )
-        `)
-        .eq("qr_page_id", qrPage.id)
-        .order("display_order", { ascending: true });
+      let formattedItems: ProfileItem[] = [];
+      try {
+        const { data: qrPageItems, error: itemsError } = await supabase
+          .from("qr_page_items")
+          .select(`
+            display_order,
+            items (
+              id,
+              title,
+              type,
+              content,
+              categories (name)
+            )
+          `)
+          .eq("qr_page_id", qrPage.id)
+          .order("display_order", { ascending: true });
 
-      if (itemsError) throw itemsError;
-
-      const formattedItems = (qrPageItems || [])
-        .filter((qpItem: any) => qpItem && qpItem.items)
-        .map((qpItem: any) => ({
-          id: qpItem.items.id,
-          title: qpItem.items.title,
-          type: qpItem.items.type,
-          content: qpItem.items.content,
-          category_name: qpItem.items.categories?.name || "General",
-        }));
+        if (!itemsError && qrPageItems) {
+          formattedItems = qrPageItems
+            .filter((qpItem: any) => qpItem && qpItem.items)
+            .map((qpItem: any) => ({
+              id: qpItem.items.id,
+              title: qpItem.items.title,
+              type: qpItem.items.type,
+              content: qpItem.items.content,
+              category_name: qpItem.items.categories?.name || "General",
+            }));
+        }
+      } catch (itemsErr) {
+        console.warn("Items query error:", itemsErr);
+      }
 
       // Check for starred item - redirect if valid URL, or auto-open file viewer
       if (qrPage.starred_item_id) {
@@ -353,8 +371,8 @@ const PublicProfile = () => {
 
       setItems(formattedItems);
     } catch (err) {
-      console.error(err);
-      setError("Failed to load profile");
+      console.error("Public profile load error:", err);
+      setItems([]);
     } finally {
       setIsLoading(false);
     }

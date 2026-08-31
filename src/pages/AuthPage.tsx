@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { QrCode, Mail, Lock, ArrowRight, Eye, EyeOff, User } from "lucide-react";
+import { QrCode, Mail, Lock, ArrowRight, Eye, EyeOff, User, CheckCircle2, Circle, ShieldCheck, AlertCircle } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 
+interface PasswordRequirement {
+  id: string;
+  label: string;
+  test: (p: string) => boolean;
+}
+
+const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
+  { id: "length", label: "8+ characters", test: (p) => p.length >= 8 },
+  { id: "lowercase", label: "Lowercase letter (a-z)", test: (p) => /[a-z]/.test(p) },
+  { id: "uppercase", label: "Uppercase letter (A-Z)", test: (p) => /[A-Z]/.test(p) },
+  { id: "number", label: "Number digit (0-9)", test: (p) => /[0-9]/.test(p) },
+  { id: "symbol", label: "Special symbol (!@#$%...)", test: (p) => /[^A-Za-z0-9]/.test(p) },
+];
+
 const AuthPage = () => {
   const isNative = Capacitor.isNativePlatform();
   const requiresRecaptcha = !isNative;
@@ -22,9 +36,12 @@ const AuthPage = () => {
   
   const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
@@ -120,6 +137,26 @@ const AuthPage = () => {
     }
   }, [recaptchaLoaded, renderRecaptcha]);
 
+  // Password requirement checks
+  const reqStatuses = PASSWORD_REQUIREMENTS.map((req) => ({
+    ...req,
+    met: req.test(password),
+  }));
+  const metCount = reqStatuses.filter((r) => r.met).length;
+  const isPasswordApproved = password.length > 0 && reqStatuses.every((r) => r.met);
+
+  const getStrengthInfo = () => {
+    if (password.length === 0) return { label: "", percent: 0, color: "bg-muted", textColor: "text-muted-foreground" };
+    if (metCount <= 2) return { label: "Weak", percent: 25, color: "bg-rose-500", textColor: "text-rose-500" };
+    if (metCount === 3) return { label: "Fair", percent: 50, color: "bg-amber-500", textColor: "text-amber-500" };
+    if (metCount === 4) return { label: "Good", percent: 75, color: "bg-blue-500", textColor: "text-blue-500" };
+    return { label: "Strong & Approved", percent: 100, color: "bg-emerald-500", textColor: "text-emerald-500" };
+  };
+
+  const strength = getStrengthInfo();
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
 
@@ -151,7 +188,6 @@ const AuthPage = () => {
       toast.error(error?.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);
     }
-
   };
 
   const verifyRecaptcha = async (token: string): Promise<boolean> => {
@@ -191,6 +227,17 @@ const AuthPage = () => {
     if (requiresRecaptcha && !isVerified) {
       toast.error("Please complete the reCAPTCHA verification");
       return;
+    }
+
+    if (isSignUp) {
+      if (!isPasswordApproved) {
+        toast.error("Please satisfy all password suggestions (lowercase, uppercase, number, symbol, 8+ characters)");
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast.error("Passwords do not match. Please verify your confirm password.");
+        return;
+      }
     }
     
     setIsLoading(true);
@@ -266,7 +313,7 @@ const AuthPage = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative z-10"
+        className="w-full max-w-md relative z-10 my-8"
       >
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
@@ -276,7 +323,7 @@ const AuthPage = () => {
           <span className="text-2xl font-bold text-foreground">Connect<span className="text-gradient-primary">HUB</span></span>
         </Link>
 
-        <Card className="glass-strong border-border/50">
+        <Card className="glass-strong border-border/50 shadow-2xl backdrop-blur-xl">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold">
               {isSignUp ? "Create your account" : "Welcome back"}
@@ -368,10 +415,18 @@ const AuthPage = () => {
                 </div>
               </div>
 
+              {/* Password Field */}
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-foreground">
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="text-sm font-medium text-foreground">
+                    Password
+                  </label>
+                  {isSignUp && isPasswordApproved && (
+                    <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Approved
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -380,7 +435,12 @@ const AuthPage = () => {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    onFocus={() => setIsPasswordFocused(true)}
+                    className={`pl-10 pr-10 transition-all ${
+                      isSignUp && isPasswordApproved
+                        ? "border-emerald-500/60 focus-visible:ring-emerald-500/30"
+                        : ""
+                    }`}
                     required
                     minLength={6}
                   />
@@ -392,7 +452,138 @@ const AuthPage = () => {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+
+                {/* Dynamic Password Suggestions & Strength Meter (Sign Up Only) */}
+                {isSignUp && (
+                  <AnimatePresence>
+                    {(password.length > 0 || isPasswordFocused) && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="space-y-3 pt-2"
+                      >
+                        {/* Strength Progress Bar */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-medium">
+                            <span className="text-muted-foreground">Password strength:</span>
+                            <span className={strength.textColor}>{strength.label}</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden flex gap-1">
+                            <div
+                              className={`h-full transition-all duration-300 rounded-full ${strength.color}`}
+                              style={{ width: `${strength.percent}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Suggestions Checklist */}
+                        <div className="p-3 rounded-xl bg-card/60 border border-border/60 backdrop-blur-sm space-y-2">
+                          <p className="text-xs font-semibold text-foreground/90">
+                            Password Suggestions & Requirements:
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {reqStatuses.map((req) => (
+                              <div
+                                key={req.id}
+                                className={`flex items-center gap-2 text-xs px-2 py-1 rounded-md transition-all ${
+                                  req.met
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20"
+                                    : "text-muted-foreground bg-muted/30 border border-transparent"
+                                }`}
+                              >
+                                {req.met ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                ) : (
+                                  <Circle className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+                                )}
+                                <span className="truncate">{req.label}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Approval Banner */}
+                          {isPasswordApproved && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="mt-2 pt-2 border-t border-emerald-500/20 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
+                            >
+                              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                              <span>Great! Password meets all security requirements.</span>
+                            </motion.div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
               </div>
+
+              {/* Confirm Password Field (Sign Up Only) */}
+              {isSignUp && (
+                <div className="space-y-2">
+                  <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`pl-10 pr-10 transition-all ${
+                        passwordsMatch
+                          ? "border-emerald-500/60 focus-visible:ring-emerald-500/30"
+                          : passwordsMismatch
+                          ? "border-rose-500/60 focus-visible:ring-rose-500/30"
+                          : ""
+                      }`}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+
+                  {/* Real-time Match Indicator Bar */}
+                  {confirmPassword.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-1.5 pt-1"
+                    >
+                      <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 rounded-full ${
+                            passwordsMatch ? "w-full bg-emerald-500" : "w-1/2 bg-rose-500"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordsMatch ? (
+                          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Passwords match</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-rose-500 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Passwords do not match</span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              )}
 
               {/* reCAPTCHA for web */}
               {requiresRecaptcha && (
@@ -405,8 +596,8 @@ const AuthPage = () => {
                 type="submit" 
                 variant="hero" 
                 size="lg" 
-                className="w-full mt-6" 
-                disabled={isLoading || (requiresRecaptcha && !isVerified)}
+                className="w-full mt-6 shadow-glow" 
+                disabled={isLoading || (requiresRecaptcha && !isVerified) || (isSignUp && (!isPasswordApproved || !passwordsMatch))}
               >
                 {isLoading ? (
                   <span className="flex items-center gap-2">
@@ -429,6 +620,9 @@ const AuthPage = () => {
                   type="button"
                   onClick={() => {
                     setIsSignUp(!isSignUp);
+                    setConfirmPassword("");
+                    setShowPassword(false);
+                    setShowConfirmPassword(false);
                     resetRecaptcha();
                   }}
                   className="text-primary font-medium hover:underline"
@@ -449,3 +643,4 @@ const AuthPage = () => {
 };
 
 export default AuthPage;
+

@@ -21,8 +21,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   String? _errorMessage;
@@ -31,10 +33,49 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void initState() {
     super.initState();
     _isSignUp = widget.initialIsSignUp;
+    _passwordController.addListener(() => setState(() {}));
+    _confirmPasswordController.addListener(() => setState(() {}));
   }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  bool _hasMinLength(String p) => p.length >= 8;
+  bool _hasLowercase(String p) => RegExp(r'[a-z]').hasMatch(p);
+  bool _hasUppercase(String p) => RegExp(r'[A-Z]').hasMatch(p);
+  bool _hasDigit(String p) => RegExp(r'[0-9]').hasMatch(p);
+  bool _hasSymbol(String p) => RegExp(r'[^A-Za-z0-9]').hasMatch(p);
+
+  bool _isPasswordApproved(String p) =>
+      _hasMinLength(p) &&
+      _hasLowercase(p) &&
+      _hasUppercase(p) &&
+      _hasDigit(p) &&
+      _hasSymbol(p);
 
   Future<void> _handleEmailAuth() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_isSignUp) {
+      if (!_isPasswordApproved(_passwordController.text)) {
+        setState(() {
+          _errorMessage = 'Please fulfill all password requirements (lowercase, uppercase, digit, symbol, 8+ characters).';
+        });
+        return;
+      }
+      if (_passwordController.text != _confirmPasswordController.text) {
+        setState(() {
+          _errorMessage = 'Passwords do not match. Please verify.';
+        });
+        return;
+      }
+    }
 
     setState(() {
       _isLoading = true;
@@ -76,6 +117,38 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildReqBadge(String label, bool isMet) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isMet ? AppColors.emerald.withValues(alpha: 0.12) : AppColors.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isMet ? AppColors.emerald.withValues(alpha: 0.4) : AppColors.cardBorder,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 13,
+            color: isMet ? AppColors.emerald : AppColors.textMuted,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+              color: isMet ? AppColors.emerald : AppColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleGoogleAuth() async {
@@ -304,6 +377,137 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             return null;
                           },
                         ),
+
+                        // Suggestions Checklist & Approval Banner (Sign Up Only)
+                        if (_isSignUp) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Password Suggestions:',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: [
+                                    _buildReqBadge('8+ chars', _hasMinLength(_passwordController.text)),
+                                    _buildReqBadge('Lowercase (a-z)', _hasLowercase(_passwordController.text)),
+                                    _buildReqBadge('Uppercase (A-Z)', _hasUppercase(_passwordController.text)),
+                                    _buildReqBadge('Number (0-9)', _hasDigit(_passwordController.text)),
+                                    _buildReqBadge('Symbol (!@#)', _hasSymbol(_passwordController.text)),
+                                  ],
+                                ),
+                                if (_isPasswordApproved(_passwordController.text)) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.emerald.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppColors.emerald.withValues(alpha: 0.4)),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.shield_outlined, size: 16, color: AppColors.emerald),
+                                        SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            'Password Approved! Meets all criteria.',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.emerald,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Confirm Password Field
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+                                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (_isSignUp && v != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          // Live Match Indicator Bar
+                          if (_confirmPasswordController.text.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Builder(
+                              builder: (_) {
+                                final matches = _passwordController.text == _confirmPasswordController.text;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: matches ? 1.0 : 0.5,
+                                        backgroundColor: AppColors.cardBorder,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          matches ? AppColors.emerald : AppColors.rose,
+                                        ),
+                                        minHeight: 4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          matches ? Icons.check_circle : Icons.error_outline,
+                                          size: 13,
+                                          color: matches ? AppColors.emerald : AppColors.rose,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          matches ? 'Passwords match' : 'Passwords do not match',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: matches ? AppColors.emerald : AppColors.rose,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ],
                         const SizedBox(height: 22),
 
                         // Submit Button
@@ -347,6 +551,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 onPressed: () {
                                   setState(() {
                                     _isSignUp = !_isSignUp;
+                                    _confirmPasswordController.clear();
                                     _errorMessage = null;
                                   });
                                 },

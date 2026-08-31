@@ -47,6 +47,20 @@ export const oceanPresetStyle: QRStyleConfig = {
   errorCorrectionLevel: 'H',
 };
 
+// Crimson preset (default when custom QR is enabled)
+export const crimsonPresetStyle: QRStyleConfig = {
+  bodyShape: 'diamond',
+  eyeFrameShape: 'rounded',
+  eyeBallShape: 'rounded',
+  bodyColor: '#881337',
+  eyeFrameColor: '#be123c',
+  eyeBallColor: '#e11d48',
+  backgroundColor: '#ffffff',
+  size: 240,
+  margin: 4,
+  errorCorrectionLevel: 'H',
+};
+
 export const bodyShapeOptions: { value: BodyShape; label: string; description: string }[] = [
   { value: 'square', label: 'Square', description: 'Standard high-density square blocks' },
   { value: 'dots', label: 'Dots', description: 'Modern circular dots' },
@@ -263,4 +277,55 @@ export function evaluateQRScannability(
 export function getContrastWarning(bodyColor: string, backgroundColor: string): string | null {
   const status = evaluateQRScannability(bodyColor, bodyColor, bodyColor, backgroundColor);
   return status.warningMessage;
+}
+
+/**
+ * Automatically adjusts QR code colors to guarantee 100% scannable high contrast on a clean white background
+ */
+export function autoFixQRContrast(style: QRStyleConfig): QRStyleConfig {
+  const targetBg = '#ffffff';
+
+  const ensureDarkContrast = (hex: string, fallbackDark: string): string => {
+    if (!hex || hex.toLowerCase() === '#ffffff' || hex.toLowerCase() === '#fff') {
+      return fallbackDark;
+    }
+    
+    // Check contrast ratio against white
+    const ratio = getContrastRatio(hex, targetBg);
+    if (ratio >= 4.5) return hex; // Already high contrast
+
+    // If ratio is too low (e.g. yellow, pastel, light gray, cyan), darken it
+    const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
+    if (cleanHex.length !== 6) return fallbackDark;
+
+    const r = parseInt(cleanHex.slice(0, 2), 16) || 0;
+    const g = parseInt(cleanHex.slice(2, 4), 16) || 0;
+    const b = parseInt(cleanHex.slice(4, 6), 16) || 0;
+
+    // Darken by reducing RGB values until contrast ratio >= 4.5
+    for (let factor = 0.6; factor >= 0.1; factor -= 0.1) {
+      const darkR = Math.floor(r * factor);
+      const darkG = Math.floor(g * factor);
+      const darkB = Math.floor(b * factor);
+      const darkHex = `#${darkR.toString(16).padStart(2, '0')}${darkG.toString(16).padStart(2, '0')}${darkB.toString(16).padStart(2, '0')}`;
+      if (getContrastRatio(darkHex, targetBg) >= 4.5) {
+        return darkHex;
+      }
+    }
+
+    return fallbackDark;
+  };
+
+  const fixedBodyColor = ensureDarkContrast(style.bodyColor, '#881337');
+  const fixedEyeFrameColor = ensureDarkContrast(style.eyeFrameColor, '#be123c');
+  const fixedEyeBallColor = ensureDarkContrast(style.eyeBallColor, '#e11d48');
+
+  return {
+    ...style,
+    backgroundColor: targetBg,
+    bodyColor: fixedBodyColor,
+    eyeFrameColor: fixedEyeFrameColor,
+    eyeBallColor: fixedEyeBallColor,
+    errorCorrectionLevel: 'H',
+  };
 }
