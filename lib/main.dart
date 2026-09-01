@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
 import 'config/theme.dart';
-import 'screens/webview/connect_webview_screen.dart';
+import 'screens/splash/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,13 +15,13 @@ void main() async {
     await FlutterDisplayMode.setHighRefreshRate();
   } catch (_) {}
 
-  // Set system UI styling for sleek dark mobile UI
+  // Set initial system UI styling for clean white launch screen
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0F172A),
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -55,11 +55,11 @@ class ConnectHubApp extends StatelessWidget {
       title: 'ConnectHUB',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const ConnectWebViewScreen(),
+      home: const SplashScreen(),
       onGenerateRoute: (settings) {
         final routeName = settings.name;
         return MaterialPageRoute(
-          builder: (_) => ConnectWebViewScreen(initialRoute: routeName),
+          builder: (_) => SplashScreen(initialRoute: routeName),
           settings: settings,
         );
       },
