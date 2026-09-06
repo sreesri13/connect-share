@@ -115,26 +115,77 @@ export const getRequestCount = async (
   return count || 0;
 };
 
-export const approveAccessRequest = async (requestId: string, role: "viewer" | "editor") => {
+export const updateQRAccessSettings = async (
+  pageId: string,
+  isBusiness: boolean,
+  publicView: boolean,
+  allowRequests: boolean,
+  ownerId?: string
+) => {
+  const { data, error } = await (supabase.rpc as any)("update_qr_access_settings", {
+    p_page_id: pageId,
+    p_is_business: isBusiness,
+    p_public_view: publicView,
+    p_allow_requests: allowRequests,
+    p_owner_id: ownerId || null,
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const submitAccessRequest = async (
+  pageId: string,
+  isBusiness: boolean,
+  email: string,
+  role: "viewer" | "editor",
+  note?: string,
+  userId?: string
+) => {
+  const { data, error } = await (supabase.rpc as any)("submit_qr_access_request", {
+    p_page_id: pageId,
+    p_is_business: isBusiness,
+    p_email: email,
+    p_role: role,
+    p_note: note || null,
+    p_user_id: userId || null,
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const approveAccessRequest = async (requestId: string, role: "viewer" | "editor", ownerId?: string) => {
   const { data, error } = await (supabase.rpc as any)("approve_qr_access_request", {
     p_request_id: requestId,
     p_role: role,
+    p_owner_id: ownerId || null,
   });
   if (error) throw error;
   return data;
 };
 
-export const rejectAccessRequest = async (requestId: string) => {
+export const rejectAccessRequest = async (requestId: string, ownerId?: string) => {
   const { data, error } = await (supabase.rpc as any)("reject_qr_access_request", {
     p_request_id: requestId,
+    p_owner_id: ownerId || null,
   });
   if (error) throw error;
   return data;
 };
 
-export const revokePermission = async (permissionId: string) => {
+export const revokePermission = async (permissionId: string, ownerId?: string) => {
   const { data, error } = await (supabase.rpc as any)("revoke_qr_permission", {
     p_permission_id: permissionId,
+    p_owner_id: ownerId || null,
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const updatePermissionRole = async (permissionId: string, role: "viewer" | "editor", ownerId?: string) => {
+  const { data, error } = await (supabase.rpc as any)("update_qr_permission_role", {
+    p_permission_id: permissionId,
+    p_role: role,
+    p_owner_id: ownerId || null,
   });
   if (error) throw error;
   return data;
@@ -144,14 +195,45 @@ export const addDirectPermission = async (
   pageId: string,
   isBusiness: boolean,
   email: string,
-  role: "viewer" | "editor"
+  role: "viewer" | "editor",
+  ownerId?: string
 ) => {
   const { data, error } = await (supabase.rpc as any)("add_direct_qr_permission", {
     p_page_id: pageId,
     p_is_business: isBusiness,
     p_email: email,
     p_role: role,
+    p_owner_id: ownerId || null,
   });
   if (error) throw error;
   return data;
 };
+
+export const fetchQRPermissionsList = async (
+  pageId: string,
+  isBusiness: boolean,
+  ownerId?: string
+) => {
+  const { data, error } = await (supabase.rpc as any)("get_qr_permissions_list", {
+    p_page_id: pageId,
+    p_is_business: isBusiness,
+    p_owner_id: ownerId || null,
+  });
+  if (error) throw error;
+  return (data as any[]) || [];
+};
+
+export const fetchQRAccessRequestsList = async (
+  pageId: string,
+  isBusiness: boolean,
+  ownerId?: string
+) => {
+  const { data, error } = await (supabase.rpc as any)("get_qr_access_requests_list", {
+    p_page_id: pageId,
+    p_is_business: isBusiness,
+    p_owner_id: ownerId || null,
+  });
+  if (error) throw error;
+  return (data as any[]) || [];
+};
+

@@ -20,6 +20,7 @@ import { AccessDenied } from "@/components/qr/AccessDenied";
 import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
+import { RequestAccessBanner } from "@/components/qr/RequestAccessBanner";
 
 interface Category {
   id: string;
@@ -227,6 +228,9 @@ const BusinessPage = () => {
       setUserRole(accessInfo.user_role || null);
       if (accessInfo.id) {
         setQrIdForAccess(accessInfo.id);
+      }
+      if (accessInfo.title) {
+        setPageTitle(accessInfo.title);
       }
 
       const isPublic = accessInfo.public_view ?? true;
@@ -689,17 +693,15 @@ const BusinessPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
-      {/* View-only banner for viewers without edit access */}
-      {userRole !== "owner" && userRole !== "editor" && (
-        <AccessDenied
-          qrId={qrIdForAccess}
-          qrType="business"
-          allowRequests={allowRequests}
-          qrTitle={pageData?.business_name || pageTitle || "Business QR"}
-          ownerName={ownerName}
-          viewOnly
-        />
-      )}
+      {/* Request Access Banner for visitors / viewers */}
+      <RequestAccessBanner
+        qrId={qrIdForAccess}
+        qrType="business"
+        allowRequests={allowRequests}
+        qrTitle={pageData?.business_name || pageTitle || "Business QR"}
+        ownerName={ownerName}
+        userRole={userRole as any}
+      />
       {/* Sticky Header */}
       <motion.header
         initial={{ y: -60 }}

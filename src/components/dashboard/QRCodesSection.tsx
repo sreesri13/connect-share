@@ -221,7 +221,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         .eq("status", "active");
 
       if (userEmail) {
-        permQuery = permQuery.or(`user_id.eq.${userId},email.eq.${userEmail}`);
+        permQuery = permQuery.or(`user_id.eq.${userId},user_email.eq.${userEmail}`);
       } else {
         permQuery = permQuery.eq("user_id", userId);
       }

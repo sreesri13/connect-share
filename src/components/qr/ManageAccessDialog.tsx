@@ -10,10 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
+  updateQRAccessSettings,
   approveAccessRequest, 
   rejectAccessRequest, 
   revokePermission, 
-  addDirectPermission 
+  addDirectPermission,
+  updatePermissionRole,
+  fetchQRPermissionsList,
+  fetchQRAccessRequestsList
 } from "@/hooks/useQRPermissions";
 
 interface Permission {
@@ -128,73 +132,84 @@ export const ManageAccessDialog = ({
   };
 
   const fetchPermissions = async () => {
-    const { data: perms } = await supabase
-      .from("qr_permissions")
-      .select("*")
-      .eq(fkColumn, qrId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false });
+    try {
+      const perms = await fetchQRPermissionsList(qrId, qrType === "business", userId);
+      setPermissions(perms || []);
+    } catch (err) {
+      console.warn("RPC fetchQRPermissionsList failed, falling back to direct query:", err);
+      const { data: perms } = await supabase
+        .from("qr_permissions")
+        .select("*")
+        .eq(fkColumn, qrId)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
 
-    setPermissions(perms || []);
+      setPermissions(perms || []);
+    }
   };
 
   const fetchRequests = async () => {
-    const { data: reqs } = await supabase
-      .from("qr_access_requests")
-      .select("*")
-      .eq(fkColumn, qrId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+    try {
+      const reqs = await fetchQRAccessRequestsList(qrId, qrType === "business", userId);
+      setRequests(reqs || []);
+    } catch (err) {
+      console.warn("RPC fetchQRAccessRequestsList failed, falling back to direct query:", err);
+      const { data: reqs } = await supabase
+        .from("qr_access_requests")
+        .select("*")
+        .eq(fkColumn, qrId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
 
-    if (!reqs || reqs.length === 0) {
-      setRequests([]);
-      return;
+      if (!reqs || reqs.length === 0) {
+        setRequests([]);
+        return;
+      }
+
+      const userIds = reqs.map((r: any) => r.user_id).filter(Boolean);
+      let nameMap: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, display_name")
+          .in("user_id", userIds);
+
+        (profiles || []).forEach((p: any) => {
+          if (p.user_id && p.display_name) {
+            nameMap[p.user_id] = p.display_name;
+          }
+        });
+      }
+
+      setRequests(
+        reqs.map((r: any) => ({
+          ...r,
+          requester_name: r.user_id ? nameMap[r.user_id] : undefined,
+        }))
+      );
     }
-
-    // Attempt to fetch requester profile display names
-    const userIds = reqs.map((r: any) => r.user_id).filter(Boolean);
-    let nameMap: Record<string, string> = {};
-
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, display_name")
-        .in("user_id", userIds);
-
-      (profiles || []).forEach((p: any) => {
-        if (p.user_id && p.display_name) {
-          nameMap[p.user_id] = p.display_name;
-        }
-      });
-    }
-
-    setRequests(
-      reqs.map((r: any) => ({
-        ...r,
-        requester_name: r.user_id ? nameMap[r.user_id] : undefined,
-      }))
-    );
   };
 
   const handleTogglePublicView = async (val: boolean) => {
     setPublicView(val);
-    const { error } = await supabase.from(table).update({ public_view: val }).eq("id", qrId);
-    if (error) {
-      toast.error("Failed to update Public View Access");
-      setPublicView(!val);
-    } else {
+    try {
+      await updateQRAccessSettings(qrId, qrType === "business", val, allowRequests, userId);
       toast.success(val ? "Public access enabled" : "Access restricted to permitted users");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update Public View Access");
+      setPublicView(!val);
     }
   };
 
   const handleToggleAllowRequests = async (val: boolean) => {
     setAllowRequests(val);
-    const { error } = await supabase.from(table).update({ allow_requests: val }).eq("id", qrId);
-    if (error) {
-      toast.error("Failed to update Allow Access Requests");
-      setAllowRequests(!val);
-    } else {
+    try {
+      await updateQRAccessSettings(qrId, qrType === "business", publicView, val, userId);
       toast.success(val ? "Access requests enabled" : "Access requests disabled");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update Allow Access Requests");
+      setAllowRequests(!val);
     }
   };
 
@@ -212,7 +227,7 @@ export const ManageAccessDialog = ({
 
     setIsSaving(true);
     try {
-      await addDirectPermission(qrId, qrType === "business", trimmed, newRole);
+      await addDirectPermission(qrId, qrType === "business", trimmed, newRole, userId);
       toast.success(`${trimmed} added as ${newRole}`);
       setNewEmail("");
       await fetchPermissions();
@@ -226,12 +241,7 @@ export const ManageAccessDialog = ({
 
   const handleChangeRole = async (permId: string, role: "viewer" | "editor") => {
     try {
-      const { error } = await supabase
-        .from("qr_permissions")
-        .update({ role, updated_at: new Date().toISOString() })
-        .eq("id", permId);
-
-      if (error) throw error;
+      await updatePermissionRole(permId, role, userId);
       toast.success(`Role updated to ${role}`);
       await fetchPermissions();
     } catch (err: any) {
@@ -241,7 +251,7 @@ export const ManageAccessDialog = ({
 
   const handleRemovePermission = async (permId: string, email: string) => {
     try {
-      await revokePermission(permId);
+      await revokePermission(permId, userId);
       toast.success(`Access revoked for ${email}`);
       await fetchPermissions();
     } catch (err: any) {
@@ -252,7 +262,7 @@ export const ManageAccessDialog = ({
   const handleApprove = async (req: AccessRequest, role: "viewer" | "editor") => {
     setActionLoadingId(`${req.id}-${role}`);
     try {
-      await approveAccessRequest(req.id, role);
+      await approveAccessRequest(req.id, role, userId);
       toast.success(`Approved ${req.user_email} as ${role}`);
       await Promise.all([fetchRequests(), fetchPermissions()]);
     } catch (err: any) {
@@ -266,7 +276,7 @@ export const ManageAccessDialog = ({
   const handleReject = async (reqId: string) => {
     setActionLoadingId(`${reqId}-reject`);
     try {
-      await rejectAccessRequest(reqId);
+      await rejectAccessRequest(reqId, userId);
       toast.success("Request rejected");
       await fetchRequests();
     } catch (err: any) {

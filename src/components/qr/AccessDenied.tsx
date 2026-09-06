@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { Shield, Mail, Lock, Loader2, Check, Eye, User, ArrowRight } from "lucide-react";
+import { Shield, Mail, Lock, Loader2, Check, Eye, User, ArrowRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { submitAccessRequest } from "@/hooks/useQRPermissions";
 
 interface AccessDeniedProps {
   qrId: string;
@@ -27,6 +30,8 @@ export const AccessDenied = ({
 }: AccessDeniedProps) => {
   const { user } = useAuth();
   const [requestedRole, setRequestedRole] = useState<"viewer" | "editor">("editor");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [requestNote, setRequestNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [alreadyRequested, setAlreadyRequested] = useState(false);
@@ -36,9 +41,15 @@ export const AccessDenied = ({
   const fkColumn = qrType === "profile" ? "qr_page_id" : "qr_business_page_id";
 
   useEffect(() => {
+    if (user?.email) {
+      setGuestEmail(user.email);
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
     const checkExistingRequest = async () => {
-      const userEmail = user?.email;
-      if (!userEmail || !qrId) return;
+      const emailToCheck = user?.email || guestEmail;
+      if (!emailToCheck || !qrId) return;
 
       setCheckingExisting(true);
       try {
@@ -46,7 +57,7 @@ export const AccessDenied = ({
           .from("qr_access_requests")
           .select("id, requested_role")
           .eq(fkColumn, qrId)
-          .eq("user_email", userEmail.toLowerCase())
+          .eq("user_email", emailToCheck.toLowerCase().trim())
           .eq("status", "pending")
           .maybeSingle();
 
@@ -62,60 +73,48 @@ export const AccessDenied = ({
       }
     };
 
-    checkExistingRequest();
-  }, [qrId, user?.email]);
+    if (user?.email) {
+      checkExistingRequest();
+    }
+  }, [qrId, user?.email, fkColumn]);
 
   const handleRequestAccess = async (roleToRequest: "viewer" | "editor" = requestedRole) => {
-    const userEmail = user?.email;
-    if (!userEmail) {
-      handleRedirectToLogin();
+    const emailToUse = (user?.email || guestEmail).trim().toLowerCase();
+
+    if (!emailToUse || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    if (!qrId) {
+      toast.error("Unable to identify QR page");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Check existing pending request
-      const { data: existing } = await supabase
-        .from("qr_access_requests")
-        .select("id")
-        .eq(fkColumn, qrId)
-        .eq("user_email", userEmail.toLowerCase())
-        .eq("status", "pending")
-        .maybeSingle();
-
-      if (existing) {
-        toast.info("You already have a pending access request");
-        setSubmitted(true);
-        setAlreadyRequested(true);
-        return;
-      }
-
-      // Look up owner_id from page if possible
-      let ownerId: string | null = null;
-      const pageTable = qrType === "profile" ? "qr_pages" : "qr_business_pages";
-      const { data: pData } = await supabase.from(pageTable).select("user_id").eq("id", qrId).maybeSingle();
-      if (pData) {
-        ownerId = pData.user_id;
-      }
-
-      const insertData: any = {
-        [fkColumn]: qrId,
-        user_email: userEmail.toLowerCase(),
-        requested_role: roleToRequest,
-        user_id: user?.id || null,
-        owner_id: ownerId,
-        status: "pending",
-      };
-
-      const { error } = await supabase.from("qr_access_requests").insert(insertData);
-      if (error) throw error;
+      await submitAccessRequest(
+        qrId,
+        qrType === "business",
+        emailToUse,
+        roleToRequest,
+        requestNote.trim() || undefined,
+        user?.id
+      );
 
       setSubmitted(true);
       setAlreadyRequested(true);
       setPendingRole(roleToRequest);
       toast.success("Access request sent to the owner!");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to submit access request");
+      const msg = err?.message || "";
+      if (msg.includes("already have a pending")) {
+        toast.info("You already have a pending access request for this page");
+        setSubmitted(true);
+        setAlreadyRequested(true);
+      } else {
+        toast.error(msg || "Failed to submit access request");
+      }
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -130,33 +129,29 @@ export const AccessDenied = ({
   // Banner mode: user has view access and can request edit access
   if (viewOnly) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-2">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 backdrop-blur-md">
+      <div className="mx-auto w-full max-w-3xl px-4 py-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-primary/25 bg-card/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center gap-2.5 min-w-0">
-            <Eye className="w-4 h-4 text-primary shrink-0" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <Eye className="w-4 h-4" />
+            </div>
             <div className="min-w-0">
-              <p className="text-xs text-foreground font-medium">
-                Viewing mode
+              <p className="text-xs text-foreground font-semibold flex items-center gap-1.5">
+                Viewing Mode
+                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-primary/30 text-primary">
+                  Viewer
+                </Badge>
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {ownerName ? `Created by ${ownerName}. ` : ""}Request editor access to collaborate on this page.
+                {ownerName ? `Created by ${ownerName}. ` : ""}Request editor access to collaborate and modify this page.
               </p>
             </div>
           </div>
 
           {allowRequests && (
             <div className="shrink-0 w-full sm:w-auto">
-              {!user ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRedirectToLogin}
-                  className="w-full sm:w-auto h-7 text-xs border-primary/30 hover:bg-primary/10"
-                >
-                  <Mail className="w-3 h-3 mr-1.5" /> Sign in to Request Edit
-                </Button>
-              ) : submitted || alreadyRequested ? (
-                <div className="flex items-center gap-1.5 text-xs text-primary font-medium px-2 py-1 bg-primary/10 rounded-lg">
+              {submitted || alreadyRequested ? (
+                <div className="flex items-center gap-1.5 text-xs text-primary font-medium px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
                   <Check className="w-3.5 h-3.5" /> Request Sent ({pendingRole || "editor"})
                 </div>
               ) : (
@@ -165,12 +160,12 @@ export const AccessDenied = ({
                   variant="outline"
                   onClick={() => handleRequestAccess("editor")}
                   disabled={isSubmitting || checkingExisting}
-                  className="w-full sm:w-auto h-7 text-xs border-primary/30 hover:bg-primary/10"
+                  className="w-full sm:w-auto h-8 text-xs border-primary/30 hover:bg-primary/10 text-primary"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                   ) : (
-                    <Mail className="w-3 h-3 mr-1.5" />
+                    <Mail className="w-3.5 h-3.5 mr-1.5" />
                   )}
                   Request Edit Access
                 </Button>
@@ -182,24 +177,24 @@ export const AccessDenied = ({
     );
   }
 
-  // Full Access Restricted screen
+  // Full Access Restricted screen (Public View is OFF)
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background glow */}
+      {/* Ambient background glow */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[140px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[140px]" />
       </div>
 
       <div className="max-w-md w-full relative z-10 text-center space-y-6">
-        {/* Icon & Title */}
+        {/* Lock Icon & Title */}
         <div className="space-y-3">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive shadow-lg">
             <Lock className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Access Restricted</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Access Restricted</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {qrTitle || "This QR Code"} is private
+              {qrTitle || "This QR Code"} is set to private
             </p>
           </div>
 
@@ -212,60 +207,84 @@ export const AccessDenied = ({
           )}
         </div>
 
-        {/* Requests Allowed: Logged In Form */}
-        {allowRequests && user && !submitted && (
-          <div className="space-y-4 p-6 rounded-2xl border border-border/60 bg-card/70 backdrop-blur-xl shadow-xl text-left">
-            <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+        {/* Access Requests Allowed: Unified Form for Logged In & Guests */}
+        {allowRequests && !submitted && (
+          <div className="space-y-4 p-6 rounded-2xl border border-border/60 bg-card/80 backdrop-blur-xl shadow-xl text-left">
+            <div className="flex items-center gap-2 pb-2 border-b border-border/40">
               <Shield className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Request Access</h3>
+              <h3 className="text-sm font-semibold text-foreground">Request Access from Owner</h3>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Select the permission you need. The owner will review and grant access.
+              This page requires permission from the owner to view. Send a request to get authorized access.
             </p>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground">Requested Permission</label>
+            {/* Email input (editable if guest, pre-filled if logged in) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Your Email Address</label>
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                disabled={!!user?.email}
+                className="bg-secondary/30 border-border/60 text-sm"
+              />
+              {!user && (
+                <p className="text-[11px] text-muted-foreground">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={handleRedirectToLogin}
+                    className="text-primary hover:underline font-medium inline-flex items-center gap-0.5"
+                  >
+                    Sign in <ArrowRight className="w-3 h-3 inline" />
+                  </button>
+                </p>
+              )}
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Requested Access Level</label>
               <Select
                 value={requestedRole}
                 onValueChange={(val: "viewer" | "editor") => setRequestedRole(val)}
               >
-                <SelectTrigger className="w-full bg-secondary/30 border-border/60">
+                <SelectTrigger className="w-full bg-secondary/30 border-border/60 text-sm">
                   <SelectValue placeholder="Select access type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="viewer">Viewer Access (View content only)</SelectItem>
-                  <SelectItem value="editor">Editor Access (Edit and collaborate)</SelectItem>
+                  <SelectItem value="viewer">Viewer Access (View content)</SelectItem>
+                  <SelectItem value="editor">Editor Access (Collaborate & edit)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Optional Note */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground flex items-center gap-1">
+                <MessageSquare className="w-3 h-3 text-muted-foreground" /> Note for the Owner <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                placeholder="e.g. Hi, please approve my access to this page"
+                value={requestNote}
+                onChange={(e) => setRequestNote(e.target.value)}
+                className="bg-secondary/30 border-border/60 text-sm"
+              />
             </div>
 
             <Button
               onClick={() => handleRequestAccess(requestedRole)}
               disabled={isSubmitting || checkingExisting}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2 font-medium"
             >
               {isSubmitting || checkingExisting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
                 <Mail className="w-4 h-4 mr-2" />
               )}
-              Send Request to Owner
-            </Button>
-          </div>
-        )}
-
-        {/* Requests Allowed: Non-Logged-In Redirect Flow */}
-        {allowRequests && !user && !submitted && (
-          <div className="space-y-4 p-6 rounded-2xl border border-border/60 bg-card/70 backdrop-blur-xl shadow-xl">
-            <p className="text-sm text-muted-foreground">
-              Sign in to request view or edit access from the owner.
-            </p>
-            <Button
-              onClick={handleRedirectToLogin}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2"
-            >
-              Sign In to Request Access <ArrowRight className="w-4 h-4" />
+              Send Access Request
             </Button>
           </div>
         )}
@@ -280,8 +299,8 @@ export const AccessDenied = ({
               <p className="text-base font-semibold text-foreground">
                 {alreadyRequested ? "Request Already Pending" : "Access Request Sent!"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                {ownerName || "The owner"} will review your request. Once approved, you will gain {pendingRole || requestedRole} access immediately.
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto leading-relaxed">
+                {ownerName || "The owner"} will review your request in their Manage Access dashboard. Once approved as <strong className="text-foreground">{pendingRole || requestedRole}</strong>, you will gain access immediately.
               </p>
             </div>
           </div>

@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
 import { EditQRPageModal } from "@/components/qr/EditQRPageModal";
 import { Badge } from "@/components/ui/badge";
+import { RequestAccessBanner } from "@/components/qr/RequestAccessBanner";
 
 interface ProfileItem {
   id: string;
@@ -101,6 +102,7 @@ const PublicProfile = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [allowRequests, setAllowRequests] = useState(false);
   const [qrIdForAccess, setQrIdForAccess] = useState("");
+  const [qrPageTitle, setQrPageTitle] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [ownerName, setOwnerName] = useState("Owner");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -195,6 +197,9 @@ const PublicProfile = () => {
       setUserRole(accessInfo.user_role || null);
       if (accessInfo.id) {
         setQrIdForAccess(accessInfo.id);
+      }
+      if (accessInfo.title) {
+        setQrPageTitle(accessInfo.title);
       }
 
       // Check access permission (Public vs Private)
@@ -503,7 +508,7 @@ const PublicProfile = () => {
         qrId={qrIdForAccess}
         qrType="profile"
         allowRequests={allowRequests}
-        qrTitle={qrPageData?.title || "QR Page"}
+        qrTitle={qrPageTitle || qrPageData?.title || "QR Page"}
         ownerName={ownerName}
       />
     );
@@ -628,16 +633,29 @@ const PublicProfile = () => {
   const displayName = profile?.display_name || "User";
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
-      {/* Language Toggle - Top Right */}
-      <LanguageToggle />
-      
-      {/* Background Effects */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
-      </div>
+    <div className="min-h-screen bg-gradient-hero flex flex-col items-center justify-start">
+      {/* Request Access Banner when allowRequests is on and user is not owner/editor */}
+      {allowRequests && userRole !== "owner" && userRole !== "editor" && (
+        <RequestAccessBanner
+          qrId={qrIdForAccess}
+          qrType="profile"
+          allowRequests={allowRequests}
+          qrTitle={qrPageTitle || qrPageData?.title || "QR Profile"}
+          ownerName={ownerName}
+          userRole={userRole as any}
+        />
+      )}
 
-      <motion.div
+      <div className="w-full flex-1 flex items-center justify-center p-6 relative">
+        {/* Language Toggle - Top Right */}
+        <LanguageToggle />
+        
+        {/* Background Effects */}
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse-glow" />
+        </div>
+
+        <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md relative z-10"
@@ -883,6 +901,7 @@ const PublicProfile = () => {
           )}
         </Button>
       )}
+      </div>
 
       {/* In-page Edit QR Webpage Modal */}
       {qrPageData && (
