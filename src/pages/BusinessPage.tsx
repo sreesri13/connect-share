@@ -19,6 +19,7 @@ import { BusinessInstallPrompt } from "@/components/business/BusinessInstallProm
 import { AccessDenied } from "@/components/qr/AccessDenied";
 import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
 
 interface Category {
   id: string;
@@ -108,6 +109,7 @@ const BusinessPage = () => {
   const [allowRequests, setAllowRequests] = useState(false);
   const [qrIdForAccess, setQrIdForAccess] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [ownerName, setOwnerName] = useState("Owner");
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
@@ -154,12 +156,91 @@ const BusinessPage = () => {
     initGA();
     if (publicId || storeSlug) {
       trackQRScan(publicId || storeSlug || '', undefined, 'business');
-      checkSecurityRequirements();
+      fetchPageData();
     }
   }, [publicId, storeSlug]);
 
-  const checkSecurityRequirements = async () => {
+  // Realtime subscription for business page updates
+  useEffect(() => {
+    if (!qrIdForAccess) return;
+
+    const channel = supabase
+      .channel(`business-page-live-${qrIdForAccess}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_business_pages",
+          filter: `id=eq.${qrIdForAccess}`,
+        },
+        (payload: any) => {
+          if (payload.new) {
+            setPageData((prev: any) => ({ ...prev, ...payload.new }));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_business_page_products",
+          filter: `qr_page_id=eq.${qrIdForAccess}`,
+        },
+        () => {
+          fetchPageProducts(qrIdForAccess);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_permissions",
+          filter: `qr_business_page_id=eq.${qrIdForAccess}`,
+        },
+        () => {
+          fetchPageData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qrIdForAccess]);
+
+  const fetchPageData = async () => {
     try {
+      // 1. Fetch access info securely
+      const identifier = storeSlug || publicId || "";
+      const accessInfo = await fetchQRAccessInfo(identifier, true);
+      if (!accessInfo.exists) {
+        setError("Page not found");
+        setIsLoading(false);
+        return;
+      }
+
+      setOwnerName(accessInfo.owner_name || "Owner");
+      setAllowRequests(accessInfo.allow_requests ?? false);
+      setUserRole(accessInfo.user_role || null);
+      if (accessInfo.id) {
+        setQrIdForAccess(accessInfo.id);
+      }
+
+      const isPublic = accessInfo.public_view ?? true;
+      const isAuthorized =
+        accessInfo.user_role === "owner" ||
+        accessInfo.user_role === "editor" ||
+        accessInfo.user_role === "viewer";
+
+      if (!isPublic && !isAuthorized) {
+        setAccessDenied(true);
+        setIsLoading(false);
+        return;
+      }
+
       let pageDataResult: any = null;
       let pageError: any = null;
 
@@ -209,54 +290,6 @@ const BusinessPage = () => {
       setPageData(pageDataResult as any);
       setPageTitle(pageDataResult.title);
       setQrIdForAccess(pageDataResult.id);
-
-      // Check access control
-      const isPublic = pageDataResult.public_view ?? true;
-      const reqsAllowed = pageDataResult.allow_requests ?? false;
-      setAllowRequests(reqsAllowed);
-
-      if (!isPublic) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const isOwner = session?.user?.id === pageDataResult.user_id;
-        
-        if (isOwner) {
-          setUserRole("owner");
-        } else {
-          let permRole: string | null = null;
-          if (session?.user?.email) {
-            const { data: perm } = await supabase
-              .from("qr_permissions")
-              .select("role")
-              .eq("qr_business_page_id", pageDataResult.id)
-              .eq("user_email", session.user.email.toLowerCase())
-              .eq("status", "active")
-              .maybeSingle();
-            permRole = perm?.role || null;
-          }
-          
-          if (!permRole) {
-            setAccessDenied(true);
-            setIsLoading(false);
-            return;
-          }
-          setUserRole(permRole);
-        }
-      } else {
-        // Public page - still check role for banner
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id === pageDataResult.user_id) {
-          setUserRole("owner");
-        } else if (session?.user?.email) {
-          const { data: perm } = await supabase
-            .from("qr_permissions")
-            .select("role")
-            .eq("qr_business_page_id", pageDataResult.id)
-            .eq("user_email", session.user.email.toLowerCase())
-            .eq("status", "active")
-            .maybeSingle();
-          setUserRole(perm?.role || null);
-        }
-      }
 
       // Step 1: Check for expiration
       if (pageDataResult.expires_at) {
@@ -473,7 +506,15 @@ const BusinessPage = () => {
 
   // Access denied
   if (accessDenied) {
-    return <AccessDenied qrId={qrIdForAccess} qrType="business" allowRequests={allowRequests} />;
+    return (
+      <AccessDenied
+        qrId={qrIdForAccess}
+        qrType="business"
+        allowRequests={allowRequests}
+        qrTitle={pageData?.business_name || pageTitle || "Business QR"}
+        ownerName={ownerName}
+      />
+    );
   }
 
   // Scan limit reached
@@ -648,9 +689,16 @@ const BusinessPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
-      {/* View-only banner for logged-in users without edit access */}
-      {user && userRole !== "owner" && userRole !== "editor" && (
-        <AccessDenied qrId={qrIdForAccess} qrType="business" allowRequests={allowRequests} viewOnly />
+      {/* View-only banner for viewers without edit access */}
+      {userRole !== "owner" && userRole !== "editor" && (
+        <AccessDenied
+          qrId={qrIdForAccess}
+          qrType="business"
+          allowRequests={allowRequests}
+          qrTitle={pageData?.business_name || pageTitle || "Business QR"}
+          ownerName={ownerName}
+          viewOnly
+        />
       )}
       {/* Sticky Header */}
       <motion.header
@@ -672,9 +720,20 @@ const BusinessPage = () => {
               <h1 className="font-bold text-base sm:text-lg text-foreground truncate">
                 {pageData?.business_name || pageTitle || "Product Catalog"}
               </h1>
-              <p className="text-xs text-muted-foreground">
-                {products.length} product{products.length !== 1 ? "s" : ""}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">
+                  {products.length} product{products.length !== 1 ? "s" : ""}
+                </span>
+                <span className="text-muted-foreground/40">•</span>
+                <span className="text-xs text-muted-foreground">
+                  Owner: <strong className="text-foreground font-medium">{ownerName}</strong>
+                </span>
+                {userRole && (
+                  <Badge variant="outline" className="text-[10px] uppercase font-semibold py-0 px-1 border-primary/30 text-primary">
+                    {userRole === "owner" ? "Owner" : userRole === "editor" ? "Editor" : "Viewer"}
+                  </Badge>
+                )}
+              </div>
             </div>
             {pageData?.show_expires_at && pageData?.expires_at && (
               <ExpiryCountdown expiresAt={pageData.expires_at} />

@@ -68,6 +68,10 @@ interface QRPage {
   daily_limit: number | null;
   show_install_popup: boolean;
   show_footer_branding: boolean;
+  is_shared?: boolean;
+  shared_role?: "editor" | "viewer";
+  owner_name?: string;
+  owner_id?: string;
 }
 
 interface QRItem {
@@ -86,6 +90,7 @@ type ExpiryExtension = "none" | "1h" | "24h" | "7d" | "30d" | "custom" | "remove
 
 export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   const [qrPages, setQrPages] = useState<QRPage[]>([]);
+  const [filterTab, setFilterTab] = useState<"all" | "mine" | "shared">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -142,10 +147,40 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
   useEffect(() => {
     fetchQRPages();
+
+    const channel = supabase
+      .channel("dashboard_qr_pages_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "qr_pages" },
+        () => {
+          fetchQRPages();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "qr_permissions" },
+        () => {
+          fetchQRPages();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "qr_access_requests" },
+        () => {
+          fetchQRPages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const fetchQRPages = async () => {
     try {
+      // 1. Fetch own QR pages
       const { data, error } = await supabase
         .from("qr_pages")
         .select(`
@@ -153,6 +188,7 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           public_id,
           title,
           created_at,
+          user_id,
           password_hash,
           expires_at,
           style_config,
@@ -175,22 +211,92 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
 
       if (error) throw error;
 
+      // 2. Fetch shared QR permissions for current user
+      const { data: userAuth } = await supabase.auth.getUser();
+      const userEmail = userAuth?.user?.email?.toLowerCase();
+
+      let permQuery = supabase
+        .from("qr_permissions")
+        .select("qr_page_id, role")
+        .eq("status", "active");
+
+      if (userEmail) {
+        permQuery = permQuery.or(`user_id.eq.${userId},email.eq.${userEmail}`);
+      } else {
+        permQuery = permQuery.eq("user_id", userId);
+      }
+      const { data: activePerms } = await permQuery;
+
+      const ownPageIds = new Set((data || []).map((p: any) => p.id));
+      const sharedPermMap = new Map<string, "editor" | "viewer">();
+      (activePerms || []).forEach((p: any) => {
+        if (p.qr_page_id && !ownPageIds.has(p.qr_page_id)) {
+          sharedPermMap.set(p.qr_page_id, p.role);
+        }
+      });
+
+      let sharedPagesData: any[] = [];
+      let ownerMap: Record<string, string> = {};
+
+      if (sharedPermMap.size > 0) {
+        const sharedIds = Array.from(sharedPermMap.keys());
+        const { data: sharedRes } = await supabase
+          .from("qr_pages")
+          .select(`
+            id,
+            public_id,
+            title,
+            created_at,
+            user_id,
+            password_hash,
+            expires_at,
+            style_config,
+            location_locked,
+            location_lat,
+            location_lng,
+            location_name,
+            is_deleted,
+            starred_item_id,
+            scan_limit_type,
+            max_scans,
+            daily_limit,
+            show_install_popup,
+            show_footer_branding,
+            qr_page_items (id)
+          `)
+          .in("id", sharedIds)
+          .or("is_deleted.eq.false,is_deleted.is.null");
+
+        sharedPagesData = sharedRes || [];
+
+        const ownerUserIds = Array.from(new Set(sharedPagesData.map((p: any) => p.user_id)));
+        if (ownerUserIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, username")
+            .in("user_id", ownerUserIds);
+          (profs || []).forEach((pr: any) => {
+            ownerMap[pr.user_id] = pr.full_name || pr.username || "Owner";
+          });
+        }
+      }
+
       // Fetch scan counts for all pages
-      const pageIds = (data || []).map((p: any) => p.id);
+      const allPageIds = [...(data || []).map((p: any) => p.id), ...sharedPagesData.map((p: any) => p.id)];
       const scanCounts: Record<string, number> = {};
       
-      if (pageIds.length > 0) {
+      if (allPageIds.length > 0) {
         const { data: scansData } = await supabase
           .from("qr_scans")
           .select("qr_page_id")
-          .in("qr_page_id", pageIds);
+          .in("qr_page_id", allPageIds);
         
         (scansData || []).forEach((scan: any) => {
           scanCounts[scan.qr_page_id] = (scanCounts[scan.qr_page_id] || 0) + 1;
         });
       }
 
-      const pages = (data || []).map((page: any) => ({
+      const ownPages: QRPage[] = (data || []).map((page: any) => ({
         id: page.id,
         public_id: page.public_id,
         title: page.title,
@@ -210,9 +316,37 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         daily_limit: page.daily_limit,
         show_install_popup: page.show_install_popup !== false,
         show_footer_branding: page.show_footer_branding !== false,
+        is_shared: false,
+        owner_id: userId,
       }));
 
-      setQrPages(pages);
+      const sharedPages: QRPage[] = sharedPagesData.map((page: any) => ({
+        id: page.id,
+        public_id: page.public_id,
+        title: page.title,
+        created_at: page.created_at,
+        item_count: page.qr_page_items?.length || 0,
+        has_password: !!page.password_hash,
+        expires_at: page.expires_at,
+        style_config: page.style_config as QRStyleConfig | null,
+        location_locked: page.location_locked || false,
+        location_lat: page.location_lat,
+        location_lng: page.location_lng,
+        location_name: page.location_name,
+        starred_item_id: page.starred_item_id || null,
+        scan_count: scanCounts[page.id] || 0,
+        scan_limit_type: page.scan_limit_type || 'unlimited',
+        max_scans: page.max_scans,
+        daily_limit: page.daily_limit,
+        show_install_popup: page.show_install_popup !== false,
+        show_footer_branding: page.show_footer_branding !== false,
+        is_shared: true,
+        shared_role: sharedPermMap.get(page.id) || "viewer",
+        owner_name: ownerMap[page.user_id] || "Owner",
+        owner_id: page.user_id,
+      }));
+
+      setQrPages([...ownPages, ...sharedPages]);
     } catch (error) {
       toast.error("Failed to load QR codes");
       console.error(error);
@@ -306,10 +440,11 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === qrPages.length) {
+    const ownedPages = qrPages.filter((p) => !p.is_shared);
+    if (selectedIds.size === ownedPages.length && ownedPages.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(qrPages.map((p) => p.id)));
+      setSelectedIds(new Set(ownedPages.map((p) => p.id)));
     }
   };
 
@@ -629,18 +764,26 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
     );
   }
 
+  const displayedPages = qrPages.filter((page) => {
+    if (filterTab === "mine") return !page.is_shared;
+    if (filterTab === "shared") return page.is_shared;
+    return true;
+  });
+  const ownedPagesCount = qrPages.filter((p) => !p.is_shared).length;
+  const sharedPagesCount = qrPages.filter((p) => p.is_shared).length;
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">My QR Codes</h2>
-          <p className="text-sm sm:text-base text-muted-foreground">Manage all your generated QR codes</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage all your generated and shared QR codes</p>
         </div>
-        {qrPages.length > 0 && (
+        {ownedPagesCount > 0 && (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={toggleSelectAll} className="min-h-[44px] text-xs sm:text-sm">
-              {selectedIds.size === qrPages.length ? "Deselect" : "Select All"}
+              {selectedIds.size === ownedPagesCount ? "Deselect" : "Select All"}
             </Button>
             {selectedIds.size > 0 && (
               <Button
@@ -659,17 +802,49 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
         )}
       </div>
 
-      {qrPages.length === 0 ? (
+      {/* Filter Tabs: All, My QR Codes, Shared with Me */}
+      <div className="flex items-center gap-2 border-b border-border/60 pb-3">
+        <Button
+          variant={filterTab === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilterTab("all")}
+          className="h-8 text-xs font-medium"
+        >
+          All ({qrPages.length})
+        </Button>
+        <Button
+          variant={filterTab === "mine" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilterTab("mine")}
+          className="h-8 text-xs font-medium"
+        >
+          My QR Codes ({ownedPagesCount})
+        </Button>
+        <Button
+          variant={filterTab === "shared" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilterTab("shared")}
+          className="h-8 text-xs font-medium"
+        >
+          Shared with Me ({sharedPagesCount})
+        </Button>
+      </div>
+
+      {displayedPages.length === 0 ? (
         <Card className="p-8 sm:p-12 text-center">
           <QrCode className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg sm:text-xl font-semibold mb-2">No QR codes yet</h3>
+          <h3 className="text-lg sm:text-xl font-semibold mb-2">
+            {filterTab === "shared" ? "No shared QR codes" : "No QR codes yet"}
+          </h3>
           <p className="text-sm sm:text-base text-muted-foreground mb-6">
-            Generate your first QR code from the My Profile section
+            {filterTab === "shared" 
+              ? "QR codes shared with you will appear here with your assigned permissions." 
+              : "Generate your first QR code from the My Profile section"}
           </p>
         </Card>
       ) : (
         <div className="grid gap-3 sm:gap-4">
-          {qrPages.map((page, index) => (
+          {displayedPages.map((page, index) => (
             <motion.div
               key={page.id}
               initial={{ opacity: 0, y: 20 }}
@@ -679,11 +854,15 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
               <Card className={`hover:border-primary/30 transition-colors ${selectedIds.has(page.id) ? "border-primary bg-primary/5" : ""}`}>
                 <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4">
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <Checkbox
-                      checked={selectedIds.has(page.id)}
-                      onCheckedChange={() => toggleSelect(page.id)}
-                      className="flex-shrink-0"
-                    />
+                    {!page.is_shared ? (
+                      <Checkbox
+                        checked={selectedIds.has(page.id)}
+                        onCheckedChange={() => toggleSelect(page.id)}
+                        className="flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 flex-shrink-0" />
+                    )}
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center relative flex-shrink-0">
                       <QrCode className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                       {page.has_password && (
@@ -697,6 +876,21 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                         <h3 className="font-medium text-foreground truncate text-sm sm:text-base">
                           {page.title || `QR Code`}
                         </h3>
+                        {page.is_shared && (
+                          <Badge 
+                            variant="outline" 
+                            className={page.shared_role === "editor" 
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30 text-xs" 
+                              : "bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs"}
+                          >
+                            Shared • {page.shared_role === "editor" ? "Editor" : "Viewer"}
+                          </Badge>
+                        )}
+                        {page.is_shared && page.owner_name && (
+                          <Badge variant="secondary" className="text-xs bg-muted/60 text-slate-300">
+                            Owner: <span className="font-semibold text-primary ml-1">{page.owner_name}</span>
+                          </Badge>
+                        )}
                         {page.has_password && (
                           <Badge variant="secondary" className="text-xs">
                             <Lock className="w-3 h-3 mr-1" />
@@ -761,39 +955,58 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 justify-end sm:justify-start ml-auto sm:ml-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}
-                      className="min-h-[40px] min-w-[40px]"
-                      title="Manage Access"
-                    >
-                      <Shield className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditQR(page)}
-                      className="min-h-[40px] min-w-[40px]"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
+                    {page.is_shared ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        className="min-h-[40px] min-w-[40px] opacity-40 cursor-not-allowed"
+                        title="Only the owner can manage access"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setManageAccessQR(page); setIsManageAccessOpen(true); }}
+                        className="min-h-[40px] min-w-[40px] text-cyan-400 hover:text-cyan-300 hover:border-cyan-500/50"
+                        title="Manage Access"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {(!page.is_shared || page.shared_role === "editor") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditQR(page)}
+                        className="min-h-[40px] min-w-[40px]"
+                        title="Edit QR Code"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(getPublicUrl(page.public_id), "_blank")}
                       className="min-h-[40px] min-w-[40px]"
+                      title="Open Page"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive min-h-[40px] min-w-[40px]"
-                      onClick={() => handleDelete(page.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {!page.is_shared && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive min-h-[40px] min-w-[40px]"
+                        onClick={() => handleDelete(page.id)}
+                        title="Delete QR Code"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

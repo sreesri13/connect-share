@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Shield, UserPlus, X, Check, Clock, Mail, Users, Globe, AlertCircle, Loader2 } from "lucide-react";
+import { Shield, UserPlus, X, Check, Clock, Mail, Users, Globe, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,10 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { 
+  approveAccessRequest, 
+  rejectAccessRequest, 
+  revokePermission, 
+  addDirectPermission 
+} from "@/hooks/useQRPermissions";
 
 interface Permission {
   id: string;
   user_email: string;
+  user_id?: string;
   role: string;
   status: string;
   created_at: string;
@@ -22,9 +28,11 @@ interface Permission {
 interface AccessRequest {
   id: string;
   user_email: string;
+  user_id?: string;
   requested_role: string;
   status: string;
   created_at: string;
+  requester_name?: string;
 }
 
 interface ManageAccessDialogProps {
@@ -37,16 +45,22 @@ interface ManageAccessDialogProps {
 }
 
 export const ManageAccessDialog = ({
-  open, onOpenChange, qrId, qrType, qrTitle, userId
+  open,
+  onOpenChange,
+  qrId,
+  qrType,
+  qrTitle,
+  userId,
 }: ManageAccessDialogProps) => {
   const [publicView, setPublicView] = useState(true);
   const [allowRequests, setAllowRequests] = useState(false);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState("viewer");
+  const [newRole, setNewRole] = useState<"viewer" | "editor">("viewer");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const table = qrType === "profile" ? "qr_pages" : "qr_business_pages";
   const fkColumn = qrType === "profile" ? "qr_page_id" : "qr_business_page_id";
@@ -54,13 +68,46 @@ export const ManageAccessDialog = ({
   useEffect(() => {
     if (open && qrId) {
       fetchData();
+
+      // Realtime subscription for incoming access requests & permission updates
+      const channel = supabase
+        .channel(`manage-access-${qrId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "qr_access_requests",
+            filter: `${fkColumn}=eq.${qrId}`,
+          },
+          () => {
+            fetchRequests();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "qr_permissions",
+            filter: `${fkColumn}=eq.${qrId}`,
+          },
+          () => {
+            fetchPermissions();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [open, qrId]);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch QR settings
+      // 1. Fetch QR settings
       const { data: qrData } = await supabase
         .from(table)
         .select("public_view, allow_requests")
@@ -72,170 +119,205 @@ export const ManageAccessDialog = ({
         setAllowRequests(qrData.allow_requests ?? false);
       }
 
-      // Fetch permissions
-      const { data: perms } = await supabase
-        .from("qr_permissions")
-        .select("*")
-        .eq(fkColumn, qrId);
-
-      setPermissions(perms || []);
-
-      // Fetch pending requests
-      const { data: reqs } = await supabase
-        .from("qr_access_requests")
-        .select("*")
-        .eq(fkColumn, qrId)
-        .eq("status", "pending");
-
-      setRequests(reqs || []);
+      await Promise.all([fetchPermissions(), fetchRequests()]);
     } catch (err) {
-      console.error(err);
+      console.error("Error loading access settings:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchPermissions = async () => {
+    const { data: perms } = await supabase
+      .from("qr_permissions")
+      .select("*")
+      .eq(fkColumn, qrId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    setPermissions(perms || []);
+  };
+
+  const fetchRequests = async () => {
+    const { data: reqs } = await supabase
+      .from("qr_access_requests")
+      .select("*")
+      .eq(fkColumn, qrId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (!reqs || reqs.length === 0) {
+      setRequests([]);
+      return;
+    }
+
+    // Attempt to fetch requester profile display names
+    const userIds = reqs.map((r: any) => r.user_id).filter(Boolean);
+    let nameMap: Record<string, string> = {};
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, display_name")
+        .in("user_id", userIds);
+
+      (profiles || []).forEach((p: any) => {
+        if (p.user_id && p.display_name) {
+          nameMap[p.user_id] = p.display_name;
+        }
+      });
+    }
+
+    setRequests(
+      reqs.map((r: any) => ({
+        ...r,
+        requester_name: r.user_id ? nameMap[r.user_id] : undefined,
+      }))
+    );
+  };
+
   const handleTogglePublicView = async (val: boolean) => {
     setPublicView(val);
-    await supabase.from(table).update({ public_view: val }).eq("id", qrId);
-    toast.success(val ? "Public access enabled" : "Access restricted to permitted users");
+    const { error } = await supabase.from(table).update({ public_view: val }).eq("id", qrId);
+    if (error) {
+      toast.error("Failed to update Public View Access");
+      setPublicView(!val);
+    } else {
+      toast.success(val ? "Public access enabled" : "Access restricted to permitted users");
+    }
   };
 
   const handleToggleAllowRequests = async (val: boolean) => {
     setAllowRequests(val);
-    await supabase.from(table).update({ allow_requests: val }).eq("id", qrId);
-    toast.success(val ? "Access requests enabled" : "Access requests disabled");
+    const { error } = await supabase.from(table).update({ allow_requests: val }).eq("id", qrId);
+    if (error) {
+      toast.error("Failed to update Allow Access Requests");
+      setAllowRequests(!val);
+    } else {
+      toast.success(val ? "Access requests enabled" : "Access requests disabled");
+    }
   };
 
   const handleAddPerson = async () => {
-    if (!newEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
-      toast.error("Please enter a valid email");
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast.error("Please enter a valid email address");
       return;
     }
 
-    const emailLower = newEmail.trim().toLowerCase();
-    
-    // Check if already has permission
-    if (permissions.some(p => p.user_email === emailLower)) {
-      toast.error("This email already has access");
+    if (permissions.some((p) => p.user_email.toLowerCase() === trimmed)) {
+      toast.error("This user already has access");
       return;
     }
 
     setIsSaving(true);
     try {
-      const insertData: any = {
-        [fkColumn]: qrId,
-        user_email: emailLower,
-        role: newRole,
-        status: "active",
-        granted_by: userId,
-      };
-
-      const { error } = await supabase.from("qr_permissions").insert(insertData);
-      if (error) throw error;
-
-      toast.success(`${emailLower} added as ${newRole}`);
+      await addDirectPermission(qrId, qrType === "business", trimmed, newRole);
+      toast.success(`${trimmed} added as ${newRole}`);
       setNewEmail("");
-      fetchData();
+      await fetchPermissions();
     } catch (err: any) {
-      toast.error("Failed to add permission");
+      toast.error(err?.message || "Failed to add user permission");
+      console.error(err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleChangeRole = async (permId: string, role: string) => {
-    await supabase.from("qr_permissions").update({ role }).eq("id", permId);
-    toast.success("Role updated");
-    fetchData();
-  };
-
-  const handleRemovePermission = async (permId: string) => {
-    await supabase.from("qr_permissions").delete().eq("id", permId);
-    toast.success("Access removed");
-    fetchData();
-  };
-
-  const handleApproveRequest = async (req: AccessRequest) => {
+  const handleChangeRole = async (permId: string, role: "viewer" | "editor") => {
     try {
-      // Update request status
-      await supabase.from("qr_access_requests").update({ status: "approved" }).eq("id", req.id);
-
-      // Check if permission already exists
-      const { data: existingPerm } = await supabase
+      const { error } = await supabase
         .from("qr_permissions")
-        .select("id")
-        .eq(fkColumn, qrId)
-        .eq("user_email", req.user_email)
-        .maybeSingle();
+        .update({ role, updated_at: new Date().toISOString() })
+        .eq("id", permId);
 
-      if (existingPerm) {
-        // Update existing permission role
-        await supabase.from("qr_permissions").update({ 
-          role: req.requested_role, 
-          status: "active" 
-        }).eq("id", existingPerm.id);
-      } else {
-        // Add new permission
-        const insertData: any = {
-          [fkColumn]: qrId,
-          user_email: req.user_email,
-          role: req.requested_role,
-          status: "active",
-          granted_by: userId,
-        };
-        await supabase.from("qr_permissions").insert(insertData);
-      }
-
-      toast.success(`Approved ${req.user_email} as ${req.requested_role}`);
-      fetchData();
-    } catch (err) {
-      toast.error("Failed to approve request");
+      if (error) throw error;
+      toast.success(`Role updated to ${role}`);
+      await fetchPermissions();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update role");
     }
   };
 
-  const handleRejectRequest = async (reqId: string) => {
-    await supabase.from("qr_access_requests").update({ status: "rejected" }).eq("id", reqId);
-    toast.success("Request rejected");
-    fetchData();
+  const handleRemovePermission = async (permId: string, email: string) => {
+    try {
+      await revokePermission(permId);
+      toast.success(`Access revoked for ${email}`);
+      await fetchPermissions();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to remove permission");
+    }
+  };
+
+  const handleApprove = async (req: AccessRequest, role: "viewer" | "editor") => {
+    setActionLoadingId(`${req.id}-${role}`);
+    try {
+      await approveAccessRequest(req.id, role);
+      toast.success(`Approved ${req.user_email} as ${role}`);
+      await Promise.all([fetchRequests(), fetchPermissions()]);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to approve request");
+      console.error(err);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleReject = async (reqId: string) => {
+    setActionLoadingId(`${reqId}-reject`);
+    try {
+      await rejectAccessRequest(reqId);
+      toast.success("Request rejected");
+      await fetchRequests();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reject request");
+      console.error(err);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const pendingCount = requests.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-full max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-lg w-full max-h-[85vh] overflow-y-auto bg-card/95 backdrop-blur-xl border-border/60 shadow-2xl p-6">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="flex items-center gap-2.5 text-lg font-bold text-foreground">
             <Shield className="w-5 h-5 text-primary" />
             Manage Access
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">{qrTitle || "Untitled QR"}</p>
+          <p className="text-xs text-muted-foreground truncate">{qrTitle || "Untitled QR"}</p>
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex justify-center py-8">
+          <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 pt-2">
             {/* Access Toggles */}
-            <div className="space-y-4 p-4 rounded-lg bg-secondary/30 border border-border">
+            <div className="space-y-4 p-4 rounded-xl bg-secondary/30 border border-border/50">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    <Globe className="w-4 h-4" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Public View Access</p>
+                    <p className="text-sm font-medium text-foreground">Public View Access</p>
                     <p className="text-xs text-muted-foreground">Anyone can view without login</p>
                   </div>
                 </div>
                 <Switch checked={publicView} onCheckedChange={handleTogglePublicView} />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 text-muted-foreground" />
+
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Allow Access Requests</p>
+                    <p className="text-sm font-medium text-foreground">Allow Access Requests</p>
                     <p className="text-xs text-muted-foreground">Users can request view/edit access</p>
                   </div>
                 </div>
@@ -243,33 +325,38 @@ export const ManageAccessDialog = ({
               </div>
             </div>
 
-            <Tabs defaultValue="people">
-              <TabsList className="w-full">
-                <TabsTrigger value="people" className="flex-1">
-                  <Users className="w-4 h-4 mr-1" /> People
+            {/* People and Requests Tabs */}
+            <Tabs defaultValue="people" className="w-full">
+              <TabsList className="w-full grid grid-cols-2 bg-secondary/40 border border-border/40 p-1">
+                <TabsTrigger value="people" className="flex items-center gap-2 text-xs font-semibold py-2">
+                  <Users className="w-4 h-4" /> People
                 </TabsTrigger>
-                <TabsTrigger value="requests" className="flex-1 relative">
-                  <Mail className="w-4 h-4 mr-1" /> Requests
+                <TabsTrigger value="requests" className="flex items-center gap-2 text-xs font-semibold py-2 relative">
+                  <Mail className="w-4 h-4" /> Requests
                   {pendingCount > 0 && (
-                    <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive">
+                    <Badge className="ml-1.5 h-4 min-w-4 px-1 flex items-center justify-center text-[10px] bg-primary text-primary-foreground font-bold rounded-full">
                       {pendingCount}
                     </Badge>
                   )}
                 </TabsTrigger>
               </TabsList>
 
+              {/* People Tab Content */}
               <TabsContent value="people" className="space-y-4 mt-4">
-                {/* Add person */}
-                <div className="flex gap-2">
+                {/* Add Person Row */}
+                <div className="flex gap-2 items-center">
                   <Input
                     placeholder="Email address"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddPerson()}
-                    className="flex-1"
+                    className="flex-1 bg-secondary/20 border-border/50 h-10 text-sm"
                   />
-                  <Select value={newRole} onValueChange={setNewRole}>
-                    <SelectTrigger className="w-24">
+                  <Select
+                    value={newRole}
+                    onValueChange={(val: "viewer" | "editor") => setNewRole(val)}
+                  >
+                    <SelectTrigger className="w-28 h-10 text-xs font-medium border-border/50 bg-secondary/20">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -277,89 +364,172 @@ export const ManageAccessDialog = ({
                       <SelectItem value="editor">Editor</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleAddPerson} disabled={isSaving} size="icon" className="shrink-0">
-                    <UserPlus className="w-4 h-4" />
+                  <Button
+                    onClick={handleAddPerson}
+                    disabled={isSaving || !newEmail.trim()}
+                    className="h-10 px-3.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+                    title="Add User"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                   </Button>
                 </div>
 
-                {/* Owner */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                {/* Owner Row */}
+                <div className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-secondary/15">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                       You
                     </div>
                     <div>
-                      <p className="text-sm font-medium">You (Owner)</p>
+                      <p className="text-sm font-medium text-foreground">You (Owner)</p>
+                      <p className="text-xs text-muted-foreground">Original creator</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-xs">Owner</Badge>
+                  <Badge variant="outline" className="text-[11px] font-semibold text-primary border-primary/30 bg-primary/5">
+                    Owner
+                  </Badge>
                 </div>
 
-                {/* Permissions list */}
-                {permissions.map((perm) => (
-                  <div key={perm.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0">
-                        {perm.user_email[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm truncate">{perm.user_email}</p>
-                        {perm.status === "pending" && (
-                          <p className="text-xs text-amber-500">Invited</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select value={perm.role} onValueChange={(val) => handleChangeRole(perm.id, val)}>
-                        <SelectTrigger className="w-24 h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                          <SelectItem value="editor">Editor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleRemovePermission(perm.id)}>
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                {permissions.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No people added yet</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="requests" className="space-y-3 mt-4">
-                {requests.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Mail className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No pending requests</p>
-                  </div>
-                ) : (
-                  requests.map((req) => (
-                    <div key={req.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                      <div className="min-w-0">
-                        <p className="text-sm truncate">{req.user_email}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs capitalize">{req.requested_role}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            {new Date(req.created_at).toLocaleDateString()}
-                          </span>
+                {/* Permissions List */}
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {permissions.map((perm) => (
+                    <div
+                      key={perm.id}
+                      className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-secondary/10 hover:bg-secondary/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 pr-2">
+                        <div className="w-8 h-8 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-xs font-bold uppercase shrink-0 border border-border/40">
+                          {perm.user_email[0] || "U"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{perm.user_email}</p>
+                          <p className="text-[11px] text-muted-foreground capitalize">{perm.role}</p>
                         </div>
                       </div>
-                      <div className="flex gap-1.5">
-                        <Button size="sm" variant="default" className="h-8" onClick={() => handleApproveRequest(req)}>
-                          <Check className="w-3 h-3 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8" onClick={() => handleRejectRequest(req.id)}>
-                          <X className="w-3 h-3" />
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Select
+                          value={perm.role}
+                          onValueChange={(val: "viewer" | "editor") => handleChangeRole(perm.id, val)}
+                        >
+                          <SelectTrigger className="w-24 h-8 text-xs font-medium border-border/50 bg-background/50">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                            <SelectItem value="editor">Editor</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRemovePermission(perm.id, perm.user_email)}
+                          title="Revoke access"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
-                  ))
+                  ))}
+
+                  {permissions.length === 0 && (
+                    <div className="text-center py-6 text-xs text-muted-foreground">
+                      No people added yet
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Requests Tab Content */}
+              <TabsContent value="requests" className="space-y-3 mt-4">
+                {requests.length === 0 ? (
+                  <div className="text-center py-10 space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center mx-auto text-muted-foreground">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">No pending requests</p>
+                    <p className="text-xs text-muted-foreground">
+                      When users request access to this QR code, they will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                    {requests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="p-3.5 rounded-xl border border-border/60 bg-secondary/15 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">
+                              {req.requester_name ? `${req.requester_name} (${req.user_email})` : req.user_email}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-semibold uppercase tracking-wider text-primary border-primary/30 bg-primary/10"
+                              >
+                                Requested: {req.requested_role}
+                              </Badge>
+                              <span className="text-[11px] text-muted-foreground flex items-center">
+                                <Clock className="w-3 h-3 mr-1 inline" />
+                                {new Date(req.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Owner Approval Decision Buttons */}
+                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border/30">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs px-2.5 hover:bg-primary/10 hover:text-primary hover:border-primary/40"
+                            disabled={!!actionLoadingId}
+                            onClick={() => handleApprove(req, "viewer")}
+                          >
+                            {actionLoadingId === `${req.id}-viewer` ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            As Viewer
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs px-2.5 bg-primary text-primary-foreground hover:bg-primary/90"
+                            disabled={!!actionLoadingId}
+                            onClick={() => handleApprove(req, "editor")}
+                          >
+                            {actionLoadingId === `${req.id}-editor` ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            As Editor
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            disabled={!!actionLoadingId}
+                            onClick={() => handleReject(req.id)}
+                            title="Reject request"
+                          >
+                            {actionLoadingId === `${req.id}-reject` ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

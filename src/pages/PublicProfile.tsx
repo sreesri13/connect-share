@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play, Wifi, Copy, Check } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play, Wifi, Copy, Check, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,9 @@ import { PlatformIcon } from "@/lib/platform-icons";
 import { AccessDenied } from "@/components/qr/AccessDenied";
 import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
+import { EditQRPageModal } from "@/components/qr/EditQRPageModal";
+import { Badge } from "@/components/ui/badge";
 
 interface ProfileItem {
   id: string;
@@ -37,6 +40,7 @@ interface ProfileData {
 
 interface QRPageData {
   id: string;
+  public_id: string;
   user_id: string;
   title: string | null;
   password_hash: string | null;
@@ -98,6 +102,8 @@ const PublicProfile = () => {
   const [allowRequests, setAllowRequests] = useState(false);
   const [qrIdForAccess, setQrIdForAccess] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [ownerName, setOwnerName] = useState("Owner");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -123,8 +129,88 @@ const PublicProfile = () => {
     }
   }, [profileId]);
 
+  // Realtime subscription for updates to page data, items, and permissions
+  useEffect(() => {
+    if (!qrIdForAccess) return;
+
+    const channel = supabase
+      .channel(`public-profile-live-${qrIdForAccess}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_pages",
+          filter: `id=eq.${qrIdForAccess}`,
+        },
+        (payload: any) => {
+          if (payload.new) {
+            setQrPageData((prev: any) => ({ ...prev, ...payload.new }));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_page_items",
+          filter: `qr_page_id=eq.${qrIdForAccess}`,
+        },
+        () => {
+          fetchPublicProfileItems(qrIdForAccess);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_permissions",
+          filter: `qr_page_id=eq.${qrIdForAccess}`,
+        },
+        () => {
+          checkSecurityRequirements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qrIdForAccess]);
+
   const checkSecurityRequirements = async () => {
     try {
+      // 1. Fetch access info securely
+      const accessInfo = await fetchQRAccessInfo(profileId || "", false);
+      if (!accessInfo.exists) {
+        setError("Profile not found");
+        setIsLoading(false);
+        return;
+      }
+
+      setOwnerName(accessInfo.owner_name || "Owner");
+      setAllowRequests(accessInfo.allow_requests ?? false);
+      setUserRole(accessInfo.user_role || null);
+      if (accessInfo.id) {
+        setQrIdForAccess(accessInfo.id);
+      }
+
+      // Check access permission (Public vs Private)
+      const isPublic = accessInfo.public_view ?? true;
+      const isAuthorized =
+        accessInfo.user_role === "owner" ||
+        accessInfo.user_role === "editor" ||
+        accessInfo.user_role === "viewer";
+
+      if (!isPublic && !isAuthorized) {
+        setAccessDenied(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Fetch full QR page row
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId || "");
       let query = supabase
         .from("qr_pages")
@@ -151,53 +237,6 @@ const PublicProfile = () => {
 
       setQrPageData(qrPage as any);
       setQrIdForAccess(qrPage.id);
-
-      // Check access control (Public vs Private)
-      const isPublic = (qrPage as any).public_view ?? true;
-      const reqsAllowed = (qrPage as any).allow_requests ?? false;
-      setAllowRequests(reqsAllowed);
-
-      if (!isPublic) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const isOwner = session?.user?.id === qrPage.user_id;
-        
-        if (isOwner) {
-          setUserRole("owner");
-        } else {
-          let permRole: string | null = null;
-          if (session?.user?.email) {
-            const { data: perm } = await supabase
-              .from("qr_permissions")
-              .select("role")
-              .eq("qr_page_id", qrPage.id)
-              .eq("user_email", session.user.email.toLowerCase())
-              .eq("status", "active")
-              .maybeSingle();
-            permRole = perm?.role || null;
-          }
-          
-          if (!permRole) {
-            setAccessDenied(true);
-            setIsLoading(false);
-            return;
-          }
-          setUserRole(permRole);
-        }
-      } else {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id === qrPage.user_id) {
-          setUserRole("owner");
-        } else if (session?.user?.email) {
-          const { data: perm } = await supabase
-            .from("qr_permissions")
-            .select("role")
-            .eq("qr_page_id", qrPage.id)
-            .eq("user_email", session.user.email.toLowerCase())
-            .eq("status", "active")
-            .maybeSingle();
-          setUserRole(perm?.role || null);
-        }
-      }
 
       // =========================================================================
       // STRICT ORDER OF VERIFICATION:
@@ -297,6 +336,43 @@ const PublicProfile = () => {
     }
   };
 
+  const fetchPublicProfileItems = async (pageId: string) => {
+    try {
+      const { data: qrPageItems, error: itemsError } = await supabase
+        .from("qr_page_items")
+        .select(`
+          display_order,
+          items (
+            id,
+            title,
+            type,
+            content,
+            categories (name)
+          )
+        `)
+        .eq("qr_page_id", pageId)
+        .order("display_order", { ascending: true });
+
+      if (!itemsError && qrPageItems) {
+        const formattedItems = qrPageItems
+          .filter((qpItem: any) => qpItem && qpItem.items)
+          .map((qpItem: any) => ({
+            id: qpItem.items.id,
+            title: qpItem.items.title,
+            type: qpItem.items.type,
+            content: qpItem.items.content,
+            category_name: qpItem.items.categories?.name || "General",
+          }));
+        setItems(formattedItems);
+        return formattedItems;
+      }
+      return [];
+    } catch (itemsErr) {
+      console.warn("Items query error:", itemsErr);
+      return [];
+    }
+  };
+
   const fetchPublicProfile = async (qrPage: QRPageData) => {
     try {
       // Record scan in database
@@ -311,42 +387,15 @@ const PublicProfile = () => {
           .maybeSingle();
 
         setProfile(profileData);
+        if (profileData?.display_name) {
+          setOwnerName(profileData.display_name);
+        }
       } catch (profErr) {
         console.warn("Owner profile fetch error:", profErr);
       }
 
       // Fetch items associated with this QR page
-      let formattedItems: ProfileItem[] = [];
-      try {
-        const { data: qrPageItems, error: itemsError } = await supabase
-          .from("qr_page_items")
-          .select(`
-            display_order,
-            items (
-              id,
-              title,
-              type,
-              content,
-              categories (name)
-            )
-          `)
-          .eq("qr_page_id", qrPage.id)
-          .order("display_order", { ascending: true });
-
-        if (!itemsError && qrPageItems) {
-          formattedItems = qrPageItems
-            .filter((qpItem: any) => qpItem && qpItem.items)
-            .map((qpItem: any) => ({
-              id: qpItem.items.id,
-              title: qpItem.items.title,
-              type: qpItem.items.type,
-              content: qpItem.items.content,
-              category_name: qpItem.items.categories?.name || "General",
-            }));
-        }
-      } catch (itemsErr) {
-        console.warn("Items query error:", itemsErr);
-      }
+      const formattedItems = await fetchPublicProfileItems(qrPage.id);
 
       // Check for starred item - redirect if valid URL, or auto-open file viewer
       if (qrPage.starred_item_id) {
@@ -368,8 +417,6 @@ const PublicProfile = () => {
           }
         }
       }
-
-      setItems(formattedItems);
     } catch (err) {
       console.error("Public profile load error:", err);
       setItems([]);
@@ -451,7 +498,15 @@ const PublicProfile = () => {
 
   // Access denied screen
   if (accessDenied) {
-    return <AccessDenied qrId={qrIdForAccess} qrType="profile" allowRequests={allowRequests} />;
+    return (
+      <AccessDenied
+        qrId={qrIdForAccess}
+        qrType="profile"
+        allowRequests={allowRequests}
+        qrTitle={qrPageData?.title || "QR Page"}
+        ownerName={ownerName}
+      />
+    );
   }
 
   // Scan limit reached screen
@@ -587,6 +642,19 @@ const PublicProfile = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md relative z-10"
       >
+        {/* Owner Highlighting */}
+        <div className="flex justify-center mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/70 border border-border/60 text-xs font-medium text-muted-foreground shadow-sm">
+            <User className="w-3.5 h-3.5 text-primary" />
+            <span>Owner: <strong className="text-foreground">{ownerName}</strong></span>
+            {userRole && (
+              <Badge variant="outline" className="ml-1 text-[10px] uppercase font-semibold tracking-wider py-0 px-1.5 border-primary/30 text-primary">
+                {userRole === "owner" ? "Owner" : userRole === "editor" ? "Editor" : "Viewer"}
+              </Badge>
+            )}
+          </div>
+        </div>
+
         {/* Profile Header */}
         <div className="text-center mb-8">
           <motion.div
@@ -632,9 +700,16 @@ const PublicProfile = () => {
           )}
         </div>
 
-        {/* View-only banner for logged-in users without edit access */}
-        {user && userRole !== "owner" && userRole !== "editor" && (
-          <AccessDenied qrId={qrIdForAccess} qrType="profile" allowRequests={allowRequests} viewOnly />
+        {/* View-only banner for viewers without edit access */}
+        {userRole !== "owner" && userRole !== "editor" && (
+          <AccessDenied
+            qrId={qrIdForAccess}
+            qrType="profile"
+            allowRequests={allowRequests}
+            qrTitle={qrPageData?.title || "QR Page"}
+            ownerName={ownerName}
+            viewOnly
+          />
         )}
 
         {/* Categories & Items */}
@@ -782,7 +857,6 @@ const PublicProfile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* File Viewer Modal - Supports all file types */}
       <FileViewer
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
@@ -792,6 +866,40 @@ const PublicProfile = () => {
           type: selectedItem.type as "url" | "text" | "pdf" | "image" | "video" | "audio" | "others" | "wifi" | "largefile"
         } : null}
       />
+
+      {/* Floating Edit Button for Owner and Approved Editors */}
+      {(userRole === "owner" || userRole === "editor") && (
+        <Button
+          size="sm"
+          onClick={() => setIsEditModalOpen(true)}
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-2xl bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 flex items-center gap-2"
+        >
+          <Edit3 className="w-4 h-4" />
+          <span className="font-semibold text-xs">Edit Page</span>
+          {userRole === "editor" && (
+            <Badge className="bg-primary-foreground/20 text-primary-foreground text-[10px] py-0 px-1.5 ml-0.5">
+              Editor
+            </Badge>
+          )}
+        </Button>
+      )}
+
+      {/* In-page Edit QR Webpage Modal */}
+      {qrPageData && (
+        <EditQRPageModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          qrPageId={qrPageData.id}
+          initialTitle={qrPageData.title || "Untitled QR"}
+          initialItems={items.map((i) => ({ ...i }))}
+          ownerId={qrPageData.user_id}
+          onSaveSuccess={() => {
+            if (qrPageData?.id) {
+              fetchPublicProfileItems(qrPageData.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

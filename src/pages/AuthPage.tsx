@@ -69,14 +69,18 @@ const AuthPage = () => {
     }
   }, []);
 
+  const getTargetRedirect = () => {
+    return searchParams.get("redirect") || searchParams.get("returnUrl") || "/dashboard";
+  };
+
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
       // Clear processing state when user is authenticated
       setIsProcessingOAuth(false);
-      navigate("/dashboard", { replace: true });
+      navigate(getTargetRedirect(), { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, searchParams]);
 
   // Detect session token injected by the native Android WebView wrapper
   useEffect(() => {
@@ -87,24 +91,24 @@ const AuthPage = () => {
         !!localStorage.getItem("supabase.auth.token");
       if (hasToken) {
         setIsProcessingOAuth(true);
-        navigate("/dashboard", { replace: true });
+        navigate(getTargetRedirect(), { replace: true });
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   // Listen for Supabase auth state changes from injected sessions
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
         setIsProcessingOAuth(true);
-        navigate("/dashboard", { replace: true });
+        navigate(getTargetRedirect(), { replace: true });
       }
     });
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   // Listen for native Google Sign-In events from Flutter bridge
   useEffect(() => {
@@ -264,8 +268,8 @@ const AuthPage = () => {
           }
           resetRecaptcha();
         } else {
-          toast.success("Account created! Redirecting to dashboard...");
-          navigate("/dashboard");
+          toast.success("Account created!");
+          navigate(getTargetRedirect());
         }
       } else {
         const { error } = await signIn(email, password);
@@ -278,7 +282,7 @@ const AuthPage = () => {
           resetRecaptcha();
         } else {
           toast.success("Welcome back!");
-          navigate("/dashboard");
+          navigate(getTargetRedirect());
         }
       }
     } catch (err) {
