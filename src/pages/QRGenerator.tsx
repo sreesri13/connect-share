@@ -1454,7 +1454,15 @@ const QRGenerator = () => {
                     </CardHeader>
 
                     <CardContent className="p-3.5 sm:p-6 space-y-4">
-                      {Object.entries(groupedItems).map(([categoryName, items]) => (
+                      {Object.entries(groupedItems).length === 0 ? (
+                        <div className="py-8 text-center space-y-3">
+                          <p className="text-sm text-muted-foreground">No content items found in your profile yet.</p>
+                          <Button onClick={() => navigate("/dashboard")} size="sm">
+                            Add Web URLs & Content in Profile
+                          </Button>
+                        </div>
+                      ) : (
+                        Object.entries(groupedItems).map(([categoryName, items]) => (
                         <div key={categoryName} className="space-y-2">
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -1540,7 +1548,7 @@ const QRGenerator = () => {
                             })}
                           </ul>
                         </div>
-                      ))}
+                      )))}
                     </CardContent>
                   </Card>
                 </TabsContent>

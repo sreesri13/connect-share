@@ -268,15 +268,14 @@ export const QRCodesSection = ({ userId }: QRCodesSectionProps) => {
           .or("is_deleted.eq.false,is_deleted.is.null");
 
         sharedPagesData = sharedRes || [];
-
         const ownerUserIds = Array.from(new Set(sharedPagesData.map((p: any) => p.user_id)));
         if (ownerUserIds.length > 0) {
           const { data: profs } = await supabase
             .from("profiles")
-            .select("user_id, full_name, username")
+            .select("user_id, display_name")
             .in("user_id", ownerUserIds);
           (profs || []).forEach((pr: any) => {
-            ownerMap[pr.user_id] = pr.full_name || pr.username || "Owner";
+            ownerMap[pr.user_id] = pr.display_name || "Owner";
           });
         }
       }
