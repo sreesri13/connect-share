@@ -1,7 +1,7 @@
 class AppConfig {
   static const String appName = 'ConnectHUB';
-  static const String appVersion = '1.0.8';
-  static const int buildNumber = 8;
+  static const String appVersion = '1.0.9';
+  static const int buildNumber = 9;
 
   // Supabase Configuration (synced with .env)
   static const String supabaseUrl = String.fromEnvironment(

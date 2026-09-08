@@ -198,25 +198,32 @@ class WebViewAuthBridge {
 
       return AuthBridgeResult(success: true);
     } on PlatformException catch (e) {
-      final msg = 'Google Sign-In Error (${e.code}): ${e.message ?? 'Check Google Cloud SHA-1 & OAuth Consent'}';
+      final msg = 'Google Sign-In (${e.code}): ${e.message}';
       if (kDebugMode) {
-        print('[WebViewAuthBridge] PlatformException: $msg');
+        print('[WebViewAuthBridge] Native Google Sign-In error: $msg. Falling back to Supabase Web Google OAuth...');
       }
+      // Seamlessly fall back to Supabase Web Google OAuth so user is never blocked
       if (controller != null) {
-        await controller.evaluateJavascript(
-          source: "window.dispatchEvent(new CustomEvent('googleSignInFailed', { detail: { error: ${jsonEncode(msg)} } }));",
+        final redirectUrl = Uri.encodeComponent('${AppConfig.productionWebsiteUrl}/dashboard');
+        final oauthUrl = '${AppConfig.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=$redirectUrl';
+        await controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(oauthUrl)),
         );
+        return AuthBridgeResult(success: true);
       }
       return AuthBridgeResult(success: false, errorMessage: msg);
     } catch (e) {
       final msg = 'Google Sign-In Error: $e';
       if (kDebugMode) {
-        print('[WebViewAuthBridge] $msg');
+        print('[WebViewAuthBridge] $msg. Falling back to Supabase Web Google OAuth...');
       }
       if (controller != null) {
-        await controller.evaluateJavascript(
-          source: "window.dispatchEvent(new CustomEvent('googleSignInFailed', { detail: { error: ${jsonEncode(msg)} } }));",
+        final redirectUrl = Uri.encodeComponent('${AppConfig.productionWebsiteUrl}/dashboard');
+        final oauthUrl = '${AppConfig.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=$redirectUrl';
+        await controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(oauthUrl)),
         );
+        return AuthBridgeResult(success: true);
       }
       return AuthBridgeResult(success: false, errorMessage: msg);
     }

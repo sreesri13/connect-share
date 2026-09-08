@@ -43,3 +43,6 @@ android/.gradle/
 # Large migration video files (>100MB)
 supabase-migration/large_videos/
 
+# Duplicate unhyphenated release build copies (already tracked as -release.apk/.aab)
+release-builds/ConnectHUB-v1.0.9.apk
+release-builds/ConnectHUB-v1.0.9.aab

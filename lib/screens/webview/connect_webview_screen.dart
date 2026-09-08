@@ -35,11 +35,16 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
   String _errorMessage = '';
 
   bool _isOffline = false;
-  bool _showReconnectedBanner = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   DateTime? _lastBackPressTime;
   final WebViewAuthBridge _authBridge = WebViewAuthBridge();
+
+  Timer? _offlineToastTimer;
+  bool _showOfflineToast = false;
+
+  Timer? _doubleBackToastTimer;
+  bool _showDoubleBackToast = false;
 
   String _currentUrl = AppConfig.productionWebsiteUrl;
   String _targetInitialUrl = AppConfig.productionWebsiteUrl;
@@ -60,7 +65,41 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
+    _offlineToastTimer?.cancel();
+    _doubleBackToastTimer?.cancel();
     super.dispose();
+  }
+
+  /// Trigger floating offline notification at bottom for 2 seconds
+  void _triggerOfflineBottomNotification() {
+    _offlineToastTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _showOfflineToast = true;
+    });
+    _offlineToastTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showOfflineToast = false;
+        });
+      }
+    });
+  }
+
+  /// Trigger floating double-back exit notification at bottom for 2 seconds
+  void _triggerDoubleBackToast() {
+    _doubleBackToastTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _showDoubleBackToast = true;
+    });
+    _doubleBackToastTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showDoubleBackToast = false;
+        });
+      }
+    });
   }
 
   /// Request highest supported refresh rate (90Hz / 120Hz)
@@ -107,15 +146,6 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
       if (isOfflineNow != _isOffline) {
         setState(() {
           if (!isOfflineNow && _isOffline) {
-            // Transitioned from offline to online
-            _showReconnectedBanner = true;
-            Timer(const Duration(seconds: 3), () {
-              if (mounted) {
-                setState(() {
-                  _showReconnectedBanner = false;
-                });
-              }
-            });
             // Auto reload when reconnected to refresh stale cache
             if (_hasError) {
               _reloadWebView();
@@ -123,6 +153,9 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
           }
           _isOffline = isOfflineNow;
         });
+        if (isOfflineNow) {
+          _triggerOfflineBottomNotification();
+        }
       }
     });
   }
@@ -179,40 +212,12 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         clean.contains('/profile-dashboard');
   }
 
-  /// Native Google Sign In flow with Supabase session injection
+  /// Native Google Sign In flow with Supabase session injection & fallback
   Future<void> _handleGoogleSignIn() async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            SizedBox(width: 12),
-            Text('Signing in with Google...'),
-          ],
-        ),
-        duration: Duration(seconds: 4),
-        backgroundColor: Color(0xFF1E293B),
-      ),
-    );
-
     final result = await _authBridge.handleNativeGoogleSignIn(_webViewController);
-    if (!result.success && mounted) {
-      if (!result.cancelled) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(result.errorMessage ?? 'Google Sign-In was cancelled or encountered an error.'),
-            backgroundColor: const Color(0xFFEF4444),
-            duration: const Duration(seconds: 4),
-          ),
-        );
+    if (!result.success && mounted && !result.cancelled) {
+      if (kDebugMode) {
+        print('[ConnectWebView] Native Google sign in reported: ${result.errorMessage}');
       }
     }
   }
@@ -311,159 +316,6 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     }
   }
 
-  /// Show website-themed exit confirmation dialog with Cancel & Exit buttons
-  Future<void> _showExitConfirmationDialog() async {
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF334155),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  blurRadius: 28,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Glowing Icon Badge
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.power_settings_new_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Exit ConnectHUB',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Are you sure you want to exit the application?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    // Cancel Button
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF334155)),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          backgroundColor: const Color(0xFF1E293B),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Color(0xFFE2E8F0),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Exit / OK Button
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(dialogContext).pop();
-                            SystemNavigator.pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Exit',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   /// Android Back Navigation handling
   Future<void> _handleBackPress() async {
     if (_webViewController == null) {
@@ -473,57 +325,82 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
 
     final currentWebUri = await _webViewController!.getUrl();
     final currentUrl = currentWebUri?.toString() ?? _currentUrl;
+    final isSignedIn = await _authBridge.hasSavedSession();
 
-    // 1. Unauthenticated or Landing Home Page:
-    // Double click back to exit to phone home screen; do not show previous redirect pages
+    // 1. Signed-in User: Stop at /dashboard and never exit to landing page
+    if (isSignedIn) {
+      // If currently on Dashboard: Prompt double back to exit
+      if (_isDashboardPage(currentUrl)) {
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          _triggerDoubleBackToast();
+        } else {
+          await SystemNavigator.pop();
+        }
+        return;
+      }
+
+      // If currently on an authenticated subpage:
+      final canGoBack = await _webViewController!.canGoBack();
+      if (canGoBack) {
+        final history = await _webViewController!.getCopyBackForwardList();
+        final currentIndex = history?.currentIndex ?? 0;
+        if (currentIndex > 0 && history?.list != null) {
+          final prevItem = history!.list![currentIndex - 1];
+          final prevUrl = prevItem.url?.toString() ?? '';
+          // If previous page in history is public landing or auth, stop at dashboard
+          if (_isLandingPage(prevUrl)) {
+            await _webViewController!.loadUrl(
+              urlRequest: URLRequest(
+                url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+              ),
+            );
+            return;
+          }
+        }
+        await _webViewController!.goBack();
+        return;
+      }
+
+      // Cannot go back further: Halt at dashboard
+      await _webViewController!.loadUrl(
+        urlRequest: URLRequest(
+          url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+        ),
+      );
+      return;
+    }
+
+    // 2. Unauthenticated User: Landing page prompt double back to exit
     if (_isLandingPage(currentUrl)) {
       final now = DateTime.now();
       if (_lastBackPressTime == null ||
           now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
         _lastBackPressTime = now;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 18),
-                  SizedBox(width: 8),
-                  Text('Press back again to exit ConnectHUB'),
-                ],
-              ),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: const Color(0xFF1E293B).withValues(alpha: 0.95),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0xFF334155)),
-              ),
-            ),
-          );
-        }
+        _triggerDoubleBackToast();
       } else {
         await SystemNavigator.pop();
       }
       return;
     }
 
-    // 2. Profile Dashboard (Root Authenticated Page):
-    // Show website-themed exit confirmation popup
-    if (_isDashboardPage(currentUrl)) {
-      _showExitConfirmationDialog();
-      return;
-    }
-
-    // 3. Authenticated Subpages:
-    // Back button navigates back to previous page in history
     final canGoBack = await _webViewController!.canGoBack();
     if (canGoBack) {
       await _webViewController!.goBack();
       return;
     }
 
-    // 4. Top-level Fallback
-    _showExitConfirmationDialog();
+    // Top-level fallback for unauthenticated user
+    final now = DateTime.now();
+    if (_lastBackPressTime == null ||
+        now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+      _triggerDoubleBackToast();
+    } else {
+      await SystemNavigator.pop();
+    }
   }
 
   @override
@@ -595,11 +472,19 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         );
                         controller.addJavaScriptHandler(
                           handlerName: 'onAuthStateChange',
-                          callback: (args) {
+                          callback: (args) async {
                             if (args.isNotEmpty && args[0] != null) {
                               final sessionStr = args[0].toString();
                               if (sessionStr.isNotEmpty && sessionStr != 'null') {
-                                _authBridge.saveSessionJson(sessionStr);
+                                await _authBridge.saveSessionJson(sessionStr);
+                                // Ensure user is navigated directly to dashboard on sign in
+                                if (_isLandingPage(_currentUrl)) {
+                                  controller.loadUrl(
+                                    urlRequest: URLRequest(
+                                      url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+                                    ),
+                                  );
+                                }
                               }
                             }
                           },
@@ -653,19 +538,15 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                           source: WebViewAuthBridge.getAuthInterceptorScript(),
                         );
 
-                        // Synchronize signout state if navigated to root or auth
-                        if (urlStr.endsWith('/auth') ||
-                            urlStr == AppConfig.productionWebsiteUrl ||
-                            urlStr == '${AppConfig.productionWebsiteUrl}/') {
-                          final tokenCheck = await controller.evaluateJavascript(
-                            source:
-                                "localStorage.getItem('sb-${AppConfig.supabaseProjectId}-auth-token')",
+                        // If user has saved session and lands on landing or auth page, redirect directly to dashboard
+                        final isSignedIn = await _authBridge.hasSavedSession();
+                        if (isSignedIn && _isLandingPage(urlStr)) {
+                          await controller.loadUrl(
+                            urlRequest: URLRequest(
+                              url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+                            ),
                           );
-                          if (tokenCheck == null ||
-                              tokenCheck == 'null' ||
-                              tokenCheck.toString().isEmpty) {
-                            // User is logged out on web
-                          }
+                          return;
                         }
                       },
                       onProgressChanged: (controller, progress) {
@@ -697,22 +578,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         final uri = navigationAction.request.url;
                         if (uri == null) return NavigationActionPolicy.ALLOW;
 
-                        final urlString = uri.toString();
-
-                        // 1. Intercept Supabase Google OAuth Authorization
-                        if (urlString.contains('supabase.co/auth/v1/authorize') &&
-                            urlString.contains('provider=google')) {
-                          _handleGoogleSignIn();
-                          return NavigationActionPolicy.CANCEL;
-                        }
-
-                        // 2. Intercept Google Account URLs
-                        if (urlString.contains('accounts.google.com/o/oauth2')) {
-                          _handleGoogleSignIn();
-                          return NavigationActionPolicy.CANCEL;
-                        }
-
-                        // 3. Handle external non-http URI schemes
+                        // 1. Handle external non-http URI schemes
                         final scheme = uri.scheme.toLowerCase();
                         if (scheme == 'tel' ||
                             scheme == 'mailto' ||
@@ -726,15 +592,17 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                           return NavigationActionPolicy.CANCEL;
                         }
 
-                        // 4. Handle internal web routes
+                        // 2. Allow internal web routes, Supabase auth, and Google OAuth
                         final host = uri.host.toLowerCase();
                         if (host.contains('connect-hub-gamma.vercel.app') ||
                             host.contains('connecthub.app') ||
-                            host.contains('supabase.co')) {
+                            host.contains('supabase.co') ||
+                            host.contains('accounts.google.com') ||
+                            host.contains('google.com')) {
                           return NavigationActionPolicy.ALLOW;
                         }
 
-                        // 5. Open external links in default external browser
+                        // 3. Open other external links in default external browser
                         if (await canLaunchUrl(uri)) {
                           await launchUrl(uri, mode: LaunchMode.externalApplication);
                           return NavigationActionPolicy.CANCEL;
@@ -788,98 +656,117 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                       ),
                     ),
 
-                  // Offline Status Pill Banner
-                  if (_isOffline)
+                  // Floating Offline Notification (bottom floating pill, auto-dismisses in 2s)
+                  if (_showOfflineToast)
                     Positioned(
-                      top: 12,
-                      left: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                      bottom: 24,
+                      left: 20,
+                      right: 20,
+                      child: AnimatedOpacity(
+                        opacity: _showOfflineToast ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFF59E0B),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.wifi_off_rounded,
-                              color: Color(0xFFF59E0B),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Text(
-                                'You are currently offline • Viewing cached data',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.wifi_off_rounded,
+                                color: Color(0xFFF59E0B),
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Make sure internet is connected',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, color: Colors.white70, size: 18),
-                              onPressed: _reloadWebView,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
 
-                  // Reconnected Status Banner
-                  if (_showReconnectedBanner && !_isOffline)
+                  // Floating Double Back To Exit Notification (bottom floating pill, auto-dismisses in 2s)
+                  if (_showDoubleBackToast)
                     Positioned(
-                      top: 12,
-                      left: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF065F46).withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                      bottom: 24,
+                      left: 20,
+                      right: 20,
+                      child: AnimatedOpacity(
+                        opacity: _showDoubleBackToast ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF38BDF8),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.wifi_rounded,
-                              color: Color(0xFF10B981),
-                              size: 20,
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Connection restored • Syncing latest data...',
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.touch_app_rounded,
+                                color: Color(0xFF38BDF8),
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                'Press back again to exit ConnectHUB',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.2,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
