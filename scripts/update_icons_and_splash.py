@@ -22,32 +22,36 @@ def create_splash(src_img, bg_color, width, height):
     return splash
 
 def main():
-    src_path = "public/Logos/New ConnectHub Logo.png"
-    if not os.path.exists(src_path):
-        print(f"Error: {src_path} not found!")
+    # 1. Launcher Icon for APK and AAB: OneConnectHubLogo.png
+    app_icon_src = "public/Logos/OneConnectHubLogo.png"
+    # 2. Splash Screen Logo: ConnectHub Web Logo.png
+    splash_src = "public/Logos/ConnectHub Web Logo.png"
+
+    if not os.path.exists(app_icon_src):
+        print(f"Error: {app_icon_src} not found!")
+        return
+    if not os.path.exists(splash_src):
+        print(f"Error: {splash_src} not found!")
         return
 
-    src_img = Image.open(src_path).convert("RGBA")
+    icon_img = Image.open(app_icon_src).convert("RGBA")
+    splash_img_src = Image.open(splash_src).convert("RGBA")
     bg_color = (15, 23, 42, 255) # #0F172A
 
-    # 1. Update release-builds and assets 512x512 icon
+    # 1. Update release-builds 512x512 icon for APK/AAB store listing
     os.makedirs("release-builds", exist_ok=True)
-    icon_512 = src_img.resize((512, 512), Image.Resampling.LANCZOS)
+    icon_512 = icon_img.resize((512, 512), Image.Resampling.LANCZOS)
     icon_512.save("release-builds/connecthub_app_icon_512.png")
-    
+    print("Updated release-builds/connecthub_app_icon_512.png from OneConnectHubLogo.png")
+
+    # 2. Update Splash screen Flutter asset from ConnectHub Web Logo.png
     os.makedirs("assets/logos", exist_ok=True)
-    icon_512.save("assets/logos/connecthub_web_logo.png")
-    print("Updated 512x512 app icons in release-builds and assets/logos")
+    splash_asset_512 = splash_img_src.resize((512, 512), Image.Resampling.LANCZOS)
+    splash_asset_512.save("assets/logos/connecthub_web_logo.png")
+    print("Updated assets/logos/connecthub_web_logo.png from ConnectHub Web Logo.png")
 
-    # 2. Update Android ic_launcher_background.xml
-    bg_xml_path = "android/app/src/main/res/values/ic_launcher_background.xml"
-    with open(bg_xml_path, "w", encoding="utf-8") as f:
-        f.write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#1A90C7</color>\n</resources>\n')
-    print("Updated ic_launcher_background.xml to #1A90C7")
-
+    # 3. Android Mipmap Launcher Icons (from OneConnectHubLogo.png)
     res_dir = "android/app/src/main/res"
-
-    # 3. Mipmap Launcher Icon sizes
     mipmap_sizes = {
         "mipmap-mdpi": (48, 108),
         "mipmap-hdpi": (72, 162),
@@ -59,9 +63,9 @@ def main():
     for folder, (sq_size, fg_size) in mipmap_sizes.items():
         folder_path = os.path.join(res_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
-        
+
         # ic_launcher.png (Square)
-        sq_img = src_img.resize((sq_size, sq_size), Image.Resampling.LANCZOS)
+        sq_img = icon_img.resize((sq_size, sq_size), Image.Resampling.LANCZOS)
         sq_img.save(os.path.join(folder_path, "ic_launcher.png"))
 
         # ic_launcher_round.png (Circular)
@@ -71,15 +75,15 @@ def main():
         # ic_launcher_foreground.png (Foreground for adaptive icon - scaled to 72% for safe zone)
         fg_canvas = Image.new("RGBA", (fg_size, fg_size), (0, 0, 0, 0))
         logo_scale = int(fg_size * 0.72)
-        logo_fg = src_img.resize((logo_scale, logo_scale), Image.Resampling.LANCZOS)
+        logo_fg = icon_img.resize((logo_scale, logo_scale), Image.Resampling.LANCZOS)
         fg_x = (fg_size - logo_fg.width) // 2
         fg_y = (fg_size - logo_fg.height) // 2
         fg_canvas.paste(logo_fg, (fg_x, fg_y), logo_fg)
         fg_canvas.save(os.path.join(folder_path, "ic_launcher_foreground.png"))
 
-        print(f"Updated {folder}")
+        print(f"Updated {folder} launcher icons from OneConnectHubLogo.png")
 
-    # 4. Splash Screen sizes
+    # 4. Android Native Splash Screen sizes (from ConnectHub Web Logo.png)
     splash_sizes = {
         "drawable": (512, 512),
         "drawable-port-mdpi": (320, 480),
@@ -97,31 +101,12 @@ def main():
     for folder, (w, h) in splash_sizes.items():
         folder_path = os.path.join(res_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
-        splash_img = create_splash(src_img, bg_color, w, h)
+        splash_img = create_splash(splash_img_src, bg_color, w, h)
         splash_img.save(os.path.join(folder_path, "splash.png"))
-        print(f"Updated splash in {folder}")
+        print(f"Updated splash in {folder} from ConnectHub Web Logo.png")
 
-    # 5. Web PWA Icons
-    web_icons = {
-        "public/pwa-192x192.png": (192, 192),
-        "public/pwa-512x512.png": (512, 512),
-        "public/pwa-maskable-192x192.png": (192, 192),
-        "public/pwa-maskable-512x512.png": (512, 512),
-        "public/apple-touch-icon.png": (180, 180),
-        "public/favicon.png": (64, 64),
-    }
-
-    for path, (w, h) in web_icons.items():
-        web_img = src_img.resize((w, h), Image.Resampling.LANCZOS)
-        web_img.save(path)
-        print(f"Updated web icon {path}")
-
-    # Generate favicon.ico (multi-resolution ICO)
-    ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64)]
-    src_img.save("public/favicon.ico", format="ICO", sizes=ico_sizes)
-    print("Updated public/favicon.ico")
-
-    print("\nAll icons, assets, and splash screens updated successfully from New ConnectHub Logo.png!")
+    print("\n[SUCCESS] APK/AAB Launcher Icons updated with OneConnectHubLogo.png")
+    print("[SUCCESS] Splash screens updated with ConnectHub Web Logo.png")
 
 if __name__ == "__main__":
     main()

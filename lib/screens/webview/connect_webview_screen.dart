@@ -29,7 +29,6 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
   InAppWebViewController? _webViewController;
   PullToRefreshController? _pullToRefreshController;
 
-  double _loadingProgress = 0.0;
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -130,7 +129,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     final isSignedIn = await _authBridge.hasSavedSession();
     setState(() {
       if (isSignedIn) {
-        _targetInitialUrl = '${AppConfig.productionWebsiteUrl}/dashboard';
+        _targetInitialUrl = '${AppConfig.productionWebsiteUrl}/my-profile';
       } else {
         _targetInitialUrl = '${AppConfig.productionWebsiteUrl}/';
       }
@@ -204,12 +203,12 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         clean == 'https://connecthub.app/';
   }
 
-  /// Check if the given URL corresponds to the Profile Dashboard
-  bool _isDashboardPage(String url) {
-    final clean = url.trim().toLowerCase();
-    return clean.contains('/dashboard') ||
-        clean.endsWith('/dashboard') ||
-        clean.contains('/profile-dashboard');
+  /// Check if the given URL corresponds to My Profile screen
+  bool _isMyProfilePage(String url) {
+    final clean = url.trim().toLowerCase().replaceAll(RegExp(r'#.*$'), '').replaceAll(RegExp(r'\?.*$'), '');
+    return clean.endsWith('/my-profile') ||
+        clean.endsWith('/profile') ||
+        clean.contains('/my-profile');
   }
 
   /// Native Google Sign In flow with Supabase session injection & fallback
@@ -327,10 +326,12 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
     final currentUrl = currentWebUri?.toString() ?? _currentUrl;
     final isSignedIn = await _authBridge.hasSavedSession();
 
-    // 1. Signed-in User: Stop at /dashboard and never exit to landing page
+    // 1. Signed-in User: Double back exit ONLY on My Profile (/my-profile).
+    // All other pages (/dashboard, /my-qr-codes, /qr, /qr-business, /qr-payments, etc.)
+    // navigate back to the previous page on single press without exit prompt.
     if (isSignedIn) {
-      // If currently on Dashboard: Prompt double back to exit
-      if (_isDashboardPage(currentUrl)) {
+      // If currently on My Profile: Prompt double back to exit
+      if (_isMyProfilePage(currentUrl)) {
         final now = DateTime.now();
         if (_lastBackPressTime == null ||
             now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
@@ -342,7 +343,7 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         return;
       }
 
-      // If currently on an authenticated subpage:
+      // If currently on any other page: Always go back to previous page on single press
       final canGoBack = await _webViewController!.canGoBack();
       if (canGoBack) {
         final history = await _webViewController!.getCopyBackForwardList();
@@ -350,11 +351,11 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         if (currentIndex > 0 && history?.list != null) {
           final prevItem = history!.list![currentIndex - 1];
           final prevUrl = prevItem.url?.toString() ?? '';
-          // If previous page in history is public landing or auth, stop at dashboard
+          // If previous page in history is public landing or auth, route cleanly to My Profile
           if (_isLandingPage(prevUrl)) {
             await _webViewController!.loadUrl(
               urlRequest: URLRequest(
-                url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+                url: WebUri('${AppConfig.productionWebsiteUrl}/my-profile'),
               ),
             );
             return;
@@ -364,10 +365,10 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
         return;
       }
 
-      // Cannot go back further: Halt at dashboard
+      // Cannot go back further: Navigate directly to /my-profile
       await _webViewController!.loadUrl(
         urlRequest: URLRequest(
-          url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+          url: WebUri('${AppConfig.productionWebsiteUrl}/my-profile'),
         ),
       );
       return;
@@ -538,12 +539,12 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                           source: WebViewAuthBridge.getAuthInterceptorScript(),
                         );
 
-                        // If user has saved session and lands on landing or auth page, redirect directly to dashboard
+                        // If user has saved session and lands on landing or auth page, redirect directly to /my-profile
                         final isSignedIn = await _authBridge.hasSavedSession();
                         if (isSignedIn && _isLandingPage(urlStr)) {
                           await controller.loadUrl(
                             urlRequest: URLRequest(
-                              url: WebUri('${AppConfig.productionWebsiteUrl}/dashboard'),
+                              url: WebUri('${AppConfig.productionWebsiteUrl}/my-profile'),
                             ),
                           );
                           return;
@@ -553,9 +554,6 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                         if (progress == 100) {
                           _pullToRefreshController?.endRefreshing();
                         }
-                        setState(() {
-                          _loadingProgress = progress / 100;
-                        });
                       },
                       onReceivedError: (controller, request, error) {
                         _pullToRefreshController?.endRefreshing();
@@ -640,19 +638,13 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
                       },
                     ),
 
-                  // Top Progress Bar
-                  if (_isLoading && _loadingProgress < 1.0 && !_hasError)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: LinearProgressIndicator(
-                        value: _loadingProgress > 0 ? _loadingProgress : null,
-                        backgroundColor: Colors.transparent,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF8B5CF6),
+                  // Centered Morphing Icon Loader (cycles QR, Web, Search, Hub, Share)
+                  if (_isLoading && !_hasError)
+                    const Positioned.fill(
+                      child: IgnorePointer(
+                        child: Center(
+                          child: _CenteredMorphingLoader(),
                         ),
-                        minHeight: 2.5,
                       ),
                     ),
 
@@ -854,6 +846,151 @@ class _ConnectWebViewScreenState extends State<ConnectWebViewScreen>
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MorphIconItem {
+  final IconData icon;
+  final Color color;
+  final String label;
+  const _MorphIconItem(this.icon, this.color, this.label);
+}
+
+/// Centered morphic loader that smoothly rotates and cycles through
+/// QR code, website, search, connect/hub, and share icons in a continuous loop.
+class _CenteredMorphingLoader extends StatefulWidget {
+  const _CenteredMorphingLoader();
+
+  @override
+  State<_CenteredMorphingLoader> createState() => _CenteredMorphingLoaderState();
+}
+
+class _CenteredMorphingLoaderState extends State<_CenteredMorphingLoader>
+    with SingleTickerProviderStateMixin {
+  int _currentIndex = 0;
+  Timer? _timer;
+  late AnimationController _spinController;
+
+  static const List<_MorphIconItem> _items = [
+    _MorphIconItem(Icons.qr_code_2_rounded, Color(0xFF8B5CF6), 'QR Code'),
+    _MorphIconItem(Icons.language_rounded, Color(0xFF38BDF8), 'Website'),
+    _MorphIconItem(Icons.search_rounded, Color(0xFF10B981), 'Search'),
+    _MorphIconItem(Icons.hub_rounded, Color(0xFFA855F7), 'ConnectHUB'),
+    _MorphIconItem(Icons.share_rounded, Color(0xFFEC4899), 'Share'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+
+    _timer = Timer.periodic(const Duration(milliseconds: 750), (timer) {
+      if (!mounted) return;
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % _items.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = _items[_currentIndex];
+
+    return Container(
+      width: 96,
+      height: 96,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: current.color.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: current.color.withValues(alpha: 0.25),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Orbital rotating sweep gradient ring
+          RotationTransition(
+            turns: _spinController,
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    current.color.withValues(alpha: 0.0),
+                    current.color.withValues(alpha: 0.8),
+                  ],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(2.5),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Morphing animated icon
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) {
+              return ScaleTransition(
+                scale: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutBack,
+                ),
+                child: RotationTransition(
+                  turns: Tween<double>(begin: -0.15, end: 0.0).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  ),
+                ),
+              );
+            },
+            child: Icon(
+              current.icon,
+              key: ValueKey<int>(_currentIndex),
+              size: 34,
+              color: current.color,
+            ),
+          ),
+        ],
       ),
     );
   }

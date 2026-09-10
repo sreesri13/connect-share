@@ -70,7 +70,7 @@ const AuthPage = () => {
   }, []);
 
   const getTargetRedirect = () => {
-    return searchParams.get("redirect") || searchParams.get("returnUrl") || "/dashboard";
+    return searchParams.get("redirect") || searchParams.get("returnUrl") || "/my-profile";
   };
 
   // Redirect if already logged in

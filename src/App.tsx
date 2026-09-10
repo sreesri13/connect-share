@@ -38,10 +38,15 @@ const App = () => (
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard section="analytics" />} />
+              <Route path="/my-profile" element={<Dashboard section="profile" />} />
+              <Route path="/my-qr-codes" element={<Dashboard section="qrcodes" />} />
+              <Route path="/qr-list" element={<Dashboard section="qrcodes" />} />
+              <Route path="/qr-business" element={<Dashboard section="qrbusiness" />} />
+              <Route path="/qr-payments" element={<Dashboard section="qrpayments" />} />
+              <Route path="/qr-scanner" element={<Dashboard section="qrscanner" />} />
+              <Route path="/settings" element={<Dashboard section="settings" />} />
               <Route path="/qr" element={<QRGenerator />} />
-              <Route path="/qr-list" element={<QRCodesList />} />
-              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/demo" element={<DemoPage />} />
               <Route path="/p/:profileId" element={<PublicProfile />} />
               <Route path="/pay" element={<PaymentRedirect />} />

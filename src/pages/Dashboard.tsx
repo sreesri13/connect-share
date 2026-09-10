@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   QrCode,
   Folder,
@@ -32,21 +32,41 @@ import { QRBusinessSection } from "@/components/dashboard/QRBusinessSection";
 import { QRScannerSection } from "@/components/dashboard/QRScannerSection";
 import { cn } from "@/lib/utils";
 
-type DashboardSection = "profile" | "qrcodes" | "qrscanner" | "qrpayments" | "qrbusiness" | "analytics" | "settings";
+export type DashboardSection = "profile" | "qrcodes" | "qrscanner" | "qrpayments" | "qrbusiness" | "analytics" | "settings";
 
 interface Profile {
   display_name: string | null;
   bio: string | null;
 }
 
-const Dashboard = () => {
+interface DashboardProps {
+  section?: DashboardSection;
+}
+
+const Dashboard = ({ section }: DashboardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signOut, loading: authLoading } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<DashboardSection>("profile");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Compute active section based on route path or prop
+  const getActiveSection = (): DashboardSection => {
+    if (section) return section;
+    const path = location.pathname.toLowerCase();
+    if (path === "/my-profile") return "profile";
+    if (path === "/my-qr-codes" || path === "/qr-list") return "qrcodes";
+    if (path === "/qr-scanner") return "qrscanner";
+    if (path === "/qr-payments") return "qrpayments";
+    if (path === "/qr-business") return "qrbusiness";
+    if (path === "/dashboard") return "analytics";
+    if (path === "/settings") return "settings";
+    return "profile";
+  };
+
+  const activeSection = getActiveSection();
 
   useEffect(() => {
     if (!user && !authLoading) {
@@ -123,13 +143,13 @@ const Dashboard = () => {
   const userInitials = displayName.slice(0, 2).toUpperCase();
 
   const sidebarItems = [
-    { id: "profile" as DashboardSection, label: "My Profile", icon: Folder },
-    { id: "qrcodes" as DashboardSection, label: "QR Codes", icon: QrCode },
-    { id: "qrscanner" as DashboardSection, label: "QR Scanner", icon: ScanLine },
-    { id: "qrpayments" as DashboardSection, label: "QR Payments", icon: CreditCard },
-    { id: "qrbusiness" as DashboardSection, label: "QR Business", icon: Store },
-    { id: "analytics" as DashboardSection, label: "Dashboard", icon: BarChart3 },
-    { id: "settings" as DashboardSection, label: "Settings", icon: Settings },
+    { id: "profile" as DashboardSection, label: "My Profile", path: "/my-profile", icon: Folder },
+    { id: "qrcodes" as DashboardSection, label: "QR Codes", path: "/my-qr-codes", icon: QrCode },
+    { id: "qrscanner" as DashboardSection, label: "QR Scanner", path: "/qr-scanner", icon: ScanLine },
+    { id: "qrpayments" as DashboardSection, label: "QR Payments", path: "/qr-payments", icon: CreditCard },
+    { id: "qrbusiness" as DashboardSection, label: "QR Business", path: "/qr-business", icon: Store },
+    { id: "analytics" as DashboardSection, label: "Dashboard", path: "/dashboard", icon: BarChart3 },
+    { id: "settings" as DashboardSection, label: "Settings", path: "/settings", icon: Settings },
   ];
 
   const SidebarContent = () => (
@@ -149,7 +169,10 @@ const Dashboard = () => {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate(item.path);
+              }}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors min-h-[48px]",
                 activeSection === item.id
@@ -181,11 +204,11 @@ const Dashboard = () => {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setActiveSection("settings")}>
+            <DropdownMenuItem onClick={() => { setIsMobileMenuOpen(false); navigate("/settings"); }}>
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setActiveSection("settings")}>
+            <DropdownMenuItem onClick={() => { setIsMobileMenuOpen(false); navigate("/settings"); }}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </DropdownMenuItem>
@@ -244,7 +267,10 @@ const Dashboard = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate(item.path);
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors min-h-[48px]",
                   activeSection === item.id
@@ -276,11 +302,11 @@ const Dashboard = () => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setActiveSection("settings")}>
+              <DropdownMenuItem onClick={() => { setIsMobileMenuOpen(false); navigate("/settings"); }}>
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setActiveSection("settings")}>
+              <DropdownMenuItem onClick={() => { setIsMobileMenuOpen(false); navigate("/settings"); }}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
