@@ -307,6 +307,11 @@ const LandingPage = () => {
                     Code of Conduct
                   </Link>
                 </li>
+                <li>
+                  <Link to="/child-safety" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    Child Safety Standards
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -317,6 +322,9 @@ const LandingPage = () => {
                 <li className="text-sm text-muted-foreground">
                   support@connecthub.app
                 </li>
+                <li className="text-sm text-muted-foreground">
+                  Child Safety: sreeconnect360@gmail.com
+                </li>
               </ul>
             </div>
           </div>
@@ -324,7 +332,7 @@ const LandingPage = () => {
           {/* Bottom Bar */}
           <div className="pt-8 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-              © {new Date().getFullYear()} ConnectHUB. All rights reserved.
+              © {new Date().getFullYear()} ConnectHUB by SreeSri. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <Link to="/privacy-policy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
@@ -335,6 +343,9 @@ const LandingPage = () => {
               </Link>
               <Link to="/code-of-conduct" className="text-xs text-muted-foreground hover:text-primary transition-colors">
                 Conduct
+              </Link>
+              <Link to="/child-safety" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                Child Safety
               </Link>
             </div>
           </div>

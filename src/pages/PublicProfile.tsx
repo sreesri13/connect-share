@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play, Wifi, Copy, Check, Edit3 } from "lucide-react";
+import { QrCode, Link as LinkIcon, FileText, ExternalLink, User, File, Image, Video, Music, Loader2, Lock, Eye, EyeOff, Play, Wifi, Copy, Check, Edit3, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
 import { EditQRPageModal } from "@/components/qr/EditQRPageModal";
 import { Badge } from "@/components/ui/badge";
 import { RequestAccessBanner } from "@/components/qr/RequestAccessBanner";
+import { ReportContentModal } from "@/components/ReportContentModal";
 
 interface ProfileItem {
   id: string;
@@ -106,6 +107,7 @@ const PublicProfile = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [ownerName, setOwnerName] = useState("Owner");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Password protection states
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -805,23 +807,41 @@ const PublicProfile = () => {
           )}
         </div>
 
-        {/* Footer - conditional on show_footer_branding */}
-        {(qrPageData?.show_footer_branding !== false) && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-12 text-center"
-          >
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <QrCode className="w-4 h-4" />
-              <span className="text-sm">Powered by ConnectHUB</span>
-            </div>
-            <Button variant="link" className="mt-2 text-primary" asChild>
-              <a href="/">Create your own profile</a>
-            </Button>
-          </motion.div>
-        )}
+        {/* Footer - conditional on show_footer_branding with safety report options */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="mt-12 text-center space-y-3"
+        >
+          {qrPageData?.show_footer_branding !== false && (
+            <>
+              <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                <QrCode className="w-4 h-4" />
+                <span className="text-sm">Powered by ConnectHUB</span>
+              </div>
+              <div>
+                <Button variant="link" className="text-primary text-xs" asChild>
+                  <a href="/">Create your own profile</a>
+                </Button>
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-3 border-t border-border/20 max-w-xs mx-auto">
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="inline-flex items-center gap-1 hover:text-red-400 transition-colors"
+            >
+              <Flag className="w-3 h-3" />
+              Report Profile
+            </button>
+            <span>•</span>
+            <a href="/child-safety" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+              Child Safety
+            </a>
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* WiFi Credentials Dialog */}
@@ -919,6 +939,15 @@ const PublicProfile = () => {
           }}
         />
       )}
+
+      {/* Report Content / Child Safety Modal */}
+      <ReportContentModal
+        open={isReportModalOpen}
+        onOpenChange={setIsReportModalOpen}
+        reportedType="profile"
+        reportedId={profileId || qrPageData?.id || "unknown"}
+        reportedTitle={profile?.display_name || qrPageData?.title || "Public Profile"}
+      />
     </div>
   );
 };

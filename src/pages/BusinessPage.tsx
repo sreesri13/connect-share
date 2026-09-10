@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle, Search, ChevronUp } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Store, Lock, Eye, EyeOff, Clock, MapPin, Phone, Mail, Globe, Instagram, Facebook, Twitter, MessageCircle, Search, ChevronUp, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { QRExpiredScreen } from "@/components/qr/QRExpiredScreen";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchQRAccessInfo } from "@/hooks/useQRPermissions";
 import { RequestAccessBanner } from "@/components/qr/RequestAccessBanner";
+import { ReportContentModal } from "@/components/ReportContentModal";
 
 interface Category {
   id: string;
@@ -111,6 +112,7 @@ const BusinessPage = () => {
   const [qrIdForAccess, setQrIdForAccess] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [ownerName, setOwnerName] = useState("Owner");
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
@@ -998,15 +1000,28 @@ const BusinessPage = () => {
                 </div>
               )}
             </div>
-            <div className="mt-8 pt-4 border-t border-border/50 text-center">
+            <div className="mt-8 pt-4 border-t border-border/50 text-center space-y-2">
               <p className="text-xs text-muted-foreground">
                 © {new Date().getFullYear()} {pageData?.business_name || "Store"}. All rights reserved.
               </p>
               {(pageData?.show_footer_branding !== false) && (
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground">
                   Powered by <a href="/" className="text-primary hover:underline">ConnectHUB</a>
                 </p>
               )}
+              <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-2">
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="inline-flex items-center gap-1 hover:text-red-400 transition-colors"
+                >
+                  <Flag className="w-3 h-3" />
+                  Report Page
+                </button>
+                <span>•</span>
+                <a href="/child-safety" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                  Child Safety
+                </a>
+              </div>
             </div>
           </div>
         </footer>
@@ -1131,6 +1146,15 @@ const BusinessPage = () => {
           storeSlug={pageData.store_slug}
         />
       )}
+
+      {/* Report Modal */}
+      <ReportContentModal
+        open={isReportModalOpen}
+        onOpenChange={setIsReportModalOpen}
+        reportedType="business_page"
+        reportedId={pageData?.id || publicId || storeSlug || "unknown"}
+        reportedTitle={pageData?.business_name || pageTitle || "Business Page"}
+      />
     </div>
   );
 };

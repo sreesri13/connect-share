@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -193,18 +194,49 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                       onPressed: isUploading
                           ? null
                           : () async {
-                              final result = await FilePicker.platform.pickFiles();
-                              if (result != null && result.files.single.path != null) {
+                              File? fileToUpload;
+                              String? fileName;
+
+                              if (selectedType == ItemType.image) {
+                                final picker = ImagePicker();
+                                final picked = await picker.pickImage(
+                                  source: ImageSource.gallery,
+                                  maxWidth: 1920,
+                                  maxHeight: 1920,
+                                  imageQuality: 85,
+                                );
+                                if (picked != null) {
+                                  fileToUpload = File(picked.path);
+                                  fileName = picked.name;
+                                }
+                              } else if (selectedType == ItemType.video) {
+                                final picker = ImagePicker();
+                                final picked = await picker.pickVideo(source: ImageSource.gallery);
+                                if (picked != null) {
+                                  fileToUpload = File(picked.path);
+                                  fileName = picked.name;
+                                }
+                              } else {
+                                final result = await FilePicker.platform.pickFiles(
+                                  withData: false,
+                                  compressionQuality: 0,
+                                );
+                                if (result != null && result.files.single.path != null) {
+                                  fileToUpload = File(result.files.single.path!);
+                                  fileName = result.files.single.name;
+                                }
+                              }
+
+                              if (fileToUpload != null) {
                                 setModalState(() => isUploading = true);
                                 try {
-                                  final file = File(result.files.single.path!);
                                   final url = await _storageService.uploadFile(
                                     userId: widget.userId,
-                                    file: file,
+                                    file: fileToUpload,
                                   );
                                   contentController.text = url;
-                                  if (titleController.text.isEmpty) {
-                                    titleController.text = result.files.single.name;
+                                  if (titleController.text.isEmpty && fileName != null) {
+                                    titleController.text = fileName;
                                   }
                                 } catch (e) {
                                   if (ctx.mounted) {

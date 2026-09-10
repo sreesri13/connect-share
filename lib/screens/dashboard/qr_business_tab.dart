@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -138,13 +138,19 @@ class _QRBusinessTabState extends ConsumerState<QRBusinessTab> with SingleTicker
                     onPressed: isUploading
                         ? null
                         : () async {
-                            final result = await FilePicker.platform.pickFiles(type: FileType.image);
-                            if (result != null && result.files.single.path != null) {
+                            final picker = ImagePicker();
+                            final pickedFile = await picker.pickImage(
+                              source: ImageSource.gallery,
+                              maxWidth: 1024,
+                              maxHeight: 1024,
+                              imageQuality: 85,
+                            );
+                            if (pickedFile != null) {
                               setModalState(() => isUploading = true);
                               try {
                                 final url = await _storageService.uploadFile(
                                   userId: widget.userId,
-                                  file: File(result.files.single.path!),
+                                  file: File(pickedFile.path),
                                   folder: 'products',
                                 );
                                 imageUrlController.text = url;

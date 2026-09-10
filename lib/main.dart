@@ -15,12 +15,13 @@ void main() async {
     await FlutterDisplayMode.setHighRefreshRate();
   } catch (_) {}
 
-  // Set initial system UI styling for clean white launch screen
+  // Set initial system UI styling with edge-to-edge transparent system bars
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
